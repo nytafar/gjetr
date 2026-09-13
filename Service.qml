@@ -65,7 +65,10 @@ Item {
 
   // Runtime rotation of a rotatable Display (never monitors.lua).
   property int rotationSequence: 0
-  property var rotation: ({ requests: 0, transform: -1, error: "" })
+  property var rotationStatus: ({ requests: 0, transform: -1, error: "" })
+  property var touch: ({ transform: -1, devices: [], error: "" })
+  property int touchLogged: -1
+
   readonly property var agentListConfig: ConfigModel.agentList(activeLayout)
   readonly property var configErrors: collectConfigErrors(mainRead, layoutTexts, deckNames)
   readonly property string configSummary: "display " + display.name + (display.rotatable ? " rotatable" : "")
@@ -208,21 +211,47 @@ Item {
       if (sequence !== rotationSequence) return
       var monitor = code === 0 ? DeckPolicy.parseMonitor(text, output) : null
       if (!monitor) {
-        rotation = { requests: rotation.requests, transform: -1, error: "output " + output + " not in hyprctl monitors" }
+        rotationStatus = { requests: rotationStatus.requests, transform: -1, error: "output " + output + " not in hyprctl monitors" }
         return
       }
       var transform = DeckPolicy.transformFor(orientation, monitor)
-      if (transform < 0) return
+      if (transform < 0) {
+        applyTouch(output, monitor.transform)
+        return
+      }
       var argv = CommandPolicy.rotateOutput(output, transform, monitor.x, monitor.y, monitor.scale)
-      rotation = { requests: rotation.requests + 1, transform: transform, error: "" }
+      rotationStatus = { requests: rotationStatus.requests + 1, transform: transform, error: "" }
       log("rotate " + output + " to transform " + transform + " for " + layoutName + " (" + orientation + ")")
       commands.run(argv, function(result, exitCode) {
-        if (exitCode !== 0 || String(result).trim() !== "ok")
-          rotation = { requests: rotation.requests, transform: transform,
+        if (exitCode !== 0 || String(result).trim() !== "ok") {
+          rotationStatus = { requests: rotationStatus.requests, transform: transform,
             error: "hyprctl eval failed (" + exitCode + "): " + String(result).trim().slice(0, 120) }
+          return
+        }
+        applyTouch(output, transform)
       })
     })
   }
+
+  // Hyprland does not map touch through a runtime output transform, so the
+  // touchscreen gets the same transform: per device when the Display names its
+  // touch_devices, else the global touchdevice option. Idempotent.
+  function applyTouch(output, transform) {
+    var devices = display.touchDevices || []
+    var argvs = []
+    if (devices.length === 0) argvs.push(CommandPolicy.touchTransform(transform))
+    for (var i = 0; i < devices.length; i++) argvs.push(CommandPolicy.deviceTransform(devices[i], output, transform))
+    touch = { transform: transform, devices: devices, error: "" }
+    for (var j = 0; j < argvs.length; j++) {
+      commands.run(argvs[j], function(result, exitCode) {
+        if (exitCode !== 0 || String(result).trim() !== "ok")
+          touch = { transform: transform, devices: devices, error: "touch transform failed (" + exitCode + ")" }
+      })
+    }
+    if (transform !== touchLogged) log("touch transform " + transform + (devices.length > 0 ? " for " + devices.join(", ") : " (all touch devices)"))
+    touchLogged = transform
+  }
+
 
   function setLayoutText(name, text) {
     if (layoutTexts[name] === text) return
@@ -437,7 +466,8 @@ Item {
         tabs: tabsVisible,
         tabEdge: surface ? surface.tabEdge : "",
         badges: tabBadges,
-        rotation: rotation
+        rotation: rotationStatus,
+        touch: touch
       },
       overrides: { key: agentListKey, sortOverridden: sortOverridden, loaded: overridesLoaded,
         error: overridesError, modules: overrides.modules },

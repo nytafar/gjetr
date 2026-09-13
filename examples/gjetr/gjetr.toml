@@ -25,6 +25,13 @@ deck = ["agents"]
 # kept if none fits).
 rotatable = false
 
+# Touchscreens that turn with this Display, as `hyprctl devices` names them.
+# Hyprland does not rotate touch input with a runtime output transform, so
+# gjetr sets the same transform on these devices. Leave it empty to set the
+# global input.touchdevice.transform instead, which covers every touchscreen
+# without a transform of its own.
+# touch_devices = ["wch.cn-usb2iic_ctp_control", "wch.cn-usb2iic_ctp_control-1"]
+
 # "black", "theme" (the Omarchy theme background), "wallpaper" (the Omarchy
 # wallpaper shows through), "transparent" (same as wallpaper), or a colour:
 # "#rrggbb", or "#aarrggbb" to tint the wallpaper, e.g. "#c0000000".

@@ -61,3 +61,16 @@ test("rotateOutput refuses values outside the allowlist", () => {
   }
   assert.equal(Command.allowed(["hyprctl", "eval", 'hl.monitor({ output = "HDMI-A-2", disabled = true })']), false)
 })
+
+test("touch transforms follow a rotation, globally or per device", () => {
+  assert.deepEqual(Array.from(Command.touchTransform(1)),
+    ["hyprctl", "eval", "hl.config({ input = { touchdevice = { transform = 1 } } })"])
+  const device = Command.deviceTransform("wch.cn-usb2iic_ctp_control-1", "HDMI-A-2", 3)
+  assert.deepEqual(Array.from(device),
+    ["hyprctl", "eval", 'hl.device({ name = "wch.cn-usb2iic_ctp_control-1", output = "HDMI-A-2", transform = 3 })'])
+  assert.equal(Command.allowed(Command.touchTransform(0)), true)
+  assert.equal(Command.allowed(device), true)
+  assert.deepEqual(Array.from(Command.touchTransform(8)), [])
+  assert.deepEqual(Array.from(Command.deviceTransform('x", enabled = false, y = "', "HDMI-A-2", 1)), [])
+  assert.equal(Command.allowed(["hyprctl", "eval", 'hl.device({ name = "x", enabled = false })']), false)
+})

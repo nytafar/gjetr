@@ -17,7 +17,7 @@ test("a missing gjetr.toml yields the defaults without errors", () => {
   assert.deepEqual(Array.from(read.errors), [])
   assert.deepEqual(plain(read.config), {
     socket: "/home/test/.config/herdr/herdr.sock",
-    displays: [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black" }]
+    displays: [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black", touchDevices: [] }]
   })
 })
 
@@ -40,8 +40,8 @@ background = "theme"
   assert.deepEqual(plain(read.config), {
     socket: "/home/test/run/herdr.sock",
     displays: [
-      { name: "HDMI-A-2", deck: ["agents", "overview"], rotatable: true, background: "#101315" },
-      { name: "DP-2", deck: ["agents"], rotatable: false, background: "theme" }
+      { name: "HDMI-A-2", deck: ["agents", "overview"], rotatable: true, background: "#101315", touchDevices: [] },
+      { name: "DP-2", deck: ["agents"], rotatable: false, background: "theme", touchDevices: [] }
     ]
   })
 })
@@ -67,7 +67,7 @@ colour = "red"
 `, HOME)
   const config = plain(read.config)
   assert.equal(config.socket, "/home/test/.config/herdr/herdr.sock")
-  assert.deepEqual(config.displays, [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black" }])
+  assert.deepEqual(config.displays, [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black", touchDevices: [] }])
   const text = read.errors.join("\n")
   assert.match(text, /gjetr\.toml: socket: /)
   assert.match(text, /display\[0\]\.deck\[1\]: /)
@@ -231,4 +231,14 @@ test("isConfigDir accepts absolute directories only", () => {
   for (const bad of ["", "relative", "/tmp/../etc", "/tmp/a/..", "/tmp/a\nb", "/" + "x".repeat(300), null, 5]) {
     assert.equal(Config.isConfigDir(bad), false, String(bad))
   }
+})
+
+test("touch_devices lists the touchscreens that rotate with a Display", () => {
+  const read = Config.readMain('[[display]]\nname = "HDMI-A-2"\ntouch_devices = ["wch.cn-usb2iic_ctp_control", "wch.cn-usb2iic_ctp_control-1", "wch.cn-usb2iic_ctp_control"]\n', HOME)
+  assert.deepEqual(Array.from(read.errors), [])
+  assert.deepEqual(Array.from(read.config.displays[0].touchDevices), ["wch.cn-usb2iic_ctp_control", "wch.cn-usb2iic_ctp_control-1"])
+  const bad = Config.readMain('[[display]]\nname = "HDMI-A-2"\ntouch_devices = ["ok-dev", "bad name\\"", 5]\n', HOME)
+  assert.deepEqual(Array.from(bad.config.displays[0].touchDevices), ["ok-dev"])
+  assert.equal(bad.errors.length, 2)
+  assert.match(Config.readMain('[[display]]\nname = "HDMI-A-2"\ntouch_devices = "all"\n', HOME).errors[0], /touch_devices: expected a list/)
 })

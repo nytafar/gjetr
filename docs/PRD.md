@@ -46,6 +46,7 @@ touchscreen.
 | M15 | Deck: tabs on a short edge, swipe between Layouts, tab bar hidden with one Layout |
 | M16 | A Layout declares orientation; selecting it rotates the Display at runtime when the Display allows rotation, without editing `monitors.lua` |
 | M17 | Leaves room for the Omarchy bar's strip on the Display |
+| M19 | Touch input rotates with a runtime rotation (per named device, or the global touchdevice transform) |
 
 ### Next
 
