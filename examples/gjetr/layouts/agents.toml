@@ -16,6 +16,8 @@ sort = "spaces"
 # or "compact" (the same without workspace › tab).
 preset = "detailed"
 
-# Focus on tap: "herdr" focuses the pane in herdr. "window" also brings its
-# terminal window forward.
+# Focus on tap: "herdr" focuses the pane in herdr. "window" also switches to
+# the most recently focused terminal window running a herdr client of this
+# server, and focuses it. Tapping "focus" in the list header flips it as an
+# Override.
 focus = "herdr"

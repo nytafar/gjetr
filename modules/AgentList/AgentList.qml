@@ -15,6 +15,7 @@ Item {
   property string preset: service ? service.cardPreset : CardPolicy.DEFAULT_PRESET
 
   signal headerTapped()
+  signal focusToggled()
 
   readonly property var fields: CardPolicy.fieldsFor(preset)
   readonly property var agents: service ? service.sortedAgents : []
@@ -35,39 +36,74 @@ Item {
     return Color.muted
   }
 
-  Rectangle {
+  Item {
     id: header
     anchors { top: parent.top; left: parent.left; right: parent.right }
     height: CardPolicy.MIN_TOUCH_PX
-    color: headerTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent) : "transparent"
 
-    Text {
-      anchors { left: parent.left; leftMargin: root.gap * 2; verticalCenter: parent.verticalCenter }
-      text: root.agents.length === 1 ? "1 agent" : root.agents.length + " agents"
-      color: Color.foreground
-      font.family: Style.font.family
-      font.pixelSize: Math.round(Style.font.title * root.textScale)
-      font.bold: true
+    // Everything left of the Focus toggle cycles the Sort mode.
+    Rectangle {
+      id: sortArea
+      anchors { top: parent.top; bottom: parent.bottom; left: parent.left; right: focusToggle.left }
+      color: headerTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent) : "transparent"
+
+      Text {
+        anchors { left: parent.left; leftMargin: root.gap * 2; verticalCenter: parent.verticalCenter }
+        text: root.agents.length === 1 ? "1 agent" : root.agents.length + " agents"
+        color: Color.foreground
+        font.family: Style.font.family
+        font.pixelSize: Math.round(Style.font.title * root.textScale)
+        font.bold: true
+      }
+
+      Text {
+        anchors { right: parent.right; rightMargin: root.gap * 2; verticalCenter: parent.verticalCenter }
+        text: "sort  " + (root.service ? root.service.sortMode : "")
+        // Accent while an Override shadows the Config default.
+        color: root.service && root.service.sortOverridden ? Color.accent : Color.muted
+        font.family: Style.font.family
+        font.pixelSize: Math.round(Style.font.body * root.textScale)
+      }
+
+      TapHandler {
+        id: headerTap
+        onTapped: root.headerTapped()
+      }
     }
 
-    Text {
-      anchors { right: parent.right; rightMargin: root.gap * 2; verticalCenter: parent.verticalCenter }
-      text: "sort  " + (root.service ? root.service.sortMode : "")
-      // Accent while an Override shadows the Config default.
-      color: root.service && root.service.sortOverridden ? Color.accent : Color.muted
-      font.family: Style.font.family
-      font.pixelSize: Math.round(Style.font.body * root.textScale)
+    // Focus behaviour: herdr only, or also the hosting window.
+    Rectangle {
+      id: focusToggle
+      anchors { top: parent.top; bottom: parent.bottom; right: parent.right }
+      width: Math.max(CardPolicy.MIN_TOUCH_PX, focusLabel.implicitWidth + root.gap * 4)
+      color: focusTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent) : "transparent"
+
+      Rectangle {
+        anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+        width: 1
+        height: parent.height / 2
+        color: Util.alpha(Color.foreground, 0.12)
+      }
+
+      Text {
+        id: focusLabel
+        anchors.centerIn: parent
+        text: "focus  " + (root.service ? root.service.focusMode : "")
+        color: root.service && root.service.focusOverridden ? Color.accent : Color.muted
+        font.family: Style.font.family
+        font.pixelSize: Math.round(Style.font.body * root.textScale)
+      }
+
+      TapHandler {
+        id: focusTap
+        onTapped: root.focusToggled()
+      }
     }
 
     Rectangle {
       anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
       height: 1
       color: Util.alpha(Color.foreground, 0.12)
-    }
-
-    TapHandler {
-      id: headerTap
-      onTapped: root.headerTapped()
     }
   }
 

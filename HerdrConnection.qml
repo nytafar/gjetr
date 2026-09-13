@@ -56,6 +56,9 @@ QtObject {
   property string focusRequestLine: ""
   property string focusPaneId: ""
 
+  // herdr accepted a pane.focus request.
+  signal paneFocused(string paneId)
+
   function log(message) {
     console.info("[gjetr] herdr " + message)
   }
@@ -220,6 +223,7 @@ QtObject {
     dropFocus()
     lastFocusError = ""
     focuses++
+    paneFocused(focusPaneId)
   }
 
   function publish() {

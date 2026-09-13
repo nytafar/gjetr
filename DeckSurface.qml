@@ -44,6 +44,7 @@ PanelWindow {
       anchors.fill: parent
       service: root.service
       onHeaderTapped: if (root.service) root.service.cycleSortMode()
+      onFocusToggled: if (root.service) root.service.toggleFocusMode()
     }
   }
 }

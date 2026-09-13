@@ -10,6 +10,8 @@ import "lib/CacheTimerModel.js" as CacheTimerModel
 import "lib/CardPolicy.js" as CardPolicy
 import "lib/ConfigModel.js" as ConfigModel
 import "lib/OverrideModel.js" as OverrideModel
+import "lib/WindowPolicy.js" as WindowPolicy
+import "lib/CommandPolicy.js" as CommandPolicy
 
 // Owns Display selection, the herdr connection and everything that must
 // outlive a surface. The surface itself is created per matching screen and
@@ -82,6 +84,12 @@ Item {
   readonly property string sortMode: OverrideModel.effective(overrides, agentListKey, "sort", agentListConfig.settings.sort)
   readonly property bool sortOverridden: sortMode !== agentListConfig.settings.sort
   readonly property string focusMode: OverrideModel.effective(overrides, agentListKey, "focus", agentListConfig.settings.focus)
+  readonly property bool focusOverridden: focusMode !== agentListConfig.settings.focus
+
+  // Focus behaviour `window`: the last attempt to bring the hosting terminal
+  // window forward. Newer taps supersede older lookups by sequence.
+  property int windowFocusSequence: 0
+  property var windowFocus: ({ requests: 0, window: "", workspace: "", candidates: 0, error: "" })
 
   // Cache timers from the cache-ttl herdr plugin. Paths are the plugin's own
   // state and config dirs (HERDR_PLUGIN_STATE_DIR, HERDR_PLUGIN_CONFIG_DIR).
@@ -153,8 +161,60 @@ Item {
     if (agentListKey === "") return sortMode
     var next = SortPolicy.nextMode(sortMode)
     writeOverrides(OverrideModel.set(overrides, agentListKey, "sort", next, agentListConfig.settings.sort))
-    log("sort " + sortMode + (sortOverridden ? " (override)" : ""))
-    return sortMode
+    log("sort " + next + (next !== agentListConfig.settings.sort ? " (override)" : ""))
+    return next
+  }
+
+  function toggleFocusMode() {
+    if (agentListKey === "") return focusMode
+    var modes = ConfigModel.FOCUS_MODES
+    var next = modes[(modes.indexOf(focusMode) + 1) % modes.length]
+    writeOverrides(OverrideModel.set(overrides, agentListKey, "focus", next, agentListConfig.settings.focus))
+    log("focus " + next + (next !== agentListConfig.settings.focus ? " (override)" : ""))
+    return next
+  }
+
+  // After herdr focused a pane: find the most recently focused Hyprland window
+  // hosting a herdr client of our server, and focus it, which also switches
+  // to its workspace. Selection is lib/WindowPolicy.js; every command is
+  // allowlisted in lib/CommandPolicy.js.
+  function focusHostWindow() {
+    var sequence = ++windowFocusSequence
+    var parts = { clients: null, processes: null }
+    var socket = herdrSocketPath
+
+    function report(fields) {
+      var next = { requests: windowFocus.requests, window: "", workspace: "", candidates: 0, error: "" }
+      for (var key in fields) next[key] = fields[key]
+      windowFocus = next
+      if (next.error !== "") log("window focus: " + next.error)
+    }
+
+    function select() {
+      if (sequence !== windowFocusSequence || parts.clients === null || parts.processes === null) return
+      var picked = WindowPolicy.selectHost(parts.clients, parts.processes, socket, home)
+      if (!picked.window) {
+        report({ error: "no window hosts a herdr client of " + socket })
+        return
+      }
+      var chosen = picked.window
+      commands.run(CommandPolicy.focusWindow(chosen.address), function(text, code) {
+        if (sequence !== windowFocusSequence) return
+        var ok = code === 0 && String(text).trim() === "ok"
+        report({ window: chosen.address, workspace: chosen.workspace, candidates: picked.candidates,
+          error: ok ? "" : "dispatch failed (" + code + "): " + String(text).trim().slice(0, 120) })
+      })
+    }
+
+    windowFocus = { requests: windowFocus.requests + 1, window: "", workspace: "", candidates: 0, error: "" }
+    commands.run(CommandPolicy.CLIENTS, function(text, code) {
+      parts.clients = code === 0 ? text : "[]"
+      select()
+    })
+    commands.run(CommandPolicy.PROCESSES, function(text, code) {
+      parts.processes = code === 0 ? text : ""
+      select()
+    })
   }
 
   function resetOverrides() {
@@ -246,6 +306,9 @@ Item {
       sortMode: sortMode,
       cardPreset: cardPreset,
       focusMode: focusMode,
+      focusOverridden: focusOverridden,
+      windowFocus: windowFocus,
+      commands: { started: commands.started, refused: commands.refused, lastError: commands.lastError },
       config: { dir: configDir, summary: configSummary, errors: configErrors },
       overrides: { key: agentListKey, sortOverridden: sortOverridden, loaded: overridesLoaded,
         error: overridesError, modules: overrides.modules },
@@ -272,6 +335,11 @@ Item {
   HerdrConnection {
     id: herdr
     socketPath: root.herdrSocketPath
+    onPaneFocused: if (root.focusMode === "window") root.focusHostWindow()
+  }
+
+  CommandRunner {
+    id: commands
   }
 
   onConfigErrorsChanged: {
@@ -381,6 +449,10 @@ Item {
 
     function resetOverrides(): void {
       root.resetOverrides()
+    }
+
+    function toggleFocus(): string {
+      return root.toggleFocusMode()
     }
   }
 
