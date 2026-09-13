@@ -83,3 +83,48 @@ test("columnsFor is at least one, even for a surface before its first configure"
   assert.equal(Layout.columnsFor(900, 0, 3), 1)
   assert.equal(Layout.columnsFor(900, 440, 0), 1)
 })
+
+test("cardPlacement stacks one column, an open Card pushing the rest down", () => {
+  const placed = Layout.cardPlacement(["a", "b", "c"], { b: 300 }, 1, 88, 10)
+  assert.deepEqual({ ...placed.positions.a }, { column: 0, y: 0 })
+  assert.deepEqual({ ...placed.positions.b }, { column: 0, y: 98 })
+  assert.deepEqual({ ...placed.positions.c }, { column: 0, y: 408 })
+  assert.equal(placed.contentHeight, 506)
+})
+
+test("cardPlacement rows take their tallest Card", () => {
+  const placed = Layout.cardPlacement(["a", "b", "c", "d", "e"], { b: 200, c: 60 }, 2, 88, 10)
+  assert.deepEqual(["a", "b", "c", "d", "e"].map(k => [placed.positions[k].column, placed.positions[k].y]),
+    [[0, 0], [1, 0], [0, 210], [1, 210], [0, 308]])
+  assert.equal(placed.contentHeight, 406)
+})
+
+test("cardPlacement falls back to the base height for unknown or junk heights", () => {
+  const placed = Layout.cardPlacement(["a", "b"], { a: NaN, b: -5 }, 0, 64, 8)
+  assert.equal(placed.positions.b.y, 72)
+  assert.equal(placed.contentHeight, 144)
+  assert.equal(Layout.cardPlacement([], {}, 1, 64, 8).contentHeight, 0)
+  assert.equal(Layout.cardPlacement(null, null, 1, 64, 8).contentHeight, 0)
+})
+
+test("clampScroll keeps the scroll position unless the content got too short", () => {
+  assert.equal(Layout.clampScroll(300, 2000, 600), 300)
+  assert.equal(Layout.clampScroll(1800, 2000, 600), 1400)
+  assert.equal(Layout.clampScroll(300, 400, 600), 0)
+  assert.equal(Layout.clampScroll(-20, 2000, 600), 0)
+  assert.equal(Layout.clampScroll(NaN, 2000, 600), 0)
+})
+
+test("keepScroll holds the Card at the top of the view when a Card above it changes height", () => {
+  const keys = ["a", "b", "c", "d"]
+  const before = Layout.cardPlacement(keys, {}, 1, 100, 0)
+  // b (above the view top at 250, inside c) grows by 200: c must stay where it was on screen.
+  assert.equal(Layout.keepScroll(before, Layout.cardPlacement(keys, { b: 300 }, 1, 100, 0), keys, 250), 450)
+  // c itself, straddling the top, grows: it grows downward, nothing moves.
+  assert.equal(Layout.keepScroll(before, Layout.cardPlacement(keys, { c: 300 }, 1, 100, 0), keys, 250), 250)
+  // d, below the top, grows: nothing moves.
+  assert.equal(Layout.keepScroll(before, Layout.cardPlacement(keys, { d: 300 }, 1, 100, 0), keys, 250), 250)
+  // At the very top the view stays at the top.
+  assert.equal(Layout.keepScroll(before, Layout.cardPlacement(keys, { a: 300 }, 1, 100, 0), keys, 0), 0)
+  assert.equal(Layout.keepScroll(null, null, keys, 120), 120)
+})

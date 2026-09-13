@@ -9,6 +9,7 @@ import "../../lib/ListSyncPolicy.js" as ListSyncPolicy
 // The Agent List Module: every Agent as a Card, in the service's Sort mode.
 // Presentation only. Data, Sort mode and preset come from the service; a tap
 // asks the service to focus the pane, and a header tap is reported upward.
+// Which Recaps are open, in Cards or the overlay, is the service's state.
 Item {
   id: root
 
@@ -19,8 +20,8 @@ Item {
   signal focusToggled()
 
   readonly property string recapMode: service ? service.recapMode : "off"
-  // The pane whose Recap is open in the overlay, or "".
-  property string recapPane: ""
+  // The Agent whose Recap is open in the overlay (recap_open = "overlay"), or null.
+  readonly property string recapPane: service && service.recapOpenMode === "overlay" ? service.recapOverlayPane : ""
   readonly property var recapAgent: recapPane !== "" ? (agentByPane[recapPane] || null) : null
 
   readonly property var fields: CardPolicy.fieldsFor(preset)
@@ -29,6 +30,14 @@ Item {
   // new snapshot or a re-sort keeps every Card, its pulse and the scroll
   // position. Each Card finds its Agent in agentByPane.
   property var agentByPane: ({})
+  // Cards may differ in height (a Recap open in its Card), so they are placed
+  // by LayoutPolicy.cardPlacement from the model's order and each Card's
+  // measured height, rather than by a uniform grid.
+  property var cardOrder: []
+  property var cardHeights: ({})
+  readonly property int baseCardHeight: CardPolicy.cardHeightFor(preset, recapMode === "inline")
+  readonly property int cellWidth: Math.floor(grid.width / columns)
+  readonly property var placement: LayoutPolicy.cardPlacement(cardOrder, cardHeights, columns, baseCardHeight, gap)
   readonly property bool online: !!service && service.herdrOnline
   readonly property bool offline: !!service && service.herdrOffline
   // Touch panels are read from further away than a desk monitor; scale the
@@ -56,6 +65,27 @@ Item {
       else if (step.op === "move") cardModel.move(step.from, step.to, 1)
       else cardModel.insert(step.index, { paneId: step.key })
     }
+    var heights = {}
+    for (var h = 0; h < keys.length; h++) {
+      if (Object.prototype.hasOwnProperty.call(cardHeights, keys[h])) heights[keys[h]] = cardHeights[keys[h]]
+    }
+    cardHeights = heights
+    cardOrder = keys
+  }
+
+  // A Card reports its height. When one changes without a re-sort, the Card at
+  // the top of the view keeps its place, so an open Recap above it never
+  // shifts what is on screen.
+  function setCardHeight(paneId, height) {
+    if (cardHeights[paneId] === height) return
+    var before = placement
+    var next = {}
+    for (var key in cardHeights) next[key] = cardHeights[key]
+    next[paneId] = height
+    cardHeights = next
+    if (grid.moving || grid.contentY <= 0) return
+    grid.contentY = LayoutPolicy.clampScroll(LayoutPolicy.keepScroll(before, placement, cardOrder, grid.contentY),
+      placement.contentHeight, grid.height)
   }
 
   onAgentsChanged: syncCards()
@@ -155,37 +185,55 @@ Item {
     font.pixelSize: Math.round(Style.font.body * root.textScale)
   }
 
-  GridView {
+  Flickable {
     id: grid
     anchors {
       top: banner.bottom; bottom: parent.bottom; left: parent.left; right: parent.right
       topMargin: root.gap; leftMargin: root.gap; rightMargin: 0
     }
     clip: true
-    model: cardModel
-    cellWidth: Math.floor(width / root.columns)
-    cellHeight: CardPolicy.cardHeightFor(root.preset, root.recapMode === "inline") + root.gap
+    contentWidth: width
+    contentHeight: root.placement.contentHeight
+    flickableDirection: Flickable.VerticalFlick
     boundsBehavior: Flickable.StopAtBounds
     // Last known Cards stay visible while Offline, greyed out.
     opacity: root.online ? 1 : 0.4
 
-    delegate: AgentCard {
-      required property string paneId
+    // Removing Agents or closing a Recap can leave the view past the end.
+    onContentHeightChanged: {
+      if (moving) return
+      var y = LayoutPolicy.clampScroll(contentY, contentHeight, height)
+      if (y !== contentY) contentY = y
+    }
 
-      width: grid.cellWidth - root.gap
-      height: grid.cellHeight - root.gap
-      agent: root.agentByPane[paneId] || null
-      service: root.service
-      fields: root.fields
-      textScale: root.textScale
-      interactive: root.online
-      statusColor: root.toneColor(CardPolicy.statusTone(agent ? agent.status : ""))
-      cacheColor: root.toneColor(CardPolicy.cacheTone(cacheTimer ? cacheTimer.level : ""))
-      attention: root.service ? root.service.attentionFor(agent, root.service.attention) : ""
-      recapMode: root.recapMode
-      recapText: root.service ? root.service.recapFor(agent, root.service.recaps) : ""
-      onTapped: if (agent) root.service.focusAgent(agent)
-      onRecapRequested: root.recapPane = paneId
+    Repeater {
+      model: cardModel
+
+      delegate: AgentCard {
+        required property string paneId
+
+        readonly property var place: root.placement.positions[paneId] || null
+
+        x: place ? place.column * root.cellWidth : 0
+        y: place ? place.y : 0
+        width: root.cellWidth - root.gap
+        agent: root.agentByPane[paneId] || null
+        service: root.service
+        fields: root.fields
+        textScale: root.textScale
+        baseHeight: root.baseCardHeight
+        interactive: root.online
+        statusColor: root.toneColor(CardPolicy.statusTone(agent ? agent.status : ""))
+        cacheColor: root.toneColor(CardPolicy.cacheTone(cacheTimer ? cacheTimer.level : ""))
+        attention: root.service ? root.service.attentionFor(agent, root.service.attention) : ""
+        recapMode: root.recapMode
+        recapText: root.service ? root.service.recapFor(agent, root.service.recaps) : ""
+        recapOpen: root.service ? root.service.recapOpenFor(agent, root.service.recapOpen) : false
+        onTapped: if (agent) root.service.focusAgent(agent)
+        onRecapRequested: if (root.service) root.service.toggleRecap(paneId)
+        onHeightChanged: root.setCardHeight(paneId, height)
+        Component.onCompleted: root.setCardHeight(paneId, height)
+      }
     }
   }
 
@@ -198,7 +246,7 @@ Item {
     color: Util.alpha(Color.background, 0.92)
 
     TapHandler {
-      onTapped: root.recapPane = ""
+      onTapped: if (root.service) root.service.closeRecapOverlay()
     }
 
     Column {

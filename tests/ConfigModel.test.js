@@ -159,7 +159,7 @@ focus = "window"
   assert.deepEqual(plain(read.layout), {
     name: "agents",
     orientation: "landscape",
-    modules: [{ type: "agent-list", sort: "cache", preset: "compact", focus: "window", recap: "off" }]
+    modules: [{ type: "agent-list", sort: "cache", preset: "compact", focus: "window", recap: "off", recapOpen: "card" }]
   })
 })
 
@@ -168,7 +168,7 @@ test("a missing layout file is the default Agent List, with an error", () => {
   assert.deepEqual(plain(read.layout), {
     name: "agents",
     orientation: "portrait",
-    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off" }]
+    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card" }]
   })
   assert.match(read.errors.join("\n"), /layouts\/agents\.toml: not found/)
 })
@@ -186,7 +186,7 @@ extra = true
   assert.deepEqual(plain(read.layout), {
     name: "side",
     orientation: "portrait",
-    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off" }]
+    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card" }]
   })
   const text = read.errors.join("\n")
   for (const key of ["orientation", "module[0].sort", "module[0].preset", "module[0].focus", "module[0].extra"]) {
@@ -196,7 +196,7 @@ extra = true
 
 test("unknown module types are skipped; no modules left means the default", () => {
   const read = Config.readLayout("x", '[[module]]\ntype = "usage"\n')
-  assert.deepEqual(plain(read.layout.modules), [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off" }])
+  assert.deepEqual(plain(read.layout.modules), [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card" }])
   assert.match(read.errors.join("\n"), /module\[0\]\.type: /)
   assert.match(read.errors.join("\n"), /no valid module/)
 })
@@ -249,4 +249,16 @@ test("recap is off, inline or expand per Agent List", () => {
   const bad = Config.readLayout("agents", '[[module]]\ntype = "agent-list"\nrecap = "loud"\n')
   assert.equal(bad.layout.modules[0].recap, "off")
   assert.match(bad.errors.join("\n"), /module\[0\]\.recap: expected one of off, inline, expand/)
+})
+
+test("recap_open is card or overlay per Agent List, default card", () => {
+  assert.equal(Config.readLayout("agents", '[[module]]\ntype = "agent-list"\n').layout.modules[0].recapOpen, "card")
+  const overlay = Config.readLayout("agents", '[[module]]\ntype = "agent-list"\nrecap = "expand"\nrecap_open = "overlay"\n')
+  assert.deepEqual(Array.from(overlay.errors), [])
+  assert.equal(overlay.layout.modules[0].recapOpen, "overlay")
+  for (const bad of ['"popup"', "true", '["card"]']) {
+    const read = Config.readLayout("agents", `[[module]]\ntype = "agent-list"\nrecap_open = ${bad}\n`)
+    assert.equal(read.layout.modules[0].recapOpen, "card", bad)
+    assert.match(read.errors.join("\n"), /layouts\/agents\.toml: module\[0\]\.recap_open: expected one of card, overlay/, bad)
+  }
 })

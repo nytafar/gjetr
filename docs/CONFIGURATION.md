@@ -82,6 +82,7 @@ Every Agent across workspaces as a Card.
 | `preset` | `"detailed"`, `"compact"` | `"detailed"` | Card Fields: detailed shows status, kind, name, workspace › tab and Cache timer; compact drops workspace › tab |
 | `focus` | `"herdr"`, `"window"` | `"herdr"` | Focus behaviour on tap. Tapping `focus` in the header flips it as an Override |
 | `recap` | `"off"`, `"inline"`, `"expand"` | `"off"` | Recap Field for Claude Agents |
+| `recap_open` | `"card"`, `"overlay"` | `"card"` | With `recap = "expand"`: open the full Recap inside the Card or over the list |
 
 ```toml
 orientation = "portrait"
@@ -92,6 +93,7 @@ sort = "priority"
 preset = "detailed"
 focus = "window"
 recap = "expand"
+recap_open = "card"
 ```
 
 #### Sort modes
@@ -129,7 +131,16 @@ removed, it is capped at 1200 characters and always shown as plain text.
 - `off`: nothing is read.
 - `inline`: two lines under the Card's Fields; Cards grow to fit.
 - `expand`: Cards with a Recap get a `recap` area at their edge. Tapping it, or
-  a long press on the Card, shows the whole Recap over the list. A tap closes it.
+  a long press on the Card, opens the whole Recap. Where is up to `recap_open`:
+  - `card` (default): under the Card's Fields. The Card grows and pushes the
+    Cards below it down. Tapping the Recap, the `recap` area or a long press
+    closes it again. Several Cards can be open at once.
+  - `overlay`: over the list. A tap anywhere closes it.
+
+Which Recaps are open is kept per Module and pane for as long as the shell
+runs. It follows each Agent through re-sorts and updates, is forgotten when the
+pane goes away, and is never written to Config or `state.json`. A Card opening
+above the part of the list you are looking at does not move what is on screen.
 
 ## Rotation and touch
 
@@ -215,6 +226,7 @@ omarchy-shell nytafar.gjetr <function> [argument]
 | `state` | JSON: Display, bar inset, herdr connection, Config summary and errors, Deck, Overrides, Attention, Recap, every Card |
 | `reconnect` | Drop and reopen the herdr connection |
 | `focus <pane-id>` | Focus an Agent's pane, as a tap does |
+| `toggleRecap <pane-id>` | Open or close an Agent's full Recap, as a tap on `recap` does. Prints `open`, `closed`, or why nothing happened (`unknown pane`, `no recap`, `recap is inline, not expand`). `state` → `recap.openCards` lists the open Cards |
 | `cycleSort` | Next Sort mode, as a header tap does |
 | `toggleFocus` | Flip Focus behaviour |
 | `selectLayout <name>` | Show a Layout of the Deck |

@@ -79,7 +79,10 @@ Tabs on one edge with badges. Reports a tapped Layout name. Owns nothing.
 The Agent List Module: header (Agent count, Sort mode and Focus behaviour
 toggles), Offline banner, Cards, and the Recap overlay. Cards live in a
 `ListModel` keyed by pane id and updated in place (`ListSyncPolicy`), so updates
-keep scroll position and running animations. A Card draws its Fields, its
+keep scroll position and running animations. A Flickable places them with
+`LayoutPolicy.cardPlacement` from each Card's measured height, so a Card with
+its Recap open grows and pushes the rows below it down; `keepScroll` holds the
+view when a Card above it changes height. A Card draws its Fields, its
 Attention pulse and its Recap, and reports taps, long presses and the Recap
 disclosure.
 
@@ -96,10 +99,10 @@ come from `CardPolicy`), or what a tap does.
 | `CacheTimerModel.js` | `timers.json` and plugin thresholds to a Cache timer, level and label | File watching |
 | `CardPolicy.js` | Presets and Fields, status and cache tones, touch sizes, kind icons | Colours themselves |
 | `AttentionModel.js` | Entering and leaving Attention from Agent lists and taps | Pulse animation |
-| `RecapModel.js` | Transcript path checks, stat parsing, the latest `away_summary`, cleaning untrusted text | Finding or reading files |
+| `RecapModel.js` | Transcript path checks, stat parsing, the latest `away_summary`, cleaning untrusted text, which Recaps are open per Module and pane | Finding or reading files |
 | `ConfigModel.js` | TOML to validated Displays, Decks, Layouts and Module settings, with per-key errors | Loading or watching files |
 | `OverrideModel.js` | `state.json` parse, set, clear and stable serialization | Writing the file |
-| `LayoutPolicy.js` | Screen by output name, bar inset, content rectangle, columns | |
+| `LayoutPolicy.js` | Screen by output name, bar inset, content rectangle, columns, Card placement by height, scroll keeping | |
 | `DeckPolicy.js` | Available and active Layouts, orientation to transform, `hyprctl monitors` parsing, tab edge and rectangle, swipe step, badges | Running `hyprctl` |
 | `WindowPolicy.js` | Process table and window list to the host window of a herdr client | Running `ps` or `hyprctl` |
 | `ListSyncPolicy.js` | Remove, move and insert steps between two key orders | The model |
@@ -131,7 +134,7 @@ come from Config, herdr or Hyprland are validated against a pattern first.
 | Agents, online, attempt | `HerdrConnection.qml` | no |
 | Config texts | FileViews in `Service.qml` (read only) | user's files, never written |
 | Overrides | `Service.writeOverrides` | `~/.local/state/gjetr/state.json` |
-| Attention, Recaps, rotation and touch status, window focus status | `Service.qml` | no |
+| Attention, Recaps, open Recaps (Cards and overlay), rotation and touch status, window focus status | `Service.qml` | no |
 | Output transform and touch transform | Hyprland, requested by `Service.applyOrientation` | runtime only, reset by `hyprctl reload` |
 
 ## Tests

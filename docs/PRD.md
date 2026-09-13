@@ -46,7 +46,7 @@ touchscreen.
 | M15 | Deck: tabs on a short edge, swipe between Layouts, tab bar hidden with one Layout |
 | M16 | A Layout declares orientation; selecting it rotates the Display at runtime when the Display allows rotation, without editing `monitors.lua` |
 | M17 | Leaves room for the Omarchy bar's strip on the Display |
-| M18 | Recap Field for Claude Agents: latest `away_summary` from the session transcript herdr names; per Module `recap = off / inline / expand`, expand by a disclosure area or long press; plain text only |
+| M18 | Recap Field for Claude Agents: latest `away_summary` from the session transcript herdr names; per Module `recap = off / inline / expand`, expand by a disclosure area or long press, opening in the Card (growing it; several at once, open state per pane, not persisted) or an overlay per `recap_open = card / overlay`; plain text only |
 | M19 | Touch input rotates with a runtime rotation (per named device, or the global touchdevice transform) |
 
 ### Status
@@ -73,7 +73,7 @@ As of v0.1.0. "Live" means checked on the real panel and recorded in
 | M15 | Done, partly live | Tabs, badges and selection live; swipe gesture by tests and IPC only |
 | M16 | Done, live | T09 rotation and re-apply after reload |
 | M17 | Done, live | T02, T09 |
-| M18 | Done, live | Recaps read for 17 of 21 real Claude Agents; expand overlay not opened by touch |
+| M18 | Done, partly live | Recaps read for 17 of 21 real Claude Agents; Recap opened in a Card via IPC `toggleRecap` on the panel; neither Card nor overlay opened by touch |
 | M19 | Done, partly live | Touch transform follows rotation (`getoption`); tap accuracy in portrait to be confirmed on the panel |
 
 ### Next

@@ -3,7 +3,8 @@ import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
 
 // One Agent as a Card. Shows the Fields its preset selects; colours arrive as
-// resolved theme tokens from the list.
+// resolved theme tokens from the list. The Card's height is its Fields band,
+// plus the full Recap below it while that is open in the Card.
 Item {
   id: root
 
@@ -17,14 +18,19 @@ Item {
   // "blocked" or "done" while the Agent is in Attention, else "".
   property string attention: ""
   // Recap: "off", "inline" (clamped under the Fields) or "expand" (a
-  // disclosure area and long press ask the list to show it in full).
+  // disclosure area and long press ask the list to open or close it).
   property string recapMode: "off"
   property string recapText: ""
+  // Whether the full Recap is open inside this Card (recap_open = "card").
+  property bool recapOpen: false
+  // Height of the Fields band, from CardPolicy.
+  property int baseHeight: CardPolicy.cardHeight(CardPolicy.DEFAULT_PRESET)
 
   signal tapped()
   signal recapRequested()
 
   readonly property bool recapExpandable: recapMode === "expand" && recapText !== ""
+  readonly property bool recapShown: recapOpen && recapExpandable
 
   readonly property bool focused: !!agent && agent.focused
   readonly property var cacheTimer: fields.cache && service && agent
@@ -32,6 +38,8 @@ Item {
   readonly property string iconUrl: fields.kind && service && agent ? service.kindIconUrl(agent.kind) : ""
   readonly property int pad: Style.spacing.xxl
   readonly property color attentionColor: attention === "blocked" ? Color.urgent : Color.accent
+
+  implicitHeight: baseHeight + (recapShown ? recapBlock.implicitHeight : 0)
 
   Rectangle {
     anchors.fill: parent
@@ -73,10 +81,17 @@ Item {
     color: root.statusColor
   }
 
+  // The Fields band: the Card as it is while no Recap is open in it.
+  Item {
+    id: band
+    anchors { left: parent.left; right: parent.right; top: parent.top }
+    height: root.baseHeight
+  }
+
   Item {
     id: kindIcon
     visible: root.fields.kind
-    anchors { left: statusBar.right; leftMargin: root.pad; verticalCenter: parent.verticalCenter }
+    anchors { left: statusBar.right; leftMargin: root.pad; verticalCenter: band.verticalCenter }
     width: visible ? 28 : 0
     height: 28
 
@@ -106,8 +121,9 @@ Item {
     anchors {
       left: kindIcon.right; leftMargin: root.pad
       right: trailing.left; rightMargin: root.pad
-      top: parent.top; topMargin: root.recapMode === "inline" ? root.pad / 2 : 0
-      verticalCenter: root.recapMode === "inline" ? undefined : parent.verticalCenter
+      top: root.recapMode === "inline" ? band.top : undefined
+      topMargin: root.recapMode === "inline" ? root.pad / 2 : 0
+      verticalCenter: root.recapMode === "inline" ? undefined : band.verticalCenter
     }
     spacing: Style.spacing.xs
 
@@ -154,7 +170,7 @@ Item {
     anchors {
       right: disclosure.visible ? disclosure.left : parent.right
       rightMargin: disclosure.visible ? 0 : root.pad
-      verticalCenter: parent.verticalCenter
+      verticalCenter: band.verticalCenter
     }
     spacing: Style.spacing.xs
 
@@ -180,9 +196,9 @@ Item {
     }
   }
 
-  // The Card body focuses the Agent; a long press opens its Recap.
+  // The Fields band focuses the Agent; a long press opens or closes its Recap.
   Item {
-    anchors { left: parent.left; top: parent.top; bottom: parent.bottom; right: disclosure.visible ? disclosure.left : parent.right }
+    anchors { left: parent.left; top: band.top; bottom: band.bottom; right: disclosure.visible ? disclosure.left : parent.right }
 
     TapHandler {
       id: tap
@@ -192,18 +208,21 @@ Item {
     }
   }
 
-  // Disclosure area for the Recap, a full-height touch target at the edge.
+  // Disclosure area for the Recap, a full-height touch target at the edge of
+  // the Fields band. Filled while the Recap is open in the Card.
   Item {
     id: disclosure
     visible: root.recapExpandable
-    anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
+    anchors { right: parent.right; top: band.top; bottom: band.bottom }
     width: visible ? 56 : 0
 
     Rectangle {
       anchors.fill: parent
       anchors.margins: 1
       radius: Style.cornerRadius
-      color: disclosureTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent) : "transparent"
+      color: disclosureTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent)
+        : root.recapShown ? Style.selectedFillFor(Color.foreground, Color.accent)
+        : "transparent"
     }
 
     Rectangle {
@@ -224,6 +243,42 @@ Item {
 
     TapHandler {
       id: disclosureTap
+      onTapped: root.recapRequested()
+    }
+  }
+
+  // The full Recap, open inside the Card under its Fields. A tap closes it.
+  Item {
+    id: recapBlock
+    visible: root.recapShown
+    anchors { left: parent.left; right: parent.right; top: band.bottom }
+    height: visible ? implicitHeight : 0
+    implicitHeight: recapBody.implicitHeight + root.pad
+
+    Rectangle {
+      anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: root.pad; rightMargin: root.pad }
+      height: 1
+      color: Util.alpha(Color.foreground, 0.12)
+    }
+
+    // Recap text is untrusted: always plain text, never rich text or links.
+    Text {
+      id: recapBody
+      anchors {
+        left: parent.left; leftMargin: statusBar.width + root.pad
+        right: parent.right; rightMargin: root.pad
+        top: parent.top; topMargin: root.pad / 2
+      }
+      text: root.recapShown ? root.recapText : ""
+      textFormat: Text.PlainText
+      wrapMode: Text.WordWrap
+      color: Color.foreground
+      font.family: Style.font.family
+      font.pixelSize: Math.round(Style.font.body * root.textScale)
+      lineHeight: 1.2
+    }
+
+    TapHandler {
       onTapped: root.recapRequested()
     }
   }

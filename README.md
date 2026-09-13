@@ -124,7 +124,7 @@ rotatable = true
 | Tap the header | Next Sort mode |
 | Tap `focus` in the header | Switch Focus behaviour between `herdr` and `window` |
 | Tap a tab, or swipe sideways | Change Layout |
-| Tap `recap` on a Card, or long press | Show the full Recap (with `recap = "expand"`) |
+| Tap `recap` on a Card, or long press | Open or close the full Recap in the Card, or over the list with `recap_open = "overlay"` (with `recap = "expand"`) |
 
 These choices are remembered until you reset them with
 `omarchy-shell nytafar.gjetr resetOverrides`.

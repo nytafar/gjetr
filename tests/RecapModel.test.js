@@ -75,3 +75,47 @@ test("modes are off, inline and expand, default off", () => {
   assert.equal(Recap.normalizeMode("expand"), "expand")
   assert.equal(Recap.normalizeMode("loud"), "off")
 })
+
+test("a Recap opens in the card or an overlay, default card", () => {
+  assert.deepEqual(Array.from(Recap.OPEN_MODES), ["card", "overlay"])
+  assert.equal(Recap.DEFAULT_OPEN, "card")
+  assert.equal(Recap.normalizeOpen("overlay"), "overlay")
+  assert.equal(Recap.normalizeOpen("popup"), "card")
+})
+
+test("open Recaps are toggled per Module and pane, several at once", () => {
+  let open = Recap.emptyOpen()
+  open = Recap.toggleOpen(open, "triage#0", "w1:p2")
+  open = Recap.toggleOpen(open, "triage#0", "w4:pT")
+  open = Recap.toggleOpen(open, "wide#0", "w1:p2")
+  assert.equal(Recap.isOpen(open, "triage#0", "w1:p2"), true)
+  assert.equal(Recap.isOpen(open, "triage#0", "w4:pT"), true)
+  assert.equal(Recap.isOpen(open, "cache#0", "w1:p2"), false)
+  assert.deepEqual(Array.from(Recap.openPanes(open, "triage#0")), ["w1:p2", "w4:pT"])
+  const before = open
+  open = Recap.toggleOpen(open, "triage#0", "w1:p2")
+  assert.equal(Recap.isOpen(open, "triage#0", "w1:p2"), false)
+  assert.equal(Recap.isOpen(before, "triage#0", "w1:p2"), true, "toggling returns a new state")
+  assert.deepEqual(Array.from(Recap.openPanes(open, "triage#0")), ["w4:pT"])
+  assert.deepEqual(Array.from(Recap.openPanes(Recap.toggleOpen(open, "wide#0", "w1:p2"), "wide#0")), [])
+})
+
+test("open state ignores junk keys and prototype names", () => {
+  const open = Recap.emptyOpen()
+  assert.equal(Recap.toggleOpen(open, "", "w1:p2"), open)
+  assert.equal(Recap.toggleOpen(open, "triage#0", ""), open)
+  assert.equal(Recap.toggleOpen(open, "triage#0", 5), open)
+  assert.equal(Recap.isOpen(open, "triage#0", "__proto__"), false)
+  assert.equal(Recap.isOpen(null, "triage#0", "w1:p2"), false)
+  assert.equal(Recap.isOpen(Recap.toggleOpen(open, "__proto__", "constructor"), "__proto__", "constructor"), true)
+  assert.equal(({}).constructor === Object, true)
+})
+
+test("pruneOpen drops panes that are gone and keeps the state when nothing changed", () => {
+  let open = Recap.toggleOpen(Recap.toggleOpen(Recap.emptyOpen(), "triage#0", "w1:p2"), "wide#0", "w9:p1")
+  assert.equal(Recap.pruneOpen(open, ["w1:p2", "w9:p1", "w3:p3"]), open)
+  const pruned = Recap.pruneOpen(open, ["w1:p2"])
+  assert.deepEqual(Array.from(Recap.openPanes(pruned, "triage#0")), ["w1:p2"])
+  assert.deepEqual(Array.from(Recap.openPanes(pruned, "wide#0")), [])
+  assert.deepEqual(Object.keys(pruned), ["triage#0"])
+})

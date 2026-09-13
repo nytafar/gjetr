@@ -75,6 +75,13 @@ Item {
   // modification time or size changes. Polled only while an Agent List shows
   // Recaps.
   readonly property string recapMode: agentListConfig.settings.recap
+  // Where an expanded Recap opens: "card" (inside the Card) or "overlay".
+  readonly property string recapOpenMode: agentListConfig.settings.recapOpen
+  // Session state, never written: the Cards whose Recap is open, per Module key
+  // and pane id (RecapModel open state), and the pane shown in the overlay.
+  // Both follow pane ids, so they survive re-sorts and updates.
+  property var recapOpen: RecapModel.emptyOpen()
+  property string recapOverlayPane: ""
   readonly property string claudeProjectsDir: RecapModel.projectsDir(home)
   property var recapPaths: ({})
   property var recapLocated: ({})
@@ -268,6 +275,45 @@ Item {
     if (!agent || recapMode === "off") return ""
     var entry = map[agent.sessionId]
     return entry ? entry.text : ""
+  }
+
+  function agentByPane(paneId) {
+    var id = String(paneId || "")
+    for (var i = 0; i < agents.length; i++) if (agents[i].paneId === id) return agents[i]
+    return null
+  }
+
+  // Pass `recapOpen` from a binding so a Card re-evaluates when it changes.
+  function recapOpenFor(agent, open) {
+    return !!agent && recapMode === "expand" && recapOpenMode === "card"
+      && RecapModel.isOpen(open, agentListKey, agent.paneId)
+  }
+
+  // Opens or closes an Agent's full Recap, in its Card or in the overlay as the
+  // Module's recap_open says. -> "open", "closed" or why nothing happened.
+  function toggleRecap(paneId) {
+    var agent = agentByPane(paneId)
+    if (!agent) return "unknown pane"
+    if (recapMode !== "expand") return "recap is " + recapMode + ", not expand"
+    if (recapFor(agent, recaps) === "") return "no recap"
+    if (recapOpenMode === "overlay") {
+      recapOverlayPane = recapOverlayPane === agent.paneId ? "" : agent.paneId
+      return recapOverlayPane === agent.paneId ? "open" : "closed"
+    }
+    recapOpen = RecapModel.toggleOpen(recapOpen, agentListKey, agent.paneId)
+    return RecapModel.isOpen(recapOpen, agentListKey, agent.paneId) ? "open" : "closed"
+  }
+
+  function closeRecapOverlay() {
+    recapOverlayPane = ""
+  }
+
+  // Open Recaps of panes that are no longer Agents are forgotten, so a later
+  // pane never inherits one. Offline keeps the last Agents, and their state.
+  function pruneRecapOpen() {
+    var ids = agents.map(function(agent) { return agent.paneId })
+    recapOpen = RecapModel.pruneOpen(recapOpen, ids)
+    if (recapOverlayPane !== "" && ids.indexOf(recapOverlayPane) < 0) recapOverlayPane = ""
   }
 
   function recapSessions() {
@@ -471,6 +517,7 @@ Item {
     var next = AttentionModel.update(attention, agents)
     var entered = AttentionModel.count(next) > AttentionModel.count(attention)
     attention = next
+    pruneRecapOpen()
     if (entered) log("attention " + Object.keys(next.attention).join(", ").replace(/p:/g, ""))
     resort()
   }
@@ -554,6 +601,9 @@ Item {
       },
       recap: {
         mode: recapMode,
+        open: recapOpenMode,
+        openCards: RecapModel.openPanes(recapOpen, agentListKey),
+        overlay: recapOverlayPane,
         sessions: recapSessions().length,
         located: Object.keys(recapPaths).length,
         recaps: Object.keys(recaps).length
@@ -637,7 +687,10 @@ Item {
   }
 
   onAgentsChanged: applyAgents()
-  onActiveLayoutNameChanged: orientationTimer.restart()
+  onActiveLayoutNameChanged: {
+    recapOverlayPane = ""
+    orientationTimer.restart()
+  }
   onActiveOrientationChanged: orientationTimer.restart()
   onOverridesLoadedChanged: orientationTimer.restart()
 
@@ -740,6 +793,11 @@ Item {
 
     function toggleFocus(): string {
       return root.toggleFocusMode()
+    }
+
+    // Opens or closes a Card's full Recap, as a tap on its recap area does.
+    function toggleRecap(paneId: string): string {
+      return root.toggleRecap(paneId)
     }
 
     function selectLayout(name: string): string {

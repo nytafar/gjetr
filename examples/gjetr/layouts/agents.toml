@@ -30,3 +30,8 @@ focus = "herdr"
 # session id herdr reports). "off", "inline" (two lines on the Card) or
 # "expand" (a "recap" area on the Card, or a long press, shows it in full).
 recap = "off"
+
+# With recap = "expand", where the full Recap opens: "card" (under the Card's
+# Fields; the Card grows, and a tap on the Recap closes it; several can be open)
+# or "overlay" (over the whole list; a tap closes it).
+recap_open = "card"

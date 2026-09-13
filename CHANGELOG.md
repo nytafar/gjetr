@@ -4,6 +4,23 @@ All notable changes to gjetr. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `recap_open = "card" | "overlay"` per Agent List, default `card`: with
+  `recap = "expand"` the full Recap opens inside its Card, under the Fields,
+  and the Card grows. Several Cards can be open at once; open Cards follow
+  their Agents through re-sorts and updates without moving the scroll
+  position, and are not persisted. `overlay` keeps the previous behaviour.
+- IPC `toggleRecap <pane-id>`, and `recap.open`, `recap.openCards` and
+  `recap.overlay` in `state`.
+
+### Changed
+
+- The Agent List places Cards by measured height instead of a uniform grid,
+  so a Card can grow.
+
 ## [0.1.0] - 2026-09-13
 
 First release: an Omarchy shell plugin that replaces herdr's sidebar on a
