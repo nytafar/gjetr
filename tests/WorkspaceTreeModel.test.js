@@ -156,3 +156,11 @@ test("nodeExists finds workspaces, tabs and panes by node key", () => {
   assert.equal(Tree.nodeExists(tree, "p:w9:p1"), false)
   assert.equal(Tree.nodeExists(null, "w:w1"), false)
 })
+
+test("node keys with control characters or over 64 characters of id are refused", () => {
+  const same = Tree.emptyExpanded()
+  for (const bad of ["w:a\u0000b", "t:\u001fx", "w:x\u007f", "w:" + "x".repeat(65)]) {
+    assert.equal(Tree.toggleExpanded(same, "ws#0", bad), same, JSON.stringify(bad))
+  }
+  assert.notEqual(Tree.toggleExpanded(same, "ws#0", "t:w1:t2"), same)
+})
