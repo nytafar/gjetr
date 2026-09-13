@@ -2,6 +2,8 @@ import QtQuick
 import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
 import "../../lib/StatusPolicy.js" as StatusPolicy
+import "../../lib/IndicatorPolicy.js" as IndicatorPolicy
+import "../../components"
 import "../../lib/RepoModel.js" as RepoModel
 
 // One Agent as a compact row, for a pointer Display or a narrow column
@@ -20,6 +22,15 @@ Item {
   property var density: null
   property bool interactive: true
   property var indicator: StatusPolicy.indicator("unknown")
+  // The kind mark as status indicator (IndicatorPolicy): the Module's
+  // indicator setting, this Agent's mark state with its tone resolved, the
+  // theme palette for the hue effect, and whether the mark may move (on screen).
+  property string indicatorMode: IndicatorPolicy.DEFAULT_MODE
+  property var mark: IndicatorPolicy.markFor("unknown", "", "")
+  property color markColor: Color.muted
+  property var palette: []
+  property bool animate: true
+  readonly property bool showGlyph: fields.status && IndicatorPolicy.showsGlyph(indicatorMode, fields.kind)
   property color statusColor: Color.muted
   property color cacheColor: Color.muted
   property bool inFocusedWorkspace: false
@@ -120,7 +131,7 @@ Item {
 
   Item {
     id: statusGlyph
-    visible: root.fields.status
+    visible: root.showGlyph
     anchors { left: parent.left; leftMargin: root.t.pad; verticalCenter: line.verticalCenter }
     width: visible ? root.t.statusWidth : 0
     height: root.t.statusWidth
@@ -136,7 +147,7 @@ Item {
       font.bold: root.indicator.status === "blocked" || root.indicator.status === "done"
 
       RotationAnimation on rotation {
-        running: root.indicator.motion === "spin" && root.visible
+        running: root.indicator.motion === "spin" && root.visible && root.showGlyph
         from: 0
         to: 360
         duration: 1800
@@ -146,43 +157,22 @@ Item {
     }
   }
 
-  Item {
+  KindMark {
     id: kindIcon
     visible: root.fields.kind
-    anchors { left: statusGlyph.right; leftMargin: root.t.gap; verticalCenter: line.verticalCenter }
+    anchors { left: statusGlyph.right; leftMargin: statusGlyph.visible ? root.t.gap : 0; verticalCenter: line.verticalCenter }
     width: visible ? root.t.iconPx : 0
     height: root.t.iconPx
-
-    Image {
-      id: kindImage
-      anchors.fill: parent
-      source: root.iconUrl
-      sourceSize.width: root.t.iconSourcePx
-      sourceSize.height: root.t.iconSourcePx
-      fillMode: Image.PreserveAspectFit
-      smooth: true
-      visible: status === Image.Ready
-    }
-
-    // A kind without an Omarchy mark: its letter in a thin frame.
-    Rectangle {
-      anchors.fill: parent
-      visible: kindImage.status !== Image.Ready
-      color: "transparent"
-      radius: Math.min(Style.cornerRadius, 3)
-      border.width: 1
-      border.color: Color.muted
-    }
-
-    Text {
-      anchors.centerIn: parent
-      visible: kindImage.status !== Image.Ready
-      text: root.agent ? CardPolicy.kindGlyph(root.agent.kind, root.agent.displayKind) : ""
-      color: Color.muted
-      font.family: Style.font.family
-      font.pixelSize: root.t.detailPx
-      font.bold: true
-    }
+    iconUrl: root.iconUrl
+    letter: root.agent ? CardPolicy.kindGlyph(root.agent.kind, root.agent.displayKind) : ""
+    sourcePx: root.t.iconSourcePx
+    letterPx: root.t.detailPx
+    frameRadius: Math.min(Style.cornerRadius, 3)
+    stateful: IndicatorPolicy.marksState(root.indicatorMode)
+    mark: root.mark
+    toneColor: root.markColor
+    palette: root.palette
+    animate: root.animate && root.visible
   }
 
   Text {

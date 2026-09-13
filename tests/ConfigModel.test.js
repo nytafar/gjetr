@@ -161,7 +161,7 @@ focus = "window"
   assert.deepEqual(plain(read.layout), {
     name: "agents",
     orientation: "landscape",
-    modules: [{ type: "agent-list", sort: "cache", preset: "compact", focus: "window", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true, density: "auto" }]
+    modules: [{ type: "agent-list", sort: "cache", preset: "compact", focus: "window", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true, density: "auto", indicator: "glyph", workingEffect: "sweep" }]
   })
 })
 
@@ -170,7 +170,7 @@ test("a missing layout file is the default Agent List, with an error", () => {
   assert.deepEqual(plain(read.layout), {
     name: "agents",
     orientation: "portrait",
-    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true, density: "auto" }]
+    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true, density: "auto", indicator: "glyph", workingEffect: "sweep" }]
   })
   assert.match(read.errors.join("\n"), /layouts\/agents\.toml: not found/)
 })
@@ -188,7 +188,7 @@ extra = true
   assert.deepEqual(plain(read.layout), {
     name: "side",
     orientation: "portrait",
-    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true, density: "auto" }]
+    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true, density: "auto", indicator: "glyph", workingEffect: "sweep" }]
   })
   const text = read.errors.join("\n")
   for (const key of ["orientation", "module[0].sort", "module[0].preset", "module[0].focus", "module[0].extra"]) {
@@ -198,7 +198,7 @@ extra = true
 
 test("unknown module types are skipped; no modules left means the default", () => {
   const read = Config.readLayout("x", '[[module]]\ntype = "clock"\n')
-  assert.deepEqual(plain(read.layout.modules), [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true, density: "auto" }])
+  assert.deepEqual(plain(read.layout.modules), [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true, density: "auto", indicator: "glyph", workingEffect: "sweep" }])
   assert.match(read.errors.join("\n"), /module\[0\]\.type: /)
   assert.match(read.errors.join("\n"), /no valid module/)
 })
@@ -305,14 +305,14 @@ test("layoutModules keys Modules by their position among valid Modules", () => {
 test("a workspace-list Module reads tap, focus and weight", () => {
   const read = Config.readLayout("ws", '[[module]]\ntype = "workspace-list"\ntap = "focus"\nfocus = "window"\nweight = 2\n')
   assert.deepEqual(Array.from(read.errors), [])
-  assert.deepEqual(plain(read.layout.modules), [{ type: "workspace-list", tap: "focus", focus: "window", weight: 2, density: "auto" }])
+  assert.deepEqual(plain(read.layout.modules), [{ type: "workspace-list", tap: "focus", focus: "window", weight: 2, density: "auto", indicator: "glyph", workingEffect: "sweep" }])
   const plainList = Config.readLayout("ws", '[[module]]\ntype = "workspace-list"\n')
-  assert.deepEqual(plain(plainList.layout.modules), [{ type: "workspace-list", tap: "expand", focus: "herdr", weight: 1, density: "auto" }])
+  assert.deepEqual(plain(plainList.layout.modules), [{ type: "workspace-list", tap: "expand", focus: "herdr", weight: 1, density: "auto", indicator: "glyph", workingEffect: "sweep" }])
 })
 
 test("workspace-list values fall back per field", () => {
   const read = Config.readLayout("ws", '[[module]]\ntype = "workspace-list"\ntap = "hover"\nfocus = "teleport"\nsort = "spaces"\n')
-  assert.deepEqual(plain(read.layout.modules), [{ type: "workspace-list", tap: "expand", focus: "herdr", weight: 1, density: "auto" }])
+  assert.deepEqual(plain(read.layout.modules), [{ type: "workspace-list", tap: "expand", focus: "herdr", weight: 1, density: "auto", indicator: "glyph", workingEffect: "sweep" }])
   const text = read.errors.join("\n")
   assert.match(text, /layouts\/ws\.toml: module\[0\]\.tap: expected one of expand, focus/)
   assert.match(text, /layouts\/ws\.toml: module\[0\]\.focus: expected one of herdr, window/)
@@ -635,4 +635,45 @@ test("defaults per Display are refused: a Layout is the same Modules on every Di
   const read = Config.readMain('[[display]]\nname = "DP-1"\n[display.defaults]\ndensity = "compact"\n', HOME)
   assert.match(read.errors.join("\n"), /gjetr\.toml: display\[0\]\.defaults: not per Display, a Layout is the same Modules on every Display; use \[defaults\] \(ignored\)/)
   assert.equal(read.config.defaults["agent-list"].density, "auto")
+})
+
+test("indicator and working_effect on Agent Lists and Workspace Lists", () => {
+  for (const type of ["agent-list", "workspace-list"]) {
+    const plainModule = Config.readLayout("i", `[[module]]\ntype = "${type}"\n`).layout.modules[0]
+    assert.deepEqual([plainModule.indicator, plainModule.workingEffect], ["glyph", "sweep"], type)
+    for (const indicator of ["glyph", "icon", "both"]) {
+      for (const effect of ["sweep", "breathe", "hue", "shimmer"]) {
+        const read = Config.readLayout("i", `[[module]]\ntype = "${type}"\nindicator = "${indicator}"\nworking_effect = "${effect}"\n`)
+        assert.deepEqual(Array.from(read.errors), [], type + indicator + effect)
+        assert.deepEqual([read.layout.modules[0].indicator, read.layout.modules[0].workingEffect], [indicator, effect])
+      }
+    }
+    const bad = Config.readLayout("i", `[[module]]\ntype = "${type}"\nindicator = "glow"\nworking_effect = 2\n`)
+    assert.deepEqual([bad.layout.modules[0].indicator, bad.layout.modules[0].workingEffect], ["glyph", "sweep"])
+    assert.match(bad.errors.join("\n"), /layouts\/i\.toml: module\[0\]\.indicator: expected one of glyph, icon, both, got "glow"/)
+    assert.match(bad.errors.join("\n"), /layouts\/i\.toml: module\[0\]\.working_effect: expected one of sweep, breathe, hue, shimmer, got 2/)
+  }
+  const usage = Config.readLayout("i", '[[module]]\ntype = "usage"\nindicator = "icon"\n')
+  assert.match(usage.errors.join("\n"), /module\[0\]\.indicator: unknown key/)
+})
+
+test("indicator cascades: [defaults.agent-list] icon, a Module back to glyph", () => {
+  const { main, layout } = layoutWith('[defaults]\nworking_effect = "hue"\n\n[defaults.agent-list]\nindicator = "icon"\n', `
+[[module]]
+type = "agent-list"
+[[module]]
+type = "agent-list"
+indicator = "glyph"
+[[module]]
+type = "workspace-list"
+[[module]]
+type = "usage"
+`)
+  assert.deepEqual(Array.from(main.errors), [])
+  assert.deepEqual(Array.from(layout.errors), [])
+  const [first, second, tree, usage] = plain(layout.layout.modules)
+  assert.deepEqual([first.indicator, first.workingEffect], ["icon", "hue"])
+  assert.deepEqual([second.indicator, second.workingEffect], ["glyph", "hue"])
+  assert.deepEqual([tree.indicator, tree.workingEffect], ["glyph", "hue"])
+  assert.equal(usage.indicator, undefined)
 })

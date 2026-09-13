@@ -16,3 +16,13 @@ test("a missing, malformed or oversized palette gives no success colour", () => 
     assert.equal(Theme.successColor(text), "", String(text).slice(0, 20))
   }
 })
+
+test("palette lists the accent and the theme's hues once each, in order", () => {
+  const Palette = loadLib("lib/ThemeModel.js")
+  const text = 'accent = "#f38d70"\nred = "#fd6883"\nyellow = "#F9CC6C"\ngreen = "#adda78"\ncyan = "nope"\nblue = "#F38D70"\nmagenta = "#a8a9eb"\n'
+  assert.deepEqual(Array.from(Palette.palette(text)), ["#f38d70", "#fd6883", "#F9CC6C", "#adda78", "#a8a9eb"])
+  for (const junk of [null, undefined, "", "= broken", "x".repeat(20000)]) {
+    assert.deepEqual(Array.from(Palette.palette(junk)), [], String(junk).slice(0, 10))
+  }
+  assert.equal(Palette.successColor(text), "#adda78")
+})

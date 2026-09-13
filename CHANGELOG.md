@@ -8,6 +8,18 @@ All notable changes to gjetr. The format follows
 
 ### Added
 
+- Status indicator: `indicator = "glyph" | "icon" | "both"` on Agent Lists and
+  Workspace Lists, default `glyph` as before. With `icon` the kind mark
+  (Omarchy's SVG or the letter mark) is drawn in its Agent's status: working in
+  the accent and moving with `working_effect` (`sweep`, the default: a slow
+  gradient; `breathe`: brightness and a soft glow every 1.5 s; `hue`: a cycle
+  through the theme's colours; `shimmer`: a highlight passing every 2 s), idle
+  dim, blocked urgent with a sharp flash, done green and pulsing until seen,
+  unknown faded. The glyph is hidden where a mark carries the state and the
+  status word stays; `both` keeps the glyph. Drawn with QtQuick.Effects
+  (MultiEffect with the mark as mask); marks move only while on screen and
+  their Display is shown. Both settings cascade through `[defaults]`. `state`
+  reports each Module's `indicator` and `workingEffect`, and `theme.palette`.
 - Defaults: Module settings given once in `gjetr.toml`. `[defaults]` applies a
   setting to every Module type that takes the key, `[defaults.<type>]` to one
   type (`agent-list`, `workspace-list`, `usage`); the order is built-in default,

@@ -8,6 +8,7 @@ import "../../lib/DensityPolicy.js" as DensityPolicy
 import "../../lib/LayoutPolicy.js" as LayoutPolicy
 import "../../lib/ListSyncPolicy.js" as ListSyncPolicy
 import "../../lib/StatusPolicy.js" as StatusPolicy
+import "../../lib/IndicatorPolicy.js" as IndicatorPolicy
 
 // The Agent List Module: every Agent as a Card, in this Module's Sort mode.
 // Presentation only. Its settings (Config shadowed by Overrides) come from the
@@ -46,6 +47,12 @@ Item {
     ? service.focusedWorkspaceId : ""
 
   readonly property string recapMode: moduleState ? moduleState.recap : "off"
+  // The kind mark as status indicator (IndicatorPolicy): glyph, icon or both,
+  // and how a working mark moves.
+  readonly property string indicatorMode: moduleState ? moduleState.indicator : IndicatorPolicy.DEFAULT_MODE
+  readonly property string workingEffect: moduleState ? moduleState.workingEffect : IndicatorPolicy.DEFAULT_WORKING_EFFECT
+  // Marks move only while this list's window is shown (a hidden Dock is not).
+  readonly property bool windowShown: !Window.window || Window.window.visible
   // The Agent whose Recap is open in this Module's overlay (recap_open =
   // "overlay"), or null.
   readonly property string recapPane: service && moduleState && moduleState.recapOpen === "overlay"
@@ -271,6 +278,9 @@ Item {
         readonly property bool inFocusedWorkspace: root.highlightedWorkspace !== "" && !!agent
           && agent.workspaceId === root.highlightedWorkspace
         readonly property bool recapOpen: root.service ? root.service.recapOpenFor(agent, root.service.recapOpen, root.moduleKey) : false
+        readonly property var mark: IndicatorPolicy.markFor(agent ? agent.status : "", attention, root.workingEffect)
+        // Within the list's view and its window shown: only then may a mark move.
+        readonly property bool onScreen: root.windowShown && y + height > grid.contentY && y < grid.contentY + grid.height
 
         function focusIt() {
           if (agent && root.service) root.service.focusAgent(agent, root.moduleKey, root.input)
@@ -305,6 +315,11 @@ Item {
             baseHeight: CardPolicy.cardHeightFor(root.preset, root.recapMode, cell.recapText)
             interactive: root.online
             indicator: cell.indicator
+            indicatorMode: root.indicatorMode
+            mark: cell.mark
+            markColor: root.toneColor(cell.mark.tone)
+            palette: root.service ? root.service.indicatorPalette : []
+            animate: cell.onScreen
             statusColor: root.toneColor(cell.indicator.tone)
             showStatusWord: StatusPolicy.showsLabel(root.preset)
             cacheColor: root.toneColor(CardPolicy.cacheTone(cell.cacheTimer ? cell.cacheTimer.level : ""))
@@ -331,6 +346,11 @@ Item {
             baseHeight: DensityPolicy.fullCardHeight(root.density, DensityPolicy.fullRecapShown(root.recapMode, cell.recapText))
             interactive: root.online
             indicator: cell.indicator
+            indicatorMode: root.indicatorMode
+            mark: cell.mark
+            markColor: root.toneColor(cell.mark.tone)
+            palette: root.service ? root.service.indicatorPalette : []
+            animate: cell.onScreen
             statusColor: root.toneColor(cell.indicator.tone)
             cacheColor: root.toneColor(cell.cacheTimer && cell.cacheTimer.level === "ok" ? "foreground"
               : CardPolicy.cacheTone(cell.cacheTimer ? cell.cacheTimer.level : ""))
@@ -360,6 +380,11 @@ Item {
             baseHeight: DensityPolicy.rowHeight(root.density, secondLine !== "")
             interactive: root.online
             indicator: cell.indicator
+            indicatorMode: root.indicatorMode
+            mark: cell.mark
+            markColor: root.toneColor(cell.mark.tone)
+            palette: root.service ? root.service.indicatorPalette : []
+            animate: cell.onScreen
             statusColor: root.toneColor(cell.indicator.tone)
             cacheColor: root.toneColor(CardPolicy.cacheTone(cell.cacheTimer ? cell.cacheTimer.level : ""))
             attention: cell.attention

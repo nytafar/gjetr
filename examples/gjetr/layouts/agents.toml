@@ -45,3 +45,14 @@ recap_open = "card"
 # Cards of Agents in herdr's focused workspace get a subtle tint. The list is
 # never filtered. true (default) or false.
 highlight_workspace = true
+
+# How a Card shows status: "glyph" (default: the glyph beside the kind mark),
+# "icon" (the kind mark itself in the status colour: moving while working,
+# dim when idle, flashing when blocked, green and pulsing when done until seen;
+# the glyph goes, the status word stays) or "both".
+indicator = "glyph"
+
+# How a working kind mark moves with "icon" or "both": "sweep" (a slow accent
+# gradient, default), "breathe" (brightness and a soft glow, about 1.5 s),
+# "hue" (cycles the theme's colours) or "shimmer" (a highlight every 2 s).
+working_effect = "sweep"

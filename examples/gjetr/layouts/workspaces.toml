@@ -22,6 +22,11 @@ tap = "expand"
 # flips it as an Override.
 focus = "herdr"
 
+# Status on pane rows: "glyph" (default), "icon" (the kind mark in its status
+# colour and moving) or "both"; workspace rows always keep their glyph. See
+# layouts/agents.toml for working_effect.
+# indicator = "glyph"
+
 [[module]]
 type = "agent-list"
 sort = "spaces"

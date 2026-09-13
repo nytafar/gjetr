@@ -2,6 +2,8 @@ import QtQuick
 import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
 import "../../lib/StatusPolicy.js" as StatusPolicy
+import "../../lib/IndicatorPolicy.js" as IndicatorPolicy
+import "../../components"
 
 // One Agent as a Card. Shows the Fields its preset selects; colours arrive as
 // resolved theme tokens from the list. The Card's height is its Fields band,
@@ -16,6 +18,15 @@ Item {
   property bool interactive: true
   // Status: glyph, word, tone and motion (StatusPolicy), and its tone resolved.
   property var indicator: StatusPolicy.indicator("unknown")
+  // The kind mark as status indicator (IndicatorPolicy): the Module's
+  // indicator setting, this Agent's mark state with its tone resolved, the
+  // theme palette for the hue effect, and whether the mark may move (on screen).
+  property string indicatorMode: IndicatorPolicy.DEFAULT_MODE
+  property var mark: IndicatorPolicy.markFor("unknown", "", "")
+  property color markColor: Color.muted
+  property var palette: []
+  property bool animate: true
+  readonly property bool showGlyph: fields.status && IndicatorPolicy.showsGlyph(indicatorMode, fields.kind)
   property color statusColor: Color.muted
   // Whether the status word shows beside the glyph (not in the compact preset).
   property bool showStatusWord: true
@@ -90,7 +101,7 @@ Item {
   // without colour; it turns while the Agent is working.
   Item {
     id: statusGlyph
-    visible: root.fields.status
+    visible: root.showGlyph
     anchors { left: parent.left; leftMargin: root.pad; verticalCenter: band.verticalCenter }
     width: visible ? 28 : 0
     height: 28
@@ -106,7 +117,7 @@ Item {
       font.bold: root.indicator.status === "blocked" || root.indicator.status === "done"
 
       RotationAnimation on rotation {
-        running: root.indicator.motion === "spin" && root.visible
+        running: root.indicator.motion === "spin" && root.visible && root.showGlyph
         from: 0
         to: 360
         duration: 1800
@@ -123,43 +134,22 @@ Item {
     height: root.baseHeight
   }
 
-  Item {
+  KindMark {
     id: kindIcon
     visible: root.fields.kind
-    anchors { left: statusGlyph.right; leftMargin: root.pad; verticalCenter: band.verticalCenter }
+    anchors { left: statusGlyph.right; leftMargin: statusGlyph.visible ? root.pad : 0; verticalCenter: band.verticalCenter }
     width: visible ? 28 : 0
     height: 28
-
-    Image {
-      id: kindImage
-      anchors.fill: parent
-      source: root.iconUrl
-      sourceSize.width: 56
-      sourceSize.height: 56
-      fillMode: Image.PreserveAspectFit
-      smooth: true
-      visible: status === Image.Ready
-    }
-
-    // A kind without an Omarchy mark: its letter in a thin frame.
-    Rectangle {
-      anchors.fill: parent
-      visible: kindImage.status !== Image.Ready
-      color: "transparent"
-      radius: Math.min(Style.cornerRadius, 6)
-      border.width: 1
-      border.color: Color.muted
-    }
-
-    Text {
-      anchors.centerIn: parent
-      visible: kindImage.status !== Image.Ready
-      text: root.agent ? CardPolicy.kindGlyph(root.agent.kind, root.agent.displayKind) : ""
-      color: Color.muted
-      font.family: Style.font.family
-      font.pixelSize: Math.round(Style.font.title * root.textScale)
-      font.bold: true
-    }
+    iconUrl: root.iconUrl
+    letter: root.agent ? CardPolicy.kindGlyph(root.agent.kind, root.agent.displayKind) : ""
+    sourcePx: 56
+    letterPx: Math.round(Style.font.title * root.textScale)
+    frameRadius: Math.min(Style.cornerRadius, 6)
+    stateful: IndicatorPolicy.marksState(root.indicatorMode)
+    mark: root.mark
+    toneColor: root.markColor
+    palette: root.palette
+    animate: root.animate && root.visible
   }
 
   Column {

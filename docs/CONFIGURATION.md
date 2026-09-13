@@ -115,8 +115,9 @@ density = "full"
 
 Every Module setting in the tables under [`layouts/<name>.toml`](#layoutsnametoml)
 can be a default (`density`; for Agent Lists `sort`, `preset`, `focus`,
-`recap`, `recap_open`, `highlight_workspace`; for Workspace Lists `tap`,
-`focus`; for Usage `show`, `providers`, `refresh_seconds`). `type` and `weight`
+`recap`, `recap_open`, `highlight_workspace`, `indicator`, `working_effect`;
+for Workspace Lists `tap`, `focus`, `indicator`, `working_effect`; for Usage
+`show`, `providers`, `refresh_seconds`). `type` and `weight`
 place a Module in its Layout, so only a `[[module]]` takes them.
 
 - A bad value in the defaults is logged once, naming `gjetr.toml` and the
@@ -299,6 +300,8 @@ Every Agent across workspaces as a Card.
 | `recap` | `"off"`, `"inline"`, `"expand"` | `"off"` | Recap Field for Claude Agents |
 | `recap_open` | `"card"`, `"overlay"` | `"card"` | With `recap = "expand"`: open the full Recap inside the Card or over the list |
 | `highlight_workspace` | `true`, `false` | `true` | Tint the Cards of Agents in herdr's Focused workspace. It never filters the list |
+| `indicator` | `"glyph"`, `"icon"`, `"both"` | `"glyph"` | How a Card shows its status: the glyph beside the kind mark, the kind mark itself in the status colour and moving, or both. See [Status indicator](#status-indicator) |
+| `working_effect` | `"sweep"`, `"breathe"`, `"hue"`, `"shimmer"` | `"sweep"` | How a working Agent's kind mark moves with `indicator = "icon"` or `"both"` |
 
 ```toml
 orientation = "portrait"
@@ -410,6 +413,47 @@ colour. While the Agent is working, the glyph turns:
 The `compact` preset shows the glyph without the word. Blocked and done Cards
 also pulse while their Agent is in Attention.
 
+#### Status indicator
+
+With `indicator = "icon"` the kind mark carries the status instead of the
+glyph. Claude's and Codex's marks and every letter mark are drawn in one
+colour, the status's, and move:
+
+| Status | Kind mark |
+|---|---|
+| working | accent, moving with `working_effect` |
+| idle | dimmed, still |
+| blocked | urgent, with a short sharp flash about once a second |
+| done | the theme's green; pulsing while the Agent is in [Attention](#attention), steady once seen |
+| unknown | faded, still |
+
+`working_effect` chooses how a working mark moves:
+
+- `sweep` (the default): a slow gradient of the accent colour moves through it.
+- `breathe`: it brightens with a soft glow and back, about every 1.5 seconds.
+- `hue`: it cycles slowly through the theme's accent and colours (`red`,
+  `yellow`, `green`, `cyan`, `blue` and `magenta` in its `colors.toml`).
+- `shimmer`: a narrow highlight passes over it every 2 seconds.
+
+Without the glyph, the status word is what reads without colour: comfortable
+Cards with the `detailed` preset and full Cards keep it, compact rows have
+none, so use `"both"` there when status must read without colour. On a full
+Card the mark moves up into the glyph's place beside the name. `"both"` keeps
+the glyph and adds the stateful mark. In a Workspace List, workspace rows and
+tabs with several panes have no kind mark and keep their glyph.
+
+A mark moves only while it is on screen and its Display is shown; a still
+mark costs nothing per frame. Moving marks cost some CPU for as long as Agents
+work: with 20 working Agents in view, `shimmer` costs the least and `hue` the
+most, and `"glyph"` (the turning glyph) less than any of them. Set the indicator for every list at once with
+[`[defaults]`](#defaults):
+
+```toml
+[defaults.agent-list]
+indicator = "icon"
+working_effect = "breathe"
+```
+
 #### Recap
 
 The latest session recap Claude Code wrote for a Claude Agent. herdr reports
@@ -442,6 +486,8 @@ plain shell from the Display.
 |---|---|---|---|
 | `tap` | `"expand"`, `"focus"` | `"expand"` | What a tap on a row does (below) |
 | `focus` | `"herdr"`, `"window"` | `"herdr"` | Focus behaviour for this Module's taps, as for the Agent List. Tapping `focus` in the header flips it as an Override |
+| `indicator` | `"glyph"`, `"icon"`, `"both"` | `"glyph"` | As for the Agent List, on pane rows and tabs with one pane. See [Status indicator](#status-indicator) |
+| `working_effect` | `"sweep"`, `"breathe"`, `"hue"`, `"shimmer"` | `"sweep"` | As for the Agent List |
 
 ```toml
 orientation = "landscape"
@@ -472,7 +518,8 @@ draws its first letter.
 
 A workspace's or tab's status is the one herdr reports for it, else the most
 urgent status below it (blocked, done, working, idle). Glyphs, colours and the
-turning working glyph are the same as on a Card, without the word. The Focused workspace,
+turning working glyph are the same as on a Card, without the word; with
+`indicator`, pane marks carry the status as on a Card. The Focused workspace,
 tab and pane are drawn selected. A row pulses while a pane in it is in
 Attention.
 

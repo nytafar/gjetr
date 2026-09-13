@@ -21,6 +21,7 @@
 # [defaults.agent-list]
 # sort = "priority"
 # recap = "inline"
+# indicator = "icon"
 
 [[display]]
 # The output to draw on, as `hyprctl monitors` names it.

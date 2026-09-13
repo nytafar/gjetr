@@ -246,6 +246,12 @@ Item {
   readonly property string themeColorsPath: home + "/.local/state/omarchy/current/theme/colors.toml"
   property string themeSuccess: ""
   readonly property color successColor: themeSuccess !== "" ? themeSuccess : Color.accent
+  // The theme's accent and hues (ThemeModel.palette), which a working kind mark
+  // cycles through with working_effect = "hue"; accent, green and urgent when
+  // the theme lists fewer than two.
+  property var themePalette: []
+  readonly property var indicatorPalette: themePalette.length >= 2 ? themePalette
+    : [String(Color.accent), String(successColor), String(Color.urgent)]
   readonly property bool lightBackground: (0.2126 * background.r + 0.7152 * background.g + 0.0722 * background.b) > 0.5
 
   // Attention, from status transitions between published Agent lists and from
@@ -828,7 +834,7 @@ Item {
         error: overridesError, modules: overrides.modules },
       focus: { requests: herdr.focuses, lastError: herdr.lastFocusError },
       attention: attention.attention,
-      theme: { success: String(successColor), fromTheme: themeSuccess !== "" },
+      theme: { success: String(successColor), fromTheme: themeSuccess !== "", palette: indicatorPalette },
       cache: {
         timers: Object.keys(cacheTimers).length,
         error: cacheTimersError,
@@ -968,8 +974,14 @@ Item {
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
-    onLoaded: root.themeSuccess = ThemeModel.successColor(text())
-    onLoadFailed: root.themeSuccess = ""
+    onLoaded: {
+      root.themeSuccess = ThemeModel.successColor(text())
+      root.themePalette = ThemeModel.palette(text())
+    }
+    onLoadFailed: {
+      root.themeSuccess = ""
+      root.themePalette = []
+    }
   }
 
   // A theme switch repoints the theme directory, which a file watch may miss;

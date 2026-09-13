@@ -8,6 +8,8 @@ import "../../lib/DensityPolicy.js" as DensityPolicy
 import "../../lib/LayoutPolicy.js" as LayoutPolicy
 import "../../lib/ListSyncPolicy.js" as ListSyncPolicy
 import "../../lib/StatusPolicy.js" as StatusPolicy
+import "../../lib/IndicatorPolicy.js" as IndicatorPolicy
+import "../../components"
 
 // The Workspace List Module: herdr's workspaces, tabs and panes as a tree that
 // expands in place, panes without an Agent included. Presentation only. Rows
@@ -37,6 +39,11 @@ Item {
     && service.moduleStates[moduleKey].type === "workspace-list" ? service.moduleStates[moduleKey] : null
   readonly property string tapMode: moduleState ? moduleState.tap : "expand"
   readonly property string focusMode: moduleState ? moduleState.focus : "herdr"
+  // The kind mark as status indicator (IndicatorPolicy), as on Agent Cards.
+  // Workspace rows have no mark, so they keep their glyph with "icon".
+  readonly property string indicatorMode: moduleState ? moduleState.indicator : IndicatorPolicy.DEFAULT_MODE
+  readonly property string workingEffect: moduleState ? moduleState.workingEffect : IndicatorPolicy.DEFAULT_WORKING_EFFECT
+  readonly property bool windowShown: !Window.window || Window.window.visible
   readonly property var rows: service
     ? service.workspaceRows(moduleKey, service.workspaceTree, service.treeExpanded, service.attention) : []
   readonly property int workspaceCount: service && service.workspaceTree ? service.workspaceTree.workspaces.length : 0
@@ -217,6 +224,8 @@ Item {
         readonly property color statusColor: root.toneColor(indicator.tone)
         readonly property color attentionColor: row && row.attention === "blocked" ? Color.urgent : Color.accent
         readonly property string iconUrl: row && row.kind !== "" && root.service ? root.service.kindIconUrl(row.kind) : ""
+        readonly property var mark: IndicatorPolicy.markFor(row ? row.status : "", row ? row.attention : "", root.workingEffect)
+        readonly property bool onScreen: root.windowShown && y + height > list.contentY && y < list.contentY + list.height
 
         x: depth * root.indent
         y: (root.rowIndex[nodeKey] !== undefined ? root.rowIndex[nodeKey] : 0) * root.pitch
@@ -265,8 +274,9 @@ Item {
 
         Item {
           id: statusGlyph
+          visible: IndicatorPolicy.showsGlyph(root.indicatorMode, kindIcon.visible)
           anchors { left: parent.left; leftMargin: root.compact ? root.pad : root.gap; verticalCenter: parent.verticalCenter }
-          width: root.statusSize
+          width: visible ? root.statusSize : 0
           height: root.statusSize
 
           Text {
@@ -281,7 +291,7 @@ Item {
             font.bold: rowItem.indicator.status === "blocked" || rowItem.indicator.status === "done"
 
             RotationAnimation on rotation {
-              running: rowItem.indicator.motion === "spin" && rowItem.visible
+              running: rowItem.indicator.motion === "spin" && rowItem.visible && statusGlyph.visible
               from: 0
               to: 360
               duration: 1800
@@ -291,43 +301,22 @@ Item {
           }
         }
 
-        Item {
+        KindMark {
           id: kindIcon
           visible: rowItem.row !== null && rowItem.row.kind !== "" && rowItem.row.type !== "workspace"
-          anchors { left: statusGlyph.right; leftMargin: root.gap; verticalCenter: parent.verticalCenter }
+          anchors { left: statusGlyph.right; leftMargin: statusGlyph.visible ? root.gap : 0; verticalCenter: parent.verticalCenter }
           width: visible ? root.iconSize : 0
           height: root.iconSize
-
-          Image {
-            id: kindImage
-            anchors.fill: parent
-            source: rowItem.iconUrl
-            sourceSize.width: root.compact ? root.density.iconSourcePx : 48
-            sourceSize.height: root.compact ? root.density.iconSourcePx : 48
-            fillMode: Image.PreserveAspectFit
-            smooth: true
-            visible: status === Image.Ready
-          }
-
-          // A kind without an Omarchy mark: its letter in a thin frame.
-          Rectangle {
-            anchors.fill: parent
-            visible: kindImage.status !== Image.Ready
-            color: "transparent"
-            radius: Math.min(Style.cornerRadius, 4)
-            border.width: 1
-            border.color: Color.muted
-          }
-
-          Text {
-            anchors.centerIn: parent
-            visible: kindImage.status !== Image.Ready
-            text: rowItem.row ? CardPolicy.kindGlyph(rowItem.row.kind, rowItem.row.displayKind) : ""
-            color: Color.muted
-            font.family: Style.font.family
-            font.pixelSize: root.compact ? root.density.detailPx : Math.round(Style.font.body * root.textScale)
-            font.bold: true
-          }
+          iconUrl: rowItem.iconUrl
+          letter: rowItem.row ? CardPolicy.kindGlyph(rowItem.row.kind, rowItem.row.displayKind) : ""
+          sourcePx: root.compact ? root.density.iconSourcePx : 48
+          letterPx: root.compact ? root.density.detailPx : Math.round(Style.font.body * root.textScale)
+          frameRadius: Math.min(Style.cornerRadius, 4)
+          stateful: IndicatorPolicy.marksState(root.indicatorMode)
+          mark: rowItem.mark
+          toneColor: root.toneColor(rowItem.mark.tone)
+          palette: root.service ? root.service.indicatorPalette : []
+          animate: rowItem.onScreen
         }
 
         Text {

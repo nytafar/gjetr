@@ -3,6 +3,8 @@ import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
 import "../../lib/DensityPolicy.js" as DensityPolicy
 import "../../lib/StatusPolicy.js" as StatusPolicy
+import "../../lib/IndicatorPolicy.js" as IndicatorPolicy
+import "../../components"
 
 // One Agent as a full Card (density = "full"), to be read leaning back from a
 // 4K Dock: the name large, the status glyph with its word and the repo and
@@ -20,6 +22,15 @@ Item {
   property var density: null
   property bool interactive: true
   property var indicator: StatusPolicy.indicator("unknown")
+  // The kind mark as status indicator (IndicatorPolicy): the Module's
+  // indicator setting, this Agent's mark state with its tone resolved, the
+  // theme palette for the hue effect, and whether the mark may move (on screen).
+  property string indicatorMode: IndicatorPolicy.DEFAULT_MODE
+  property var mark: IndicatorPolicy.markFor("unknown", "", "")
+  property color markColor: Color.muted
+  property var palette: []
+  property bool animate: true
+  readonly property bool showGlyph: fields.status && IndicatorPolicy.showsGlyph(indicatorMode, fields.kind)
   property color statusColor: Color.muted
   property color cacheColor: Color.foreground
   property color cacheBarColor: Color.muted
@@ -132,7 +143,7 @@ Item {
   // The glyph column: the status glyph on the name line, the kind mark under it.
   Item {
     id: statusGlyph
-    visible: root.fields.status
+    visible: root.showGlyph
     x: root.t.pad
     anchors.verticalCenter: nameLine.verticalCenter
     width: root.t.statusWidth
@@ -149,7 +160,7 @@ Item {
       font.bold: root.indicator.status === "blocked" || root.indicator.status === "done"
 
       RotationAnimation on rotation {
-        running: root.indicator.motion === "spin" && root.visible
+        running: root.indicator.motion === "spin" && root.visible && root.showGlyph
         from: 0
         to: 360
         duration: 1800
@@ -159,46 +170,27 @@ Item {
     }
   }
 
-  Item {
+  KindMark {
     id: kindIcon
+    // With indicator = "icon" the mark carries the state in the glyph's place,
+    // on the name line at the glyph's size.
+    readonly property int size: root.showGlyph || !root.fields.status ? root.t.iconPx : root.t.glyphPx
     visible: root.fields.kind
     x: root.t.pad + Math.round((root.t.statusWidth - width) / 2)
-    anchors.verticalCenter: metaLine.verticalCenter
-    width: root.t.iconPx
-    height: root.t.iconPx
-
-    Image {
-      id: kindImage
-      anchors.fill: parent
-      source: root.iconUrl
-      sourceSize.width: root.t.iconSourcePx
-      sourceSize.height: root.t.iconSourcePx
-      fillMode: Image.PreserveAspectFit
-      smooth: true
-      opacity: 0.85
-      visible: status === Image.Ready
-    }
-
-    // A kind without an Omarchy mark: its letter in a thin frame.
-    Rectangle {
-      anchors.fill: parent
-      visible: kindImage.status !== Image.Ready
-      color: "transparent"
-      radius: Math.min(Style.cornerRadius, 4)
-      border.width: 1
-      border.color: Color.muted
-      opacity: 0.85
-    }
-
-    Text {
-      anchors.centerIn: parent
-      visible: kindImage.status !== Image.Ready
-      text: root.agent ? CardPolicy.kindGlyph(root.agent.kind, root.agent.displayKind) : ""
-      color: Color.muted
-      font.family: Style.font.family
-      font.pixelSize: root.t.metaPx
-      font.bold: true
-    }
+    anchors.verticalCenter: size === root.t.iconPx ? metaLine.verticalCenter : nameLine.verticalCenter
+    width: size
+    height: size
+    iconUrl: root.iconUrl
+    letter: root.agent ? CardPolicy.kindGlyph(root.agent.kind, root.agent.displayKind) : ""
+    sourcePx: Math.ceil(root.t.iconSourcePx * size / Math.max(1, root.t.iconPx))
+    letterPx: Math.round(root.t.metaPx * size / Math.max(1, root.t.iconPx))
+    frameRadius: Math.min(Style.cornerRadius, 4)
+    plainOpacity: 0.85
+    stateful: IndicatorPolicy.marksState(root.indicatorMode)
+    mark: root.mark
+    toneColor: root.markColor
+    palette: root.palette
+    animate: root.animate && root.visible
   }
 
   Text {
