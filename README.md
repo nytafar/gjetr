@@ -158,13 +158,23 @@ Update with `omarchy plugin update nytafar.gjetr`.
 omarchy plugin remove nytafar.gjetr
 ```
 
-gjetr never writes your Config. Removing the plugin leaves
+gjetr writes your Config only when you run `installConfig`. Removing the plugin leaves
 `~/.config/gjetr/` (your Config, if you made one) and
 `~/.local/state/gjetr/state.json` (on-screen choices). Delete them if you like.
 
 ## Quickstart
 
-Create `~/.config/gjetr/gjetr.toml`:
+gjetr works without a Config. To make one, start from a preset:
+
+```bash
+omarchy-shell nytafar.gjetr presets                 # panel, sidebar, panel-sidebar, minimal
+omarchy-shell nytafar.gjetr installConfig sidebar   # "" installs the one gjetr detects
+```
+
+`installConfig` writes `~/.config/gjetr/gjetr.toml` and the Layouts it uses,
+with your outputs filled in, and keeps any file it replaces as
+`<file>.bak.<time>`. Or write the files yourself. Create
+`~/.config/gjetr/gjetr.toml`:
 
 ```toml
 [[display]]
@@ -270,7 +280,7 @@ Every process gjetr starts is checked against a fixed allowlist and run without
 a shell. The only things it changes outside its own state file are a runtime
 output transform and touch transform on a display you mark `rotatable`, and
 window focus (and, after a click on a Dock, the pointer position) when you tap
-with Focus behaviour `window`.
+with Focus behaviour `window`, and your Config when you run `installConfig`.
 
 ## Roadmap
 

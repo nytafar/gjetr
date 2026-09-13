@@ -32,6 +32,13 @@ All notable changes to gjetr. The format follows
   it), else the `sidebar` preset as a shown Dock on the focused monitor. It
   detects again after a hotplug or an `input.lua` change and keeps the outputs
   it chose while they are connected. `state` → `config.source` and `detect`.
+- `installConfig <preset>` installs a preset into the Config directory, as
+  `omarchy refresh config` does: `gjetr.toml` and the Layouts its Decks name,
+  with the detected outputs filled in. A file it would change is first kept as
+  `<file>.bak.<epoch>`, identical files are left alone, and it prints what
+  changed. It writes only `gjetr.toml`, `layouts/<name>.toml` and their
+  backups, and is the only way gjetr writes Config. `presets` lists the
+  presets, marking the detected one.
 
 ### Changed
 
@@ -43,6 +50,11 @@ All notable changes to gjetr. The format follows
   Dock as herdr's sidebar on a 4K monitor, the panel in landscape and portrait,
   the Workspace List and Usage), a section on using a Dock in place of herdr's
   sidebar with its Config and keybinding, and a gallery.
+
+### Fixed
+
+- A Config created while gjetr runs, in a directory that did not exist when
+  gjetr started, applies within 5 seconds instead of after a shell restart.
 
 ## [0.2.0] - 2026-09-13
 

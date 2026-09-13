@@ -129,3 +129,24 @@ test("fileOutcome says what installing a file does: created, unchanged, or repla
   // An empty file counts as absent, so nothing empty is backed up.
   assert.equal(Preset.fileOutcome("gjetr.toml", "", "a\n", 1).action, "created")
 })
+
+test("installSummary reports each file and the output names left to set", () => {
+  const outcomes = [Preset.fileOutcome("gjetr.toml", "a\n", "b\n", 7), Preset.fileOutcome("layouts/panel.toml", null, "x\n", 7)]
+  assert.equal(Preset.installSummary("panel", "/c/gjetr/", outcomes, ["touchscreen"]), [
+    "installed preset panel into /c/gjetr",
+    "  gjetr.toml: replaced (+1 -1), yours kept as gjetr.toml.bak.7",
+    "  layouts/panel.toml: created (1 line)",
+    "set the surface's name in gjetr.toml yourself: no touchscreen bound to an output of its own was found"
+  ].join("\n"))
+  assert.equal(Preset.installSummary("sidebar", "/c", [], ["monitor", "bogus"]),
+    "installed preset sidebar into /c\nset the Dock's name in gjetr.toml yourself: no monitor was found")
+})
+
+test("listText lists every preset with its description, aligned, marking the detected one", () => {
+  const lines = Preset.listText("sidebar").split("\n")
+  assert.equal(lines.length, Preset.PRESETS.length)
+  assert.match(lines[0], /^panel\s{2,}a touchscreen: the Agent List beside usage$/)
+  assert.match(lines[1], /^sidebar\s{2,}.* \(detected\)$/)
+  assert.equal(new Set(lines.map((line, i) => line.indexOf(Preset.PRESETS[i].description))).size, 1)
+  assert.doesNotMatch(Preset.listText(""), /detected/)
+})

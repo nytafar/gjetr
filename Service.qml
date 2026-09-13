@@ -55,6 +55,9 @@ Item {
   property var layoutShippedTexts: ({})
   readonly property var layoutRead: ConfigModel.overlayLayouts(deckNames, layoutUserTexts, layoutShippedTexts)
   readonly property var layoutTexts: layoutRead.texts
+  // Whether gjetr.toml or a Layout of the Decks is not in the Config (yet).
+  readonly property bool configIncomplete: mainText === null
+    || Object.keys(layoutRead.sources).some(function(name) { return layoutRead.sources[name] !== "config" })
   // Without a gjetr.toml, gjetr shows the preset DetectPolicy picks for this
   // machine, its outputs filled in (PresetModel); its Displays also stand in
   // for a gjetr.toml that names none. Monitors and touch devices are read on
@@ -809,6 +812,89 @@ Item {
     })
   }
 
+  // installConfig's file access: one FileView per read or write, loading and
+  // writing synchronously.
+  function readInstallFile(path) {
+    var view = installFile.createObject(root, { path: path })
+    if (!view) return null
+    var text = view.text()
+    view.destroy()
+    return text
+  }
+
+  function writeInstallFile(path, text) {
+    var view = installFile.createObject(root, { path: path })
+    if (!view) return false
+    view.setText(text)
+    view.destroy()
+    return readInstallFile(path) === text
+  }
+
+  // Installs a preset gjetr ships into the Config dir, as `omarchy refresh
+  // config` does: gjetr.toml and the Layouts its Decks name, with the detected
+  // outputs filled in. A file that would change is first kept as
+  // <file>.bak.<epoch>; an identical one is left alone. Writes only the paths
+  // PresetModel.isInstallPath allows. `name` "" is the detected preset.
+  // -> what it did, or why it did nothing.
+  function installConfig(name) {
+    var preset = String(name || "") !== "" ? String(name) : detection.preset
+    if (preset === "") return "no preset named, and none detected (" + detection.reason + "); presets: "
+      + PresetModel.PRESETS.map(function(p) { return p.name }).join(", ")
+    if (!PresetModel.isPreset(preset)) return "unknown preset " + preset + "; presets: "
+      + PresetModel.PRESETS.map(function(p) { return p.name }).join(", ")
+    if (!ConfigModel.isConfigDir(configDir)) return "refused: " + configDir + " is not a Config directory"
+    var shipped = presetTexts[preset]
+    if (typeof shipped !== "string" || shipped === "") return "preset " + preset + " could not be read"
+
+    var rendered = PresetModel.render(shipped, { touchscreen: detection.touchscreen, monitor: detection.monitor })
+    var layouts = {}
+    var names = ConfigModel.deckLayoutNames(ConfigModel.readMain(rendered.text, home).config)
+    for (var i = 0; i < names.length; i++) {
+      var text = readInstallFile(ConfigModel.layoutPath(shippedDir, names[i]))
+      if (typeof text === "string" && text !== "") layouts[names[i]] = text
+    }
+    var base = configDir.replace(/\/+$/, "")
+    var epoch = Math.floor(Date.now() / 1000)
+    var outcomes = []
+    var files = PresetModel.installFiles(configDir, rendered.text, layouts)
+    for (var f = 0; f < files.length; f++) {
+      var file = files[f]
+      if (!PresetModel.isInstallPath(configDir, file.path)) {
+        outcomes.push({ line: file.relative + ": refused" })
+        continue
+      }
+      var before = readInstallFile(file.path)
+      var outcome = PresetModel.fileOutcome(file.relative, before, file.text, epoch)
+      if (outcome.action === "replaced") {
+        var backupPath = base + "/" + outcome.backup
+        if (!PresetModel.isInstallPath(configDir, backupPath) || !writeInstallFile(backupPath, before)) {
+          outcomes.push({ line: file.relative + ": not replaced, its backup could not be written" })
+          continue
+        }
+      }
+      if (outcome.action !== "unchanged" && !writeInstallFile(file.path, file.text)) {
+        outcome = { line: file.relative + ": could not be written" + (outcome.backup !== "" ? " (backup " + outcome.backup + " kept)" : "") }
+      }
+      outcomes.push(outcome)
+    }
+    var summary = PresetModel.installSummary(preset, configDir, outcomes, rendered.missing)
+    log(summary.replace(/\n\s*/g, "; "))
+    reloadConfigFiles()
+    return summary
+  }
+
+  // A FileView does not see a file appear in a directory that did not exist
+  // when it began watching. So the Config files not in the Config yet are
+  // read again after installConfig and every few seconds, and a Config made by
+  // hand applies too.
+  function reloadConfigFiles() {
+    if (mainText === null) mainFile.reload()
+    var views = userLayoutFiles.instances
+    for (var i = 0; i < views.length; i++) {
+      if (views[i] && layoutRead.sources[views[i].modelData] !== "config") views[i].reload()
+    }
+  }
+
   function useConfigDir(path) {
     var value = String(path || "")
     if (value !== "" && !ConfigModel.isConfigDir(value)) return false
@@ -981,7 +1067,15 @@ Item {
   }
   onConfigSummaryChanged: log("config " + configSummary)
 
+  Timer {
+    interval: 5000
+    repeat: true
+    running: root.configIncomplete
+    onTriggered: root.reloadConfigFiles()
+  }
+
   FileView {
+    id: mainFile
     path: root.configDir + "/gjetr.toml"
     watchChanges: true
     blockLoading: true
@@ -992,6 +1086,7 @@ Item {
   }
 
   Variants {
+    id: userLayoutFiles
     model: root.deckNames
 
     FileView {
@@ -1113,6 +1208,17 @@ Item {
     log("service up, displays [" + displayEntries.join(", ") + "]")
     herdr.start()
     refreshDetection()
+  }
+
+  Component {
+    id: installFile
+
+    FileView {
+      blockLoading: true
+      blockWrites: true
+      atomicWrites: true
+      printErrors: false
+    }
   }
 
   // The presets gjetr ships, for detection and installConfig.
@@ -1260,6 +1366,18 @@ Item {
     function previousLayout(): string {
       root.swipeLayout(root.swipeThreshold * 2, 0)
       return root.activeLayoutName
+    }
+
+    // Installs a preset gjetr ships into the Config dir ("" for the detected
+    // one), keeping each file it replaces as <file>.bak.<epoch>. Prints what it
+    // did. The only way gjetr writes Config.
+    function installConfig(preset: string): string {
+      return root.installConfig(preset)
+    }
+
+    // The presets installConfig takes, marking the one gjetr detects.
+    function presets(): string {
+      return PresetModel.listText(root.detection.preset)
     }
 
     // Testing aid: read Config from another directory until the shell

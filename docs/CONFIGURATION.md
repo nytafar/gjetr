@@ -1,6 +1,7 @@
 # Configuration
 
-gjetr reads its Config from `~/.config/gjetr/` and never writes it. Every file
+gjetr reads its Config from `~/.config/gjetr/` and writes it only when you ask it
+to install a preset ([`installConfig`](#presets)). Every file
 is TOML and is reloaded live when it changes. A mistyped value falls back to its
 default, and a file that does not parse falls back as a whole. Either way gjetr
 logs one line naming the file, the key and what it expected:
@@ -60,6 +61,45 @@ omarchy-shell nytafar.gjetr state | jq '.config.source, .detect'
 `config.source` is `preset` without a `gjetr.toml` and `file` with one;
 `detect` names the preset, the touchscreen and monitor, and a `reason` such as
 `touchscreen wch.cn-usb2iic_ctp_control is bound to HDMI-A-2`.
+
+## Presets
+
+gjetr ships four presets in [`presets/`](../presets), a `gjetr.toml` each that
+uses the [Layouts gjetr ships](#layouts-gjetr-ships):
+
+| Preset | Displays |
+|---|---|
+| `panel` | A surface on your touchscreen: the Agent List beside usage |
+| `sidebar` | A Dock on the left of your focused monitor: Agents over usage pinned at the bottom |
+| `panel-sidebar` | Both |
+| `minimal` | One Agent List on your touchscreen, every key explained |
+
+To start from one, install it into your Config:
+
+```bash
+omarchy-shell nytafar.gjetr presets                 # lists them, marking the detected one
+omarchy-shell nytafar.gjetr installConfig sidebar   # or "" for the detected one
+```
+
+`installConfig` writes `gjetr.toml` and each Layout its Decks name to
+`layouts/`, creating the directories it needs, with the outputs filled in: the
+output your touchscreen is bound to for a surface, your focused monitor for a
+Dock. As `omarchy refresh config` does, a file it would change is first kept
+as `<file>.bak.<seconds since 1970>`, and a file that is already the same is
+left alone. It prints what it did:
+
+```
+installed preset panel-sidebar into /home/you/.config/gjetr
+  gjetr.toml: replaced (+12 -3), yours kept as gjetr.toml.bak.1789400000
+  layouts/panel.toml: unchanged
+  layouts/sidebar.toml: created (27 lines)
+```
+
+It writes nothing else and nowhere else: only `gjetr.toml`, `layouts/<name>.toml`
+and their backups in the Config directory (the one `useConfigDir` points at,
+while it does). When it found no touchscreen or no monitor for a Display, it
+says so, and that Display keeps the name `touchscreen` or `monitor` until you
+set it. The installed files apply at once.
 
 ## `gjetr.toml`
 
@@ -778,6 +818,7 @@ omarchy-shell nytafar.gjetr resetOverrides
 | `$OMARCHY_PATH/shell/plugins/agents/assets/*.svg` | Omarchy | Agent kind marks for Claude and Codex; other kinds draw gjetr's own logos or a letter |
 | `~/.local/state/omarchy/current/theme/colors.toml` | Omarchy theme | `green`, the colour of `done` |
 | `~/.local/state/omarchy/agents/usage/*.json` | `omarchy-agent-usage-update` | Usage Module (only while a Usage Module is in the Deck) |
+| `~/.config/hypr/input.lua` | You (Omarchy's Hyprland input config) | Which output a touchscreen is bound to, for [Without a Config](#without-a-config). Never written |
 
 ## IPC
 
@@ -804,6 +845,8 @@ omarchy-shell nytafar.gjetr <function> [argument]
 | `toggleExpand <node>` | Open or close a workspace (`w:<id>`) or tab (`t:<id>`) in the first Workspace List. Prints `expanded`, `collapsed`, `unknown node` or `no workspace list`. `state` → `workspaces.rows` lists the rows drawn |
 | `tapRow <node> <zone>` | Tap a row (`w:<id>`, `t:<id>`, `p:<id>`) of the first Workspace List in zone `row` or `chevron`, as a finger does. Prints what it did |
 | `refreshUsage` | Run `omarchy-agent-usage-update` now, as a tap on a Usage header does. Prints `started`, `already running` or `no usage module`. `state` → `usage` shows records, errors, runs and each provider's age |
+| `presets` | The presets gjetr ships, one per line with a description, marking the detected one |
+| `installConfig <preset>` | Install a preset into the Config directory (`""` for the detected one), backing up each file it replaces. Prints what it did. See [Presets](#presets) |
 | `resetOverrides` | Clear every Override |
 | `useConfigDir <path>` | Read Config from another directory until the shell restarts (testing). `""` goes back |
 
