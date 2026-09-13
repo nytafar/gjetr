@@ -443,10 +443,8 @@ the glyph and adds the stateful mark. In a Workspace List, workspace rows and
 tabs with several panes have no kind mark and keep their glyph.
 
 A mark moves only while it is on screen and its Display is shown; a still
-mark costs nothing per frame. Moving marks cost some CPU for as long as Agents
-work: with 20 working Agents in view, `shimmer` costs the least and `hue` the
-most, and `"glyph"` (the turning glyph) less than any of them. Set the indicator for every list at once with
-[`[defaults]`](#defaults):
+mark costs nothing. What motion costs is in [Performance](#performance). Set
+the indicator for every list at once with [`[defaults]`](#defaults):
 
 ```toml
 [defaults.agent-list]
@@ -717,6 +715,38 @@ omarchy-shell nytafar.gjetr <function> [argument]
 | `refreshUsage` | Run `omarchy-agent-usage-update` now, as a tap on a Usage header does. Prints `started`, `already running` or `no usage module`. `state` → `usage` shows records, errors, runs and each provider's age |
 | `resetOverrides` | Clear every Override |
 | `useConfigDir <path>` | Read Config from another directory until the shell restarts (testing). `""` goes back |
+
+## Performance
+
+gjetr draws nothing while nothing on it moves: with every Agent still and none
+in Attention it uses no CPU. What moves is a working Agent (its glyph turns, or
+its kind mark moves with `working_effect`), a blocked mark's flash and the
+Attention pulse. All of them are drawn from one clock at 20 frames a second,
+and only on Cards and rows in view on a shown Display. A Qt Quick window
+redraws all of itself for any change, so the cost follows how many windows show
+motion and how large they are more than how many Agents move: one pulsing Card
+costs about what twenty do.
+
+Measured on an Intel UHD 630 with a 360 px Dock at scale 2 and a 1024x600
+panel, 20 Agents with mixed statuses (8 pulsing in Attention), the whole
+Omarchy shell as % of one core, two runs:
+
+| | CPU | before |
+|---|---|---|
+| nothing moving | 0% | 0% |
+| `indicator = "glyph"` | 10–12% | 48% |
+| `working_effect = "sweep"` | 7% | 34% |
+| `working_effect = "breathe"` | 7% | 26% |
+| `working_effect = "hue"` | 8% | 67% |
+| `working_effect = "shimmer"` | 7% | 40% |
+| working Agents only off screen | 0% | 11% |
+| Dock hidden, panel still moving | 4% | 12% |
+
+Sweep, hue and shimmer are drawn by a small shader (`shaders/kind-fill.frag`);
+breathe and the blocked flash use MultiEffect for their glow. The figures move
+with the CPU's frequency (on `powersave` by up to three times between runs);
+what holds is their order and that nothing moving costs nothing. A Dock you are
+not looking at costs nothing once hidden (`toggleDock`).
 
 ## Limits
 

@@ -26,8 +26,8 @@ All notable changes to gjetr. The format follows
   through the theme's colours; `shimmer`: a highlight passing every 2 s), idle
   dim, blocked urgent with a sharp flash, done green and pulsing until seen,
   unknown faded. The glyph is hidden where a mark carries the state and the
-  status word stays; `both` keeps the glyph. Drawn with QtQuick.Effects
-  (MultiEffect with the mark as mask); marks move only while on screen and
+  status word stays; `both` keeps the glyph. Drawn with a small shader over
+  the mark, and MultiEffect for the breathe and flash glow; marks move only while on screen and
   their Display is shown. Both settings cascade through `[defaults]`. `state`
   reports each Module's `indicator` and `workingEffect`, and `theme.palette`.
 - Defaults: Module settings given once in `gjetr.toml`. `[defaults]` applies a
@@ -166,9 +166,21 @@ All notable changes to gjetr. The format follows
   position, and are not persisted. `overlay` keeps the previous behaviour.
 - IPC `toggleRecap <pane-id>`, and `recap.open`, `recap.openCards` and
   `recap.overlay` in `state`.
+- `scripts/perf-sample.sh` measures the Omarchy shell's CPU (the median of
+  runs, per thread group with `-t`); `scripts/build-shaders.sh` compiles
+  `shaders/*.frag` to the `.qsb` Qt Quick loads (`--check` for a stale one).
 
 ### Changed
 
+- Motion costs a fraction of what it did. The working glyph's turn, the
+  Attention pulse and the kind mark's effects are drawn from one clock at 20
+  frames a second instead of at the display's rate, and only on Cards and rows
+  in view: with 20 Agents on a Dock and the panel the whole shell went from 48%
+  of a core to 10–12% with the glyph, from 26–67% to 7–8% with an effect, and
+  to nothing with nothing moving or with the moving Agents scrolled out of
+  view. Sweep, hue and shimmer marks are drawn by a small shader and no longer
+  take twice the frames. Motions now share one phase instead of each starting
+  apart. See Performance in docs/CONFIGURATION.md.
 - `state`'s top-level `display`, `surface`, `modules` and `deck`, and the IPC
   functions that name no Display, describe the primary Display (the first
   surface). Functions that act on the first Agent List or Workspace List fall
