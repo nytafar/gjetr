@@ -52,6 +52,16 @@ test("kindGlyph is the fallback letter", () => {
 })
 
 test("an inline Recap makes room for two lines", () => {
-  assert.equal(Card.cardHeightFor("detailed", false), Card.cardHeight("detailed"))
-  assert.equal(Card.cardHeightFor("compact", true), Card.cardHeight("compact") + Card.RECAP_INLINE_PX)
+  assert.equal(Card.cardHeightFor("detailed", "off", "Fixed the parser."), Card.cardHeight("detailed"))
+  assert.equal(Card.cardHeightFor("compact", "inline", "Fixed the parser."), Card.cardHeight("compact") + Card.RECAP_INLINE_PX)
+})
+
+test("a Card without a Recap does not grow when Recaps are inline", () => {
+  for (const text of ["", null, undefined]) {
+    assert.equal(Card.cardHeightFor("detailed", "inline", text), Card.cardHeight("detailed"))
+    assert.equal(Card.inlineRecapShown("inline", text), false)
+  }
+  assert.equal(Card.inlineRecapShown("inline", "Fixed the parser."), true)
+  assert.equal(Card.inlineRecapShown("expand", "Fixed the parser."), false)
+  assert.equal(Card.cardHeightFor("detailed", "expand", "Fixed the parser."), Card.cardHeight("detailed"))
 })

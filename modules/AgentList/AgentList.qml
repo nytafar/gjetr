@@ -49,7 +49,9 @@ Item {
   // measured height, rather than by a uniform grid.
   property var cardOrder: []
   property var cardHeights: ({})
-  readonly property int baseCardHeight: CardPolicy.cardHeightFor(preset, recapMode === "inline")
+  // The height of a Card before it is measured. Each Card's own base height
+  // adds room for an inline Recap only when its Agent has one.
+  readonly property int baseCardHeight: CardPolicy.cardHeight(preset)
   readonly property int cellWidth: Math.floor(grid.width / columns)
   readonly property var placement: LayoutPolicy.cardPlacement(cardOrder, cardHeights, columns, baseCardHeight, gap)
   readonly property bool online: !!service && service.herdrOnline
@@ -236,7 +238,7 @@ Item {
         service: root.service
         fields: root.fields
         textScale: root.textScale
-        baseHeight: root.baseCardHeight
+        baseHeight: CardPolicy.cardHeightFor(root.preset, root.recapMode, recapText)
         interactive: root.online
         indicator: StatusPolicy.indicator(agent ? agent.status : "")
         statusColor: root.toneColor(indicator.tone)

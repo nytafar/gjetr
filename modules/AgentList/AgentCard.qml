@@ -37,6 +37,8 @@ Item {
   signal recapRequested()
 
   readonly property bool recapExpandable: recapMode === "expand" && recapText !== ""
+  // An inline Recap under the Fields; a Card without a Recap stays plain.
+  readonly property bool recapInline: CardPolicy.inlineRecapShown(recapMode, recapText)
   readonly property bool recapShown: recapOpen && recapExpandable
 
   readonly property bool focused: !!agent && agent.focused
@@ -152,9 +154,9 @@ Item {
     anchors {
       left: kindIcon.right; leftMargin: root.pad
       right: trailing.left; rightMargin: root.pad
-      top: root.recapMode === "inline" ? band.top : undefined
-      topMargin: root.recapMode === "inline" ? root.pad / 2 : 0
-      verticalCenter: root.recapMode === "inline" ? undefined : band.verticalCenter
+      top: root.recapInline ? band.top : undefined
+      topMargin: root.recapInline ? root.pad / 2 : 0
+      verticalCenter: root.recapInline ? undefined : band.verticalCenter
     }
     spacing: Style.spacing.xs
 
@@ -186,7 +188,7 @@ Item {
     // Recap text is untrusted: always plain text, never rich text or links.
     Text {
       width: parent.width
-      visible: root.recapMode === "inline" && root.recapText !== ""
+      visible: root.recapInline
       text: root.recapText
       textFormat: Text.PlainText
       color: Color.muted
