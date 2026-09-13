@@ -70,7 +70,7 @@ test("an expanded workspace shows its tabs: a one-pane tab is a leaf naming its 
   assert.deepEqual(rows.map(r => r.key), ["w:w1", "t:w1:t1", "t:w1:t2", "w:w2"])
   const single = rows[1]
   assert.deepEqual([single.type, single.depth, single.label, single.detail, single.status, single.expandable, single.paneId, single.kind],
-    ["tab", 1, "1", "claude", "blocked", false, "w1:p1", "claude"])
+    ["tab", 1, "1", "Claude", "blocked", false, "w1:p1", "claude"])
   const multi = rows[2]
   assert.deepEqual([multi.label, multi.detail, multi.status, multi.expandable, multi.paneId], ["logs", "2 panes", "working", true, ""])
 })
@@ -81,7 +81,7 @@ test("an expanded tab shows its panes, with shells included and named like Agent
   assert.deepEqual([rows[3].type, rows[3].depth, rows[3].name, rows[3].kindLabel, rows[3].isAgent, rows[3].expandable],
     ["pane", 2, "lasse@oma:~", "shell", false, false])
   // A generic title falls through to the renamed tab label, as on a Card.
-  assert.deepEqual([rows[4].name, rows[4].kindLabel, rows[4].isAgent, rows[4].status], ["logs", "codex", true, "working"])
+  assert.deepEqual([rows[4].name, rows[4].kindLabel, rows[4].isAgent, rows[4].status], ["logs", "Codex", true, "working"])
 })
 
 test("a pane with herdr's agent name is named by it, as a Card is", () => {

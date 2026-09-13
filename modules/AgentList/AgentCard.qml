@@ -141,6 +141,16 @@ Item {
       visible: status === Image.Ready
     }
 
+    // A kind without an Omarchy mark: its letter in a thin frame.
+    Rectangle {
+      anchors.fill: parent
+      visible: kindImage.status !== Image.Ready
+      color: "transparent"
+      radius: Math.min(Style.cornerRadius, 6)
+      border.width: 1
+      border.color: Color.muted
+    }
+
     Text {
       anchors.centerIn: parent
       visible: kindImage.status !== Image.Ready

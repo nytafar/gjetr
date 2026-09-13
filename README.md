@@ -19,8 +19,9 @@ lives beside the Omarchy bar, and needs no daemon.
 ## Features
 
 - **Every agent, live.** One Card per herdr agent with its status (a glyph and
-  a word that read without colour; the working glyph turns), agent kind,
-  a readable name, workspace › tab and, for Claude, the prompt Cache timer
+  a word that read without colour; the working glyph turns), agent kind (a
+  mark or letter for every agent herdr detects), the name you gave it in herdr
+  or else a readable one, workspace › tab and, for Claude, the prompt Cache timer
   (`42m`, `4:59`, `cold`). Updates arrive from herdr's event stream within a
   second.
 - **Tap to focus.** A tap focuses the exact pane in herdr. Switch Focus
@@ -226,7 +227,9 @@ header.
 
 The idea of finding herdr's terminal window by walking the process tree comes
 from [omaherdr](https://github.com/njpatel/omaherdr) (Apache-2.0); no code from
-it is used. Kind marks are read in place from Omarchy's agents plugin.
+it is used. Kind marks are read in place from Omarchy's agents plugin; the
+letters for other kinds follow
+[obsidian-herdr](https://github.com/nytafar/obsidian-herdr)'s badges.
 
 ## License
 

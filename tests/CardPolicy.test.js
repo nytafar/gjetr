@@ -45,9 +45,11 @@ test("kind icons exist only for kinds Omarchy ships a mark for", () => {
   assert.equal(Card.kindIconFile("../x", false), "")
 })
 
-test("kindGlyph is the fallback letter", () => {
-  assert.equal(Card.kindGlyph("pi", ""), "P")
+test("kindGlyph is the kind table's letter, else the kind's first letter", () => {
+  assert.equal(Card.kindGlyph("pi", ""), "π")
+  assert.equal(Card.kindGlyph("copilot", "copilot"), "P")
   assert.equal(Card.kindGlyph("opencode", "OpenCode"), "O")
+  assert.equal(Card.kindGlyph("aider", ""), "A")
   assert.equal(Card.kindGlyph("", ""), "?")
 })
 

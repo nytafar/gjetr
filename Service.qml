@@ -841,6 +841,9 @@ Item {
           recap: recapFor(agent, recaps) !== "",
           inFocusedWorkspace: focusedWorkspaceId !== "" && agent.workspaceId === focusedWorkspaceId,
           name: agentName(agent),
+          kind: agent.kind,
+          kindLabel: CardPolicy.kindLabel(agent.kind, agent.displayKind),
+          kindMark: CardPolicy.kindIconFile(agent.kind, lightBackground) || CardPolicy.kindGlyph(agent.kind, agent.displayKind),
           location: agentLocation(agent),
           repo: agentRepo(agent, repos).text,
           cache: timer ? timer.label + " " + timer.level : ""

@@ -8,6 +8,16 @@ All notable changes to gjetr. The format follows
 
 ### Added
 
+- Every agent kind herdr 0.8.2 and 0.9.0 can report (23: Pi, Claude, Codex,
+  Gemini, Cursor, Devin, Antigravity, Cline, Oh My Pi, Mastra Code, OpenCode,
+  GitHub Copilot, Kimi, Kiro, Droid, Amp, Grok, Hermes, Kilo Code, Qoder, Qwen
+  Code, Maki, Muse) has a written label and a mark: Omarchy's SVG for Claude
+  and Codex, a distinct letter in a thin theme-coloured frame for the rest. An
+  unknown kind shows its first letter, never a blank. herdr's aliases for a
+  kind (`claude-code`, `antigravity_cli`, ...) resolve to it. Workspace List
+  rows name the kind by its label; `state` cards carry `kind`, `kindLabel`
+  and `kindMark`.
+
 - Comfortable Cards draw a thin bar under a live Cache timer that drains as
   the cache ages, in its level's colour (green, accent, urgent); their size
   and touch targets are unchanged. A compact row's location line shows the
