@@ -14,6 +14,8 @@ Item {
   property bool interactive: true
   property color statusColor: Color.muted
   property color cacheColor: Color.muted
+  // "blocked" or "done" while the Agent is in Attention, else "".
+  property string attention: ""
 
   signal tapped()
 
@@ -22,6 +24,7 @@ Item {
     ? service.cacheTimerFor(agent, service.nowSeconds) : null
   readonly property string iconUrl: fields.kind && service && agent ? service.kindIconUrl(agent.kind) : ""
   readonly property int pad: Style.spacing.xxl
+  readonly property color attentionColor: attention === "blocked" ? Color.urgent : Color.accent
 
   Rectangle {
     anchors.fill: parent
@@ -32,6 +35,26 @@ Item {
       : Style.normalFillFor(Color.foreground, Color.accent)
     border.width: 1
     border.color: root.focused ? Color.accent : Util.alpha(Color.foreground, 0.1)
+  }
+
+  // Attention: a tinted fill and a thick border in the status colour, breathing
+  // between full and faint so it reads from across the desk, on black too.
+  Rectangle {
+    id: pulse
+    anchors.fill: parent
+    radius: Style.cornerRadius
+    visible: root.attention !== ""
+    color: Util.alpha(root.attentionColor, 0.3)
+    border.width: 3
+    border.color: root.attentionColor
+
+    SequentialAnimation on opacity {
+      running: pulse.visible
+      loops: Animation.Infinite
+      onRunningChanged: if (!running) pulse.opacity = 1
+      NumberAnimation { from: 1; to: 0.2; duration: 650; easing.type: Easing.InOutSine }
+      NumberAnimation { from: 0.2; to: 1; duration: 650; easing.type: Easing.InOutSine }
+    }
   }
 
   // Status indicator: a bar down the leading edge in the status tone.

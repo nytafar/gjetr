@@ -12,6 +12,7 @@ import "lib/ConfigModel.js" as ConfigModel
 import "lib/OverrideModel.js" as OverrideModel
 import "lib/WindowPolicy.js" as WindowPolicy
 import "lib/CommandPolicy.js" as CommandPolicy
+import "lib/AttentionModel.js" as AttentionModel
 
 // Owns Display selection, the herdr connection and everything that must
 // outlive a surface. The surface itself is created per matching screen and
@@ -30,7 +31,9 @@ Item {
 
   // Config, from ~/.config/gjetr. Texts are null while a file is missing;
   // ConfigModel turns them into validated values with defaults and errors.
-  readonly property string configDir: home + "/.config/gjetr"
+  // A session-only redirect for testing (IPC useConfigDir); never persisted.
+  property string configDirOverride: ""
+  readonly property string configDir: configDirOverride !== "" ? configDirOverride : home + "/.config/gjetr"
   property var mainText: null
   property var layoutTexts: ({})
   readonly property var mainRead: ConfigModel.readMain(mainText, home)
@@ -111,6 +114,11 @@ Item {
   // twice.
   property string omarchyPath: Quickshell.env("OMARCHY_PATH") || "/usr/share/omarchy"
   readonly property bool lightBackground: (0.2126 * background.r + 0.7152 * background.g + 0.0722 * background.b) > 0.5
+
+  // Attention, from status transitions between published Agent lists and from
+  // taps. Cards bind to it through attentionFor(agent, attention).
+  property var attention: AttentionModel.empty()
+  readonly property int attentionCount: AttentionModel.count(attention)
 
   // Agents in the current Sort mode. Replaced only when the order or the
   // Agents themselves change, so Cards are not rebuilt on every tick.
@@ -250,9 +258,32 @@ Item {
   function focusPane(paneId) {
     var id = String(paneId || "")
     for (var i = 0; i < agents.length; i++) {
-      if (agents[i].paneId === id) return herdr.focusPane(id)
+      if (agents[i].paneId !== id) continue
+      attention = AttentionModel.acknowledge(attention, id)
+      return herdr.focusPane(id)
     }
     return false
+  }
+
+  // Pass `attention` from a binding so a Card re-evaluates when it changes.
+  function attentionFor(agent, model) {
+    return agent ? AttentionModel.attentionOf(model, agent.paneId) : ""
+  }
+
+  function applyAgents() {
+    var next = AttentionModel.update(attention, agents)
+    var entered = AttentionModel.count(next) > AttentionModel.count(attention)
+    attention = next
+    if (entered) log("attention " + Object.keys(next.attention).join(", ").replace(/p:/g, ""))
+    resort()
+  }
+
+  function useConfigDir(path) {
+    var value = String(path || "")
+    if (value !== "" && !ConfigModel.isConfigDir(value)) return false
+    configDirOverride = value
+    log("config dir " + configDir)
+    return true
   }
 
   function focusAgent(agent) {
@@ -313,6 +344,7 @@ Item {
       overrides: { key: agentListKey, sortOverridden: sortOverridden, loaded: overridesLoaded,
         error: overridesError, modules: overrides.modules },
       focus: { requests: herdr.focuses, lastError: herdr.lastFocusError },
+      attention: attention.attention,
       cache: {
         timers: Object.keys(cacheTimers).length,
         error: cacheTimersError,
@@ -324,6 +356,7 @@ Item {
         return {
           paneId: agent.paneId,
           status: agent.status,
+          attention: attentionFor(agent, attention),
           name: agentName(agent),
           location: agentLocation(agent),
           cache: timer ? timer.label + " " + timer.level : ""
@@ -385,7 +418,7 @@ Item {
     onSaveFailed: function(error) { root.log("overrides not saved: error " + error) }
   }
 
-  onAgentsChanged: resort()
+  onAgentsChanged: applyAgents()
   onSortModeChanged: resort()
   onCacheTimersChanged: resort()
 
@@ -453,6 +486,12 @@ Item {
 
     function toggleFocus(): string {
       return root.toggleFocusMode()
+    }
+
+    // Testing aid: read Config from another directory until the shell
+    // restarts. An empty path goes back to ~/.config/gjetr.
+    function useConfigDir(path: string): string {
+      return root.useConfigDir(path) ? root.configDir : "refused"
     }
   }
 

@@ -225,3 +225,10 @@ test("huge inputs are refused before parsing", () => {
   assert.match(read.errors.join("\n"), /too large/)
   assert.equal(read.config.displays[0].name, "HDMI-A-2")
 })
+
+test("isConfigDir accepts absolute directories only", () => {
+  assert.equal(Config.isConfigDir("/tmp/gjetr-test"), true)
+  for (const bad of ["", "relative", "/tmp/../etc", "/tmp/a/..", "/tmp/a\nb", "/" + "x".repeat(300), null, 5]) {
+    assert.equal(Config.isConfigDir(bad), false, String(bad))
+  }
+})

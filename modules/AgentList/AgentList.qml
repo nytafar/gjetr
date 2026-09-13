@@ -145,6 +145,7 @@ Item {
       interactive: root.online
       statusColor: root.toneColor(CardPolicy.statusTone(modelData.status))
       cacheColor: root.toneColor(CardPolicy.cacheTone(cacheTimer ? cacheTimer.level : ""))
+      attention: root.service ? root.service.attentionFor(modelData, root.service.attention) : ""
       onTapped: root.service.focusAgent(modelData)
     }
   }
