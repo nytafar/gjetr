@@ -53,7 +53,7 @@ test("an Omarchy record becomes a provider-neutral provider", () => {
   assert.equal(p.recentDays.length, 7)
   assert.deepEqual(p.recentDays[6], { date: "2026-09-13", tokens: 94198345 })
   assert.deepEqual(p.models.map(m => [m.name, m.tokens]), [["Opus 5", 86635880], ["Sonnet 5", 4852440], ["Fable 5.1", 2710025]])
-  assert.equal(p.cost30d, null)
+  assert.equal("cost30d" in p, false)
 })
 
 test("a provider that is not ready keeps its quiet status text", () => {
@@ -174,13 +174,6 @@ test("day bars scale to the busiest day and carry weekday labels", () => {
   assert.equal(bars[0].fraction, 0)
   assert.deepEqual(plain(Usage.dayBars([{ date: "2026-09-13", tokens: 0 }], 7)).map(b => b.fraction), [0])
   assert.equal(Usage.dayBars(null, 7).length, 0)
-})
-
-test("formatMoney is ready for a Source that has cost", () => {
-  assert.equal(Usage.formatMoney({ amount: 12.345, currency: "USD" }), "$12.35")
-  assert.equal(Usage.formatMoney({ amount: 3, currency: "EUR" }), "EUR 3.00")
-  assert.equal(Usage.formatMoney(null), "")
-  assert.equal(Usage.formatMoney({ amount: -1 }), "")
 })
 
 test("lists that arrive as array-likes (QML sequences through a Repeater's modelData) still read", () => {

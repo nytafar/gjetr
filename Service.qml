@@ -770,7 +770,7 @@ Item {
         providers: Object.keys(usageSource.providers).sort().map(function(id) {
           var p = usageSource.providers[id]
           return { id: id, ready: p.ready, limits: p.limits.length, updated: UsageModel.ageLabel(p.updatedAtMs, Date.now()),
-            stale: UsageModel.isStale(p.updatedAtMs, Date.now(), usageRefreshSeconds), cost30d: p.cost30d }
+            stale: UsageModel.isStale(p.updatedAtMs, Date.now(), usageRefreshSeconds) }
         })
       },
       modules: activeModules.map(function(module, index) {

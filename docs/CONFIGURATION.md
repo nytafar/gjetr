@@ -262,7 +262,7 @@ Tap the Module's header to refresh now.
 
 | Key | Values | Default | Meaning |
 |---|---|---|---|
-| `show` | list of `"limits"`, `"today"`, `"recent_days"`, `"models"`, `"cost_30d"` | `["limits"]` | What each provider shows, in this order. Unknown items are skipped with an error |
+| `show` | list of `"limits"`, `"today"`, `"recent_days"`, `"models"` | `["limits"]` | What each provider shows, in this order. Unknown items are skipped with an error |
 | `providers` | list of provider ids | every ready provider | Which providers, in this order. A named provider that is not ready, or has no record yet, is shown quietly |
 | `refresh_seconds` | whole number, 60 to 86400 | the Display's, else `900` | Seconds between refreshes. With several Usage Modules in the Deck, the smallest wins |
 
@@ -287,9 +287,6 @@ Items:
 - `recent_days`: tokens per day over the last 7 days as small bars, today in
   accent.
 - `models`: today's tokens by model, largest first, up to 5.
-- `cost_30d`: cost over the last 30 days. Omarchy's records carry no cost, and
-  gjetr does not price tokens itself, so for now this reads
-  `not in usage data`.
 
 A provider whose collector reports it is not ready (signed out, unreachable)
 shows only its name and status line, muted. Numbers older than two refreshes

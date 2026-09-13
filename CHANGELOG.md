@@ -32,8 +32,8 @@ All notable changes to gjetr. The format follows
 - The Usage Module, `type = "usage"`: each AI provider's rate limits and usage
   from Omarchy's usage records. `show` picks `limits` (meters with percent and
   time to reset, accent from 75% and urgent from 90%), `today` (tokens,
-  prompts, sessions), `recent_days` (bars per day), `models` (today's tokens by
-  model) and `cost_30d`; `providers` filters and orders them. gjetr runs
+  prompts, sessions), `recent_days` (bars per day) and `models` (today's tokens
+  by model); `providers` filters and orders them. gjetr runs
   `omarchy-agent-usage-update` itself every `refresh_seconds` (900 by default,
   from the Module or the Display), one run at a time, and watches the records.
   Providers that are not ready, and stale numbers, are shown quietly. A tap on

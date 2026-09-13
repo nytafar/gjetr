@@ -19,8 +19,6 @@ type = "usage"
 # "today"       today's tokens, prompts and sessions
 # "recent_days" a small bar chart of tokens per day
 # "models"      today's tokens by model
-# "cost_30d"    cost over the last 30 days. Omarchy's records hold no cost, so
-#               this reads "not in usage data" until a source provides one.
 show = ["limits", "today", "recent_days"]
 
 # Which providers, in order. Leave it out to show every provider that is ready.

@@ -413,29 +413,6 @@ Item {
                   }
                 }
               }
-
-              // cost_30d: only a Source with cost data fills it; never priced here.
-              Item {
-                visible: item.modelData === "cost_30d"
-                width: item.width
-                height: costLabel.implicitHeight
-
-                Text {
-                  id: costLabel
-                  text: "30-day cost"
-                  color: Color.muted
-                  font.family: Style.font.family
-                  font.pixelSize: root.captionPx
-                }
-
-                Text {
-                  anchors { right: parent.right; baseline: costLabel.baseline }
-                  text: section.provider.cost30d ? UsageModel.formatMoney(section.provider.cost30d) : "not in usage data"
-                  color: section.provider.cost30d ? Color.foreground : Color.muted
-                  font.family: Style.font.family
-                  font.pixelSize: section.provider.cost30d ? root.bodyPx : root.captionPx
-                }
-              }
             }
           }
 

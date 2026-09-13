@@ -331,16 +331,22 @@ test("a usage Module reads show, providers and refresh_seconds", () => {
   const read = Config.readLayout("u", `
 [[module]]
 type = "usage"
-show = ["limits", "today", "recent_days", "models", "cost_30d", "today"]
+show = ["limits", "today", "recent_days", "models", "today"]
 providers = ["claude", "codex"]
 refresh_seconds = 300
 weight = 2
 `)
   assert.deepEqual(Array.from(read.errors), [])
-  assert.deepEqual(plain(read.layout.modules), [{ type: "usage", show: ["limits", "today", "recent_days", "models", "cost_30d"],
+  assert.deepEqual(plain(read.layout.modules), [{ type: "usage", show: ["limits", "today", "recent_days", "models"],
     providers: ["claude", "codex"], refreshSeconds: 300, weight: 2 }])
   assert.deepEqual(plain(Config.readLayout("u", '[[module]]\ntype = "usage"\n').layout.modules),
     [{ type: "usage", show: ["limits"], providers: [], refreshSeconds: null, weight: 1 }])
+})
+
+test("an old cost_30d show item is reported and ignored", () => {
+  const read = Config.readLayout("u", '[[module]]\ntype = "usage"\nshow = ["limits", "cost_30d", "today"]\n')
+  assert.deepEqual(plain(read.layout.modules[0].show), ["limits", "today"])
+  assert.deepEqual(Array.from(read.errors), ['layouts/u.toml: module[0].show[1]: expected one of limits, today, recent_days, models, got "cost_30d"'])
 })
 
 test("usage values fall back per item with clear errors", () => {
@@ -356,7 +362,7 @@ refresh_seconds = 30
   assert.deepEqual(module.providers, ["claude"])
   assert.equal(module.refreshSeconds, 60)
   const text = read.errors.join("\n")
-  assert.match(text, /layouts\/u\.toml: module\[0\]\.show\[1\]: expected one of limits, today, recent_days, models, cost_30d/)
+  assert.match(text, /layouts\/u\.toml: module\[0\]\.show\[1\]: expected one of limits, today, recent_days, models, got "weather"/)
   assert.match(text, /module\[0\]\.show\[2\]: /)
   assert.match(text, /module\[0\]\.providers\[1\]: expected a provider id/)
   assert.match(text, /module\[0\]\.refresh_seconds: expected whole seconds from 60 to 86400, got 30; using 60/)
