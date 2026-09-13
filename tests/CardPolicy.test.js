@@ -65,3 +65,13 @@ test("a Card without a Recap does not grow when Recaps are inline", () => {
   assert.equal(Card.inlineRecapShown("expand", "Fixed the parser."), false)
   assert.equal(Card.cardHeightFor("detailed", "expand", "Fixed the parser."), Card.cardHeight("detailed"))
 })
+
+test("a narrow list header drops the sort and focus captions, keeping the values", () => {
+  assert.equal(Card.compactHeader(360), true)
+  assert.equal(Card.compactHeader(Card.COMPACT_HEADER_BELOW - 1), true)
+  assert.equal(Card.compactHeader(Card.COMPACT_HEADER_BELOW), false)
+  assert.equal(Card.compactHeader(940), false)
+  assert.equal(Card.compactHeader(0), false)
+  assert.equal(Card.headerCaption("sort", "priority", true), "priority")
+  assert.equal(Card.headerCaption("focus", "herdr", false), "focus  herdr")
+})

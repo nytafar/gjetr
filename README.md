@@ -41,6 +41,9 @@ lives beside the Omarchy bar, and needs no daemon.
   inline on the Card or on request.
 - **Decks of Layouts.** Several Layouts per display, with tabs on a short edge,
   a sideways swipe between them, and badges on tabs you are not looking at.
+- **Dock.** Dock gjetr along an edge of your main monitor too, with its own
+  Deck: it stays on every workspace, windows tile beside it, ordinary windows
+  never cover it, and a keybinding shows or hides it. Works with the mouse.
 - **Rotation.** A Layout declares portrait or landscape; on a display you mark
   rotatable, gjetr turns the output and its touch input to match at runtime.
 - **Offline-tolerant.** If herdr goes away, the last Cards stay visible, greyed,
@@ -193,10 +196,9 @@ window focus when you tap with Focus behaviour `window`.
 
 ## Roadmap
 
-- A docked surface on the main monitor that reserves space across workspaces
 - Client mode: work in a herdr pane on the display when the desk is away
 - Long-press actions on Cards
-- Several herdr servers and several displays at once
+- Several herdr servers at once
 
 ## Credits
 

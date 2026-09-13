@@ -97,7 +97,12 @@ Item {
     height: CardPolicy.MIN_TOUCH_PX
 
     Text {
-      anchors { left: parent.left; leftMargin: root.gap * 2; verticalCenter: parent.verticalCenter }
+      anchors {
+        left: parent.left; leftMargin: root.gap * 2
+        right: tapLabel.left; rightMargin: root.gap
+        verticalCenter: parent.verticalCenter
+      }
+      elide: Text.ElideRight
       text: root.workspaceCount === 1 ? "1 workspace" : root.workspaceCount + " workspaces"
       color: Color.foreground
       font.family: Style.font.family
@@ -105,9 +110,11 @@ Item {
       font.bold: true
     }
 
+    // A narrow list (a Dock) shows its header values without captions.
     Text {
+      id: tapLabel
       anchors { right: focusToggle.left; rightMargin: root.gap * 2; verticalCenter: parent.verticalCenter }
-      text: "tap  " + root.tapMode
+      text: CardPolicy.headerCaption("tap", root.tapMode, CardPolicy.compactHeader(root.width))
       color: Color.muted
       font.family: Style.font.family
       font.pixelSize: Math.round(Style.font.body * root.textScale)
@@ -130,7 +137,7 @@ Item {
       Text {
         id: focusLabel
         anchors.centerIn: parent
-        text: "focus  " + root.focusMode
+        text: CardPolicy.headerCaption("focus", root.focusMode, CardPolicy.compactHeader(root.width))
         color: root.moduleState && root.moduleState.focusOverridden ? Color.accent : Color.muted
         font.family: Style.font.family
         font.pixelSize: Math.round(Style.font.body * root.textScale)

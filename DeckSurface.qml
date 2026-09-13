@@ -6,13 +6,23 @@ import Quickshell.Wayland
 import qs.Commons
 import "lib/LayoutPolicy.js" as LayoutPolicy
 import "lib/DeckPolicy.js" as DeckPolicy
+import "lib/DockPolicy.js" as DockPolicy
 import "lib/CardPolicy.js" as CardPolicy
 import "modules/AgentList"
 import "modules/WorkspaceList"
 import "modules/Usage"
 
-// The full-output surface on one Display. Renders only: every value comes from
-// the service it registers with.
+// A Display's surface. Renders only: every value comes from its Deck and the
+// service. Two kinds:
+//
+// - surface: the whole output, Bottom layer, reserving nothing. It spans
+//   under the Omarchy bar and steps its content out of the bar's strip.
+// - dock: a strip along one edge, Top layer so ordinary windows never cover
+//   it, reserving its size as a layer-shell exclusive zone so windows tile
+//   beside it on every workspace. The compositor places it beside the bar, so
+//   it needs no bar inset. Hidden, it is unmapped and reserves nothing.
+//
+// Neither ever takes keyboard focus.
 //
 // Layer configuration follows OmaDeck's components/DeckSurface.qml
 // (github.com/TheAirick/OmaDeck, MIT, Copyright (c) 2026 Erik Holum).
@@ -20,11 +30,20 @@ PanelWindow {
   id: root
 
   property var service: null
+  property var deck: null
 
-  readonly property var inset: service ? service.barInset : ({ top: 0, right: 0, bottom: 0, left: 0 })
-  readonly property bool tabsShown: !!service && service.tabsVisible
-  readonly property string tabEdge: DeckPolicy.tabEdge(service ? service.barPosition : "", service ? service.barHidden : false,
-    width, height)
+  readonly property bool isDock: !!deck && deck.isDock
+  readonly property string dockEdge: deck ? deck.edge : ""
+  readonly property var dockGeometry: DockPolicy.geometry(dockEdge, deck ? deck.dockSize : 0,
+    screen ? screen.width : 0, screen ? screen.height : 0)
+  // The strip a shown Dock keeps free of windows.
+  readonly property int reservedSize: isDock && visible ? dockGeometry.size : 0
+  readonly property string layerName: isDock ? "top" : "bottom"
+
+  readonly property var inset: !isDock && service ? service.barInset : ({ top: 0, right: 0, bottom: 0, left: 0 })
+  readonly property bool tabsShown: !!deck && deck.tabsVisible
+  readonly property string tabEdge: isDock ? DockPolicy.tabEdge(dockEdge)
+    : DeckPolicy.tabEdge(service ? service.barPosition : "", service ? service.barHidden : false, width, height)
   readonly property int tabThickness: CardPolicy.MIN_TOUCH_PX
   readonly property var tabRect: DeckPolicy.tabRect(width, height, inset, tabEdge, tabThickness)
   readonly property var contentRect: LayoutPolicy.contentRect(width, height,
@@ -34,21 +53,29 @@ PanelWindow {
   // side on a landscape area, stacked on a portrait one, sized by weight.
   readonly property int moduleGap: Style.spacing.lg
   readonly property var moduleRects: LayoutPolicy.moduleRects(contentRect.width, contentRect.height,
-    service ? service.activeModules.map(function(module) { return module.weight }) : [], moduleGap)
+    deck ? deck.activeModules.map(function(module) { return module.weight }) : [], moduleGap)
 
   // Modules are placed into the content area, which never sits under the bar.
   default property alias content: contentArea.data
 
-  anchors { top: true; right: true; bottom: true; left: true }
-  exclusionMode: ExclusionMode.Ignore
-  color: service ? service.background : "black"
-  WlrLayershell.namespace: "gjetr"
-  WlrLayershell.layer: WlrLayer.Bottom
+  anchors {
+    top: !root.isDock || root.dockGeometry.anchors.top
+    right: !root.isDock || root.dockGeometry.anchors.right
+    bottom: !root.isDock || root.dockGeometry.anchors.bottom
+    left: !root.isDock || root.dockGeometry.anchors.left
+  }
+  implicitWidth: isDock ? dockGeometry.width : 0
+  implicitHeight: isDock ? dockGeometry.height : 0
+  visible: !deck || deck.shown
+  exclusionMode: isDock && visible ? ExclusionMode.Auto : ExclusionMode.Ignore
+  color: deck ? deck.background : "black"
+  WlrLayershell.namespace: isDock ? "gjetr-dock" : "gjetr"
+  WlrLayershell.layer: isDock ? WlrLayer.Top : WlrLayer.Bottom
   // gjetr is touch-driven and must never pull keyboard focus off the desk.
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-  Component.onCompleted: if (service) service.registerSurface(root)
-  Component.onDestruction: if (service) service.unregisterSurface(root)
+  Component.onCompleted: if (deck) deck.registerSurface(root)
+  Component.onDestruction: if (deck) deck.unregisterSurface(root)
 
   DeckTabs {
     visible: root.tabsShown
@@ -57,10 +84,10 @@ PanelWindow {
     width: root.tabRect.width
     height: root.tabRect.height
     edge: root.tabEdge
-    names: root.service ? root.service.deckLayouts : []
-    active: root.service ? root.service.activeLayoutName : ""
-    badges: root.service ? root.service.tabBadges : []
-    onSelected: function(name) { if (root.service) root.service.selectLayout(name) }
+    names: root.deck ? root.deck.deckLayouts : []
+    active: root.deck ? root.deck.activeLayoutName : ""
+    badges: root.deck ? root.deck.tabBadges : []
+    onSelected: function(name) { if (root.deck) root.deck.selectLayout(name) }
   }
 
   Item {
@@ -74,7 +101,7 @@ PanelWindow {
     // Every Module of the active Layout, each in its own rectangle and keyed
     // <layout>#<index>, so its Overrides and session state are its own.
     Repeater {
-      model: root.service ? root.service.activeModules : []
+      model: root.deck ? root.deck.activeModules : []
 
       Item {
         id: slot
@@ -164,7 +191,7 @@ PanelWindow {
             return
           }
           var end = centroid.scenePosition
-          if (root.service) root.service.swipeLayout(end.x - start.x, end.y - start.y)
+          if (root.deck) root.deck.swipeLayout(end.x - start.x, end.y - start.y)
         }
       }
     }

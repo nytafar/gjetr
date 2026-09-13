@@ -142,3 +142,30 @@ test("moduleStates shadows each Module's sort and focus with its own Overrides",
   assert.equal(states["wide#1"].weight, 2)
   assert.deepEqual(JSON.parse(JSON.stringify(Override.moduleStates(null, overrides))), {})
 })
+
+test("parse keeps a Display's visible Override beside its Layout, dropping junk", () => {
+  const read = Override.parse(JSON.stringify({
+    version: 1,
+    modules: {},
+    displays: { "DP-1": { visible: false }, "DP-2": { visible: "no" }, "HDMI-A-2": { layout: "wide", visible: true } }
+  }))
+  assert.deepEqual(plain(read.overrides.displays), { "DP-1": { visible: false }, "HDMI-A-2": { layout: "wide", visible: true } })
+  assert.equal(Override.displayVisible(read.overrides, "DP-1", true), false)
+  assert.equal(Override.displayVisible(read.overrides, "DP-2", true), true)
+  assert.equal(Override.displayLayout(read.overrides, "DP-1", "dock"), "dock")
+})
+
+test("setDisplayVisible validates, keeps the Layout Override and clears itself at the Config value", () => {
+  const empty = Override.empty()
+  const hidden = Override.setDisplayVisible(empty, "DP-1", false, true)
+  assert.deepEqual(plain(hidden.displays), { "DP-1": { visible: false } })
+  const both = Override.setDisplayLayout(hidden, "DP-1", "usage", "dock")
+  assert.deepEqual(plain(both.displays), { "DP-1": { layout: "usage", visible: false } })
+  assert.match(Override.serialize(both), /"DP-1": \{\n      "layout": "usage",\n      "visible": false\n    \}/)
+  assert.deepEqual(plain(Override.setDisplayVisible(both, "DP-1", true, true).displays), { "DP-1": { layout: "usage" } })
+  assert.deepEqual(plain(Override.setDisplayLayout(hidden, "DP-1", "dock", "dock").displays), { "DP-1": { visible: false } })
+  assert.deepEqual(plain(Override.setDisplayVisible(hidden, "DP-1", true, true).displays), {})
+  assert.equal(Override.setDisplayVisible(empty, "DP 1", false, true), empty)
+  assert.equal(Override.setDisplayVisible(empty, "DP-1", "no", true), empty)
+  assert.deepEqual(plain(Override.clear(both)), { version: 1, modules: {}, displays: {} })
+})

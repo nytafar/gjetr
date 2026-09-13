@@ -11,7 +11,7 @@ omarchy-shell nytafar.gjetr state | jq .config
 ```
 
 Choices made on the Display itself (Sort mode, Focus behaviour, the active
-Layout) are **Overrides**. They live in `~/.local/state/gjetr/state.json` and
+Layout, whether a Dock is shown) are **Overrides**. They live in `~/.local/state/gjetr/state.json` and
 shadow Config until reset. See [Overrides](#overrides).
 
 Copy [`examples/gjetr/`](../examples/gjetr) to `~/.config/gjetr/` to start. With
@@ -24,6 +24,7 @@ no Config at all, gjetr shows one Agent List on `HDMI-A-2`.
     agents.toml         one file per Layout
     workspaces.toml
     usage.toml
+    dock.toml
 ```
 
 ## `gjetr.toml`
@@ -40,14 +41,18 @@ socket = "~/.config/herdr/sessions/work/herdr.sock"
 
 ### `[[display]]`
 
-A place the dashboard is shown. Only the first `[[display]]` is used today.
+A place the dashboard is shown. Every `[[display]]` is drawn, each with its own
+Deck: for example the touchscreen as a `surface` and a [Dock](#docks) beside
+your windows on the main monitor. An output holds one Display; a second
+`[[display]]` with the same `name` is skipped with a logged error.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `name` | string | `"HDMI-A-2"` | The output, as `hyprctl monitors` names it. Letters, digits, `.`, `_`, `-`. A Display without a valid name is skipped |
+| `kind` | string | `"surface"` | `"surface"`: the whole output. `"dock"`: a strip along one edge, beside windows (see [Docks](#docks)). Any other value skips the Display |
 | `deck` | list of Layout names | `["agents"]` | The Deck: Layouts to tab through, in order. Each is `layouts/<name>.toml`. Names use letters, digits, `-` and `_`, at most 32 characters. Duplicates are dropped |
-| `rotatable` | boolean | `false` | May gjetr rotate the output to fit the active Layout's orientation |
-| `touch_devices` | list of device names | `[]` | Touchscreens that rotate with the Display (see [Rotation and touch](#rotation-and-touch)) |
+| `rotatable` | boolean | `false` | Surface only. May gjetr rotate the output to fit the active Layout's orientation |
+| `touch_devices` | list of device names | `[]` | Surface only. Touchscreens that rotate with the Display (see [Rotation and touch](#rotation-and-touch)) |
 | `background` | string | `"black"` | `"black"`, `"theme"` (Omarchy theme background), `"wallpaper"` (the Omarchy wallpaper shows through), `"transparent"` (same as wallpaper), `"#rrggbb"`, or `"#aarrggbb"` to tint the wallpaper |
 | `refresh_seconds` | whole number, 60 to 86400 | `900` | Seconds between usage refreshes for the Usage Modules in this Display's Deck. Out of range clamps, with a logged error |
 
@@ -60,8 +65,103 @@ touch_devices = ["wch.cn-usb2iic_ctp_control", "wch.cn-usb2iic_ctp_control-1"]
 background = "#c0000000"
 ```
 
-The surface sits on the Bottom layer, so ordinary windows cover it and the
+A surface sits on the Bottom layer, so ordinary windows cover it and the
 Omarchy bar stays on top. Content steps out of the bar's strip on its own.
+
+## Docks
+
+A Dock is a Display along one edge of an output, beside your windows. It stays
+on every workspace and reserves its strip (a layer-shell exclusive zone), so
+windows tile beside it instead of under it. It never takes keyboard focus, and
+mouse clicks and the scroll wheel work on it like taps and swipes on a
+touchscreen.
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `kind` | string | | `"dock"` |
+| `name` | string | | The output, e.g. `"DP-1"` |
+| `edge` | string | required | `"left"`, `"right"`, `"top"` or `"bottom"`. A Dock without a valid edge is skipped, with a logged error |
+| `size` | whole number, 120 to 2000 | `360` | Logical pixels: the width of a left or right Dock, the height of a top or bottom one. Out of range clamps, with a logged error. A Dock never takes more than half of its output |
+| `visible` | boolean | `true` | Shown when gjetr starts. `toggleDock` keeps its choice as an Override |
+| `deck`, `background`, `refresh_seconds` | | | As for any Display |
+
+`rotatable` and `touch_devices` do not apply to a Dock and are ignored with a
+logged error; `edge`, `size` and `visible` are ignored on a surface the same
+way.
+
+```toml
+[[display]]
+name = "HDMI-A-2"
+deck = ["wide", "usage"]
+
+[[display]]
+kind = "dock"
+name = "DP-1"
+edge = "right"
+size = 360
+deck = ["dock"]
+```
+
+with `layouts/dock.toml`, Agents over usage:
+
+```toml
+orientation = "portrait"
+
+[[module]]
+type = "agent-list"
+weight = 2
+preset = "compact"
+
+[[module]]
+type = "usage"
+show = ["limits"]
+```
+
+**Orientation.** A Dock's shape decides it: left and right Docks are portrait,
+top and bottom Docks landscape. Layouts built for the other orientation are
+skipped (all are kept if none fits). A Dock never rotates its output or touch
+input. Modules stack in a portrait Dock and sit side by side in a landscape
+one; with several Layouts, tabs go on the short edge (top of a portrait Dock,
+left of a landscape one). Below 480 pixels wide, list headers show their sort,
+tap and focus values without the captions.
+
+**Layering.** A Dock sits on the Top layer, the same as the Omarchy bar, so
+ordinary windows never cover it; fullscreen windows still do. Its exclusive
+zone keeps it beside the bar, never under it. On the same edge as the bar, the
+surface mapped first sits at the edge: after a shell start the bar is outside
+and the Dock inside it, and showing a hidden Dock puts it inside the bar again.
+
+**Showing and hiding.** Hidden, a Dock is unmapped and reserves nothing, so
+windows take the space back. The choice is an Override per output and survives
+restarts; `resetOverrides` returns to `visible` from Config.
+
+```bash
+omarchy-shell nytafar.gjetr toggleDock DP-1   # or showDock, hideDock
+omarchy-shell nytafar.gjetr toggleDock ""     # the first Dock
+```
+
+Bind it to a key in `~/.config/hypr/bindings.lua`, with Omarchy's helper:
+
+```lua
+o.bind("SUPER + CTRL + G", "Toggle gjetr dock", "omarchy-shell nytafar.gjetr toggleDock DP-1")
+```
+
+or with Hyprland's own:
+
+```lua
+hl.bind("SUPER + CTRL + G", hl.dsp.exec_cmd("omarchy-shell nytafar.gjetr toggleDock DP-1"), { description = "Toggle gjetr dock" })
+```
+
+Pick a key that is free (`omarchy menu keybindings --print`), and check
+`hyprctl configerrors` after saving.
+
+**Hotplug.** Like a surface, a Dock goes away with its output and comes back
+with it, keeping its Deck and visibility.
+
+**Sharing a Layout.** Module Overrides and session state are keyed by Layout
+(`<layout>#<index>`), so a Layout shown on two Displays at once is the same
+Modules on both: a Sort mode chosen on one shows on the other, and so do open
+Recaps and expanded rows. Give a Dock its own Layout file to keep it separate.
 
 ## `layouts/<name>.toml`
 
@@ -343,13 +443,15 @@ notifications; herdr owns those.
 {
   "version": 1,
   "modules": { "agents#0": { "sort": "priority", "focus": "window" } },
-  "displays": { "HDMI-A-2": { "layout": "wide" } }
+  "displays": { "HDMI-A-2": { "layout": "wide" }, "DP-1": { "visible": false } }
 }
 ```
 
 A Module is keyed by `<layout>#<position>` (its place among the Layout's valid
-Modules, from 0), a Display by its output name. An Agent List keeps `sort` and
-`focus`; a Workspace List keeps `focus`. An
+Modules, from 0), shared by every Display that shows the Layout. A Display is
+keyed by its output name and keeps its active `layout` and, for a Dock,
+`visible`. An Agent List keeps `sort` and `focus`; a Workspace List keeps
+`focus`. An
 Override equal to the Config value removes itself, so a later Config edit applies
 again. Reset every Override with:
 
@@ -378,14 +480,16 @@ omarchy-shell nytafar.gjetr <function> [argument]
 
 | Function | Does |
 |---|---|
-| `state` | JSON: Display, bar inset, herdr connection, Config summary and errors, the active Layout's `modules` (key, type, weight, rectangle), `workspaces` (Focused workspace, expansion and rows of the first Workspace List), Deck, Overrides, Attention, Recap, every Card. `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
+| `state` | JSON: `displays` (every Display: kind, edge, size, shown, surface with layer and exclusive zone, Deck, Modules). The rest describes the primary Display, the first surface: Display, bar inset, herdr connection, Config summary and errors, the active Layout's `modules` (key, type, weight, rectangle), `workspaces` (Focused workspace, expansion and rows of the first Workspace List), Deck, Overrides, Attention, Recap, every Card. `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
 | `reconnect` | Drop and reopen the herdr connection |
 | `focus <pane-id>` | Focus an Agent's pane, as a tap does |
 | `toggleRecap <pane-id>` | Open or close an Agent's full Recap in the first Agent List, as a tap on `recap` does. Prints `open`, `closed`, or why nothing happened (`unknown pane`, `no agent list`, `no recap`, `recap is inline, not expand`). `state` → `recap.openCards` lists the open Cards |
 | `cycleSort` | Next Sort mode of the first Agent List, as a header tap does |
 | `toggleFocus` | Flip Focus behaviour of the first Agent List |
-| `selectLayout <name>` | Show a Layout of the Deck |
-| `nextLayout`, `previousLayout` | The step a swipe takes |
+| `selectLayout <name>` | Show a Layout of the primary Display's Deck |
+| `nextLayout`, `previousLayout` | The step a swipe takes, on the primary Display |
+| `toggleDock <output>` | Show or hide the Dock on an output (`""` for the first Dock), kept as an Override. Prints `shown`, `hidden`, or why nothing happened (`no dock DP-9`, `HDMI-A-2 is not a dock`) |
+| `showDock <output>`, `hideDock <output>` | The same, one way |
 | `toggleExpand <node>` | Open or close a workspace (`w:<id>`) or tab (`t:<id>`) in the first Workspace List. Prints `expanded`, `collapsed`, `unknown node` or `no workspace list`. `state` → `workspaces.rows` lists the rows drawn |
 | `tapRow <node> <zone>` | Tap a row (`w:<id>`, `t:<id>`, `p:<id>`) of the first Workspace List in zone `row` or `chevron`, as a finger does. Prints what it did |
 | `refreshUsage` | Run `omarchy-agent-usage-update` now, as a tap on a Usage header does. Prints `started`, `already running` or `no usage module`. `state` → `usage` shows records, errors, runs and each provider's age |
@@ -397,4 +501,6 @@ omarchy-shell nytafar.gjetr <function> [argument]
 - Config files over 64 KB are refused.
 - One herdr server per Config. Watch a second server with a second plugin
   instance or Config later; multi-server discovery is out of scope.
-- Only the first `[[display]]` is drawn.
+- One Display per output. Functions that name no Display (`selectLayout`,
+  `cycleSort`, `toggleExpand`, ...) act on the primary Display, then on shown
+  Docks for Modules it does not have.

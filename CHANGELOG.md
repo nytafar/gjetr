@@ -8,6 +8,22 @@ All notable changes to gjetr. The format follows
 
 ### Added
 
+- Docks: `kind = "dock"` on a `[[display]]` puts gjetr along one `edge` of an
+  output (`left`, `right`, `top`, `bottom`; a Dock without one is skipped),
+  `size` logical pixels deep (default 360, at most half the output), with its
+  own Deck. It sits on the Top layer, reserves its strip so windows tile
+  beside it on every workspace, never takes keyboard focus, and survives
+  hotplug. Its orientation comes from its edge; it never rotates its output.
+- Every `[[display]]` is drawn, each with its own Deck, active Layout and
+  surface, so the touchscreen and a Dock run at once. An output holds one
+  Display.
+- IPC `toggleDock <output>`, `showDock <output>` and `hideDock <output>` (`""`
+  for the first Dock); the choice is an Override per output
+  (`displays.<output>.visible`), and Config `visible` sets the start. `state` →
+  `displays` describes every Display.
+- `examples/gjetr/layouts/dock.toml`: Agents over usage, portrait, and a
+  commented Dock in `examples/gjetr/gjetr.toml`.
+
 - A Layout draws every `[[module]]`, not only the first Agent List: side by
   side as equal columns on a landscape Display, stacked on a portrait one, with
   a hairline between them. A per-Module `weight` (default 1) sets its share.
@@ -49,6 +65,18 @@ All notable changes to gjetr. The format follows
   `recap.overlay` in `state`.
 
 ### Changed
+
+- `state`'s top-level `display`, `surface`, `modules` and `deck`, and the IPC
+  functions that name no Display, describe the primary Display (the first
+  surface). Functions that act on the first Agent List or Workspace List fall
+  back to a shown Dock's.
+- List headers narrower than 480 pixels show their sort, tap and focus values
+  without captions, and the count elides instead of running under them.
+
+### Fixed
+
+- With `recap = "inline"`, Cards without a Recap no longer reserve two empty
+  lines under their name.
 
 - Status reads without colour. Cards and Workspace List rows show a glyph
   instead of a thin coloured line: working ◌ (turning, accent), idle ○

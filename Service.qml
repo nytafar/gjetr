@@ -15,15 +15,17 @@ import "lib/WindowPolicy.js" as WindowPolicy
 import "lib/CommandPolicy.js" as CommandPolicy
 import "lib/AttentionModel.js" as AttentionModel
 import "lib/DeckPolicy.js" as DeckPolicy
+import "lib/DockPolicy.js" as DockPolicy
 import "lib/RecapModel.js" as RecapModel
 import "lib/WorkspaceTreeModel.js" as WorkspaceTreeModel
 import "lib/ThemeModel.js" as ThemeModel
 import "lib/UsageModel.js" as UsageModel
 import "sources"
 
-// Owns Display selection, the herdr connection and everything that must
-// outlive a surface. The surface itself is created per matching screen and
-// registers back here, so state and the IPC target survive the Display being
+// Owns the Displays, the herdr connection and everything that must outlive a
+// surface. Each [[display]] gets a DisplayDeck (its Deck, surface, rotation and
+// Dock visibility); its surface is created per matching screen and registers
+// back with it, so state and the IPC target survive the Display being
 // unplugged.
 //
 // Service-owns-surface with hotplug re-registration follows OmaDeck's
@@ -45,34 +47,44 @@ Item {
   property var layoutTexts: ({})
   readonly property var mainRead: ConfigModel.readMain(mainText, home)
   readonly property var config: mainRead.config
-  // One Display for now: the first [[display]].
-  readonly property var display: config.displays[0]
   readonly property var deckNames: ConfigModel.deckLayoutNames(config)
-  readonly property var layoutsByName: readLayouts(display.deck, layoutTexts)
 
-  // The Deck: the Layouts this Display can show now, and the active one. A
-  // fixed Display skips Layouts built for the other orientation; the active
-  // Layout is an Override per Display, defaulting to the Deck's first.
-  readonly property string surfaceOrientation: activeSurface
-    ? DeckPolicy.orientationOf(activeSurface.width, activeSurface.height) : ""
-  readonly property var deckRead: DeckPolicy.availableLayouts(
-    display.deck.map(function(name) { return layoutsByName[name] }), display.rotatable, surfaceOrientation)
-  readonly property var deckLayouts: deckRead.names
-  readonly property string activeLayoutName: DeckPolicy.activeName(deckLayouts,
-    OverrideModel.displayLayout(overrides, display.name, ""))
-  readonly property int activeLayoutIndex: deckLayouts.indexOf(activeLayoutName)
-  readonly property var activeLayout: layoutsByName[activeLayoutName] || ConfigModel.defaultLayout(activeLayoutName)
-  readonly property string activeOrientation: activeLayout.orientation
-  readonly property bool tabsVisible: DeckPolicy.tabsVisible(deckLayouts)
-  readonly property var tabBadges: DeckPolicy.badges(deckLayouts, layoutsByName, activeLayoutName, attentionCount)
+  // Displays: one DisplayDeck per [[display]], keyed "<kind>:<output>" (an
+  // output holds one Display). `decks` lists them in Config order.
+  readonly property var displayEntries: config.displays.map(function(entry) { return entry.kind + ":" + entry.name })
+  readonly property var decks: {
+    var instances = deckVariants.instances
+    var out = []
+    for (var i = 0; i < displayEntries.length; i++) {
+      for (var j = 0; j < instances.length; j++) {
+        if (instances[j] && instances[j].entry === displayEntries[i]) {
+          out.push(instances[j])
+          break
+        }
+      }
+    }
+    return out
+  }
+  // The primary Display: the first surface, else the first Display. `state`
+  // and the IPC functions that name no Display describe and act on it.
+  readonly property int primaryIndex: DeckPolicy.primaryIndex(config.displays)
+  readonly property var display: config.displays[Math.max(0, primaryIndex)]
+  readonly property var primaryDeck: deckNamed(display.name)
+  // Decks shown now: every surface, and each Dock that is not hidden.
+  readonly property var shownDecks: decks.filter(function(deck) { return deck.shown })
+  // Each shown Deck's active Modules, the primary Display's first.
+  readonly property var shownModuleLists: {
+    var lists = []
+    if (primaryDeck && primaryDeck.shown) lists.push(primaryDeck.activeModules)
+    for (var i = 0; i < shownDecks.length; i++) if (shownDecks[i] !== primaryDeck) lists.push(shownDecks[i].activeModules)
+    return lists
+  }
+
+  // The primary Display's Deck, for `state` and IPC.
+  readonly property var deckLayouts: primaryDeck ? primaryDeck.deckLayouts : []
+  readonly property string activeLayoutName: primaryDeck ? primaryDeck.activeLayoutName : ""
   // A swipe must travel this far, mostly sideways, to change Layout.
   readonly property int swipeThreshold: 80
-
-  // Runtime rotation of a rotatable Display (never monitors.lua).
-  property int rotationSequence: 0
-  property var rotationStatus: ({ requests: 0, transform: -1, error: "" })
-  property var touch: ({ transform: -1, devices: [], error: "" })
-  property int touchLogged: -1
 
   // Recap: the latest away_summary of each Claude Agent's session, found by
   // session id under ~/.claude/projects and re-read when the transcript's
@@ -82,8 +94,8 @@ Item {
   // List reads its own from moduleStates.
   readonly property string recapMode: primaryModule && primaryModule.recap ? primaryModule.recap : "off"
   readonly property string recapOpenMode: primaryModule && primaryModule.recapOpen ? primaryModule.recapOpen : RecapModel.DEFAULT_OPEN
-  // Recaps are read while any Agent List on the active Layout shows them.
-  readonly property bool recapNeeded: activeModules.some(function(module) {
+  // Recaps are read while any Agent List shown shows them.
+  readonly property bool recapNeeded: shownModules.some(function(module) {
     return module.type === "agent-list" && module.settings.recap !== "off"
   })
   // Session state, never written: the Cards whose Recap is open, per Module key
@@ -97,43 +109,42 @@ Item {
   property var recapStamps: ({})
   property var recaps: ({})
   property bool recapPolling: false
-  // Every Module of the active Layout, keyed <layout>#<index>, and each
-  // Module's settings shadowed by its own Overrides.
-  readonly property var activeModules: ConfigModel.layoutModules(activeLayout)
+  // Every Module of every Display's active Layout, keyed <layout>#<index>, and
+  // each Module's settings shadowed by its own Overrides. A Layout on two
+  // Displays is the same Modules, listed once. A hidden Dock's Modules keep
+  // their state; only shown ones count for what gjetr reads and polls.
+  readonly property var activeModules: DeckPolicy.mergeModules(decks.map(function(deck) { return deck.activeModules }))
+  readonly property var shownModules: DeckPolicy.mergeModules(shownModuleLists)
   readonly property var moduleStates: OverrideModel.moduleStates(activeModules, overrides)
-  // The first Agent List: what `state` reports, and what the IPC functions that
-  // name no Module act on. Empty key when the Layout has none.
-  readonly property var agentListConfig: ConfigModel.agentList(activeLayout)
+  // The first Agent List shown, the primary Display's first: what `state`
+  // reports, and what the IPC functions that name no Module act on. Empty key
+  // when none is shown.
+  readonly property string agentListKey: DeckPolicy.firstModuleKey(shownModuleLists, "agent-list")
   // Checked by type: while a Layout file loads, a key can briefly name a
   // Module of another type.
   readonly property var primaryModule: moduleStates[agentListKey] && moduleStates[agentListKey].type === "agent-list"
     ? moduleStates[agentListKey] : null
-  // The first Workspace List: what the tree IPC functions act on.
-  readonly property string workspaceListKey: {
-    for (var i = 0; i < activeModules.length; i++) if (activeModules[i].type === "workspace-list") return activeModules[i].key
-    return ""
-  }
+  // The first Workspace List shown: what the tree IPC functions act on.
+  readonly property string workspaceListKey: DeckPolicy.firstModuleKey(shownModuleLists, "workspace-list")
 
   // herdr's workspace > tab > pane tree and the Focused workspace. Agent Lists
   // highlight the Agents in it; nothing filters by it.
   readonly property var workspaceTree: herdr.tree
   readonly property string focusedWorkspaceId: workspaceTree ? workspaceTree.focusedWorkspaceId : ""
   // Usage (ADR 0002): providers from Omarchy's usage records, refreshed
-  // and watched while any Layout of the Deck has a Usage Module.
+  // and watched while any Layout of a shown Deck has a Usage Module.
   readonly property var deckUsageModules: {
     var out = []
-    for (var i = 0; i < deckLayouts.length; i++) {
-      var layout = layoutsByName[deckLayouts[i]]
-      var modules = layout && Array.isArray(layout.modules) ? layout.modules : []
-      for (var j = 0; j < modules.length; j++) if (modules[j] && modules[j].type === "usage") out.push(modules[j])
-    }
+    for (var i = 0; i < shownDecks.length; i++) out = out.concat(shownDecks[i].usageModules)
     return out
   }
-  readonly property int usageRefreshSeconds: UsageModel.refreshSeconds(display.refreshSeconds, deckUsageModules)
+  readonly property int usageRefreshSeconds: UsageModel.deckRefreshSeconds(shownDecks.map(function(deck) {
+    return { displaySeconds: deck.display.refreshSeconds, modules: deck.usageModules }
+  }))
   readonly property string usageDir: UsageModel.usageDir(home, Quickshell.env("XDG_STATE_HOME"))
   readonly property var usageProviders: usageSource.providers
   readonly property bool usageRefreshing: usageSource.refreshing
-  readonly property bool usageShown: activeModules.some(function(module) { return module.type === "usage" })
+  readonly property bool usageShown: shownModules.some(function(module) { return module.type === "usage" })
   // Clock for reset countdowns and ages; ticks only while a Usage Module shows.
   property double usageNowMs: Date.now()
 
@@ -141,11 +152,7 @@ Item {
   // Workspace List (WorkspaceTreeModel expansion state), pruned as they go away.
   property var treeExpanded: WorkspaceTreeModel.emptyExpanded()
   readonly property var configErrors: collectConfigErrors(mainRead, layoutTexts, deckNames)
-  readonly property string configSummary: "display " + display.name + (display.rotatable ? " rotatable" : "")
-    + ", deck [" + deckLayouts.join(", ") + "]"
-    + (deckRead.skipped.length > 0 ? " skipping [" + deckRead.skipped.join(", ") + "]" : "")
-    + (deckRead.fallback ? " (no Layout fits " + surfaceOrientation + ", showing all)" : "")
-    + ", layout " + activeLayout.name + " " + activeLayout.orientation
+  readonly property string configSummary: decks.map(function(deck) { return deck.summary }).join("; ")
 
   // Overrides, from ~/.local/state/gjetr/state.json. This service is the file's
   // only writer; writeOverrides is the only place it changes.
@@ -153,20 +160,12 @@ Item {
   property var overrides: OverrideModel.empty()
   property bool overridesLoaded: false
   property string overridesError: ""
-  readonly property string agentListKey: OverrideModel.moduleKey(activeLayout.name, agentListConfig.index)
 
-  // The Display this service draws on.
+  // The primary Display, and its background (kind marks pick their light or
+  // dark variant from it).
   readonly property string displayName: display.name
-  // "wallpaper" and "transparent" leave the Bottom-layer surface clear, so
-  // omarchy-background shows through.
-  readonly property color background: display.background === "theme" ? Color.background
-    : display.background === "transparent" || display.background === "wallpaper" ? "transparent"
-    : display.background === "black" ? "black" : display.background
+  readonly property color background: primaryDeck ? primaryDeck.background : "black"
   readonly property string herdrSocketPath: config.socket
-
-  property var activeSurface: null
-
-  readonly property var displayScreens: LayoutPolicy.displayScreens(Quickshell.screens, displayName)
 
   // Bar geometry, read the same way omarchy's notifications service does.
   readonly property string barPosition: LayoutPolicy.normalizeBarPosition(
@@ -268,74 +267,36 @@ Item {
     return out
   }
 
+  function deckNamed(output) {
+    for (var i = 0; i < decks.length; i++) if (decks[i].name === output) return decks[i]
+    return null
+  }
+
+  // Runs an allowlisted command for a Deck (rotation, touch).
+  function runCommand(argv, callback) {
+    return commands.run(argv, callback)
+  }
+
+  // A Layout of the primary Display's Deck.
   function selectLayout(name) {
-    var value = String(name || "")
-    if (deckLayouts.indexOf(value) < 0) return false
-    // The default is the first Layout this Display can show, so choosing it
-    // removes the Override.
-    writeOverrides(OverrideModel.setDisplayLayout(overrides, display.name, value, deckLayouts[0]))
-    return true
+    return !!primaryDeck && primaryDeck.selectLayout(name)
   }
 
-  // dx, dy: the gesture's travel in surface pixels.
+  // dx, dy: the gesture's travel in surface pixels, on the primary Display.
   function swipeLayout(dx, dy) {
-    var index = DeckPolicy.swipeTarget(activeLayoutIndex, deckLayouts.length, dx, dy, swipeThreshold)
-    if (index === activeLayoutIndex || index < 0) return false
-    return selectLayout(deckLayouts[index])
+    return !!primaryDeck && primaryDeck.swipeLayout(dx, dy)
   }
 
-  // Turns a rotatable Display to the active Layout's orientation. Reads the
-  // output first so position and scale are written back unchanged.
-  function applyOrientation() {
-    if (!display.rotatable || !overridesLoaded || displayScreens.length === 0) return
-    if (activeOrientation !== "portrait" && activeOrientation !== "landscape") return
-    var sequence = ++rotationSequence
-    var output = display.name
-    var orientation = activeOrientation
-    var layoutName = activeLayoutName
-    commands.run(CommandPolicy.MONITORS, function(text, code) {
-      if (sequence !== rotationSequence) return
-      var monitor = code === 0 ? DeckPolicy.parseMonitor(text, output) : null
-      if (!monitor) {
-        rotationStatus = { requests: rotationStatus.requests, transform: -1, error: "output " + output + " not in hyprctl monitors" }
-        return
-      }
-      var transform = DeckPolicy.transformFor(orientation, monitor)
-      if (transform < 0) {
-        applyTouch(output, monitor.transform)
-        return
-      }
-      var argv = CommandPolicy.rotateOutput(output, transform, monitor.x, monitor.y, monitor.scale)
-      rotationStatus = { requests: rotationStatus.requests + 1, transform: transform, error: "" }
-      log("rotate " + output + " to transform " + transform + " for " + layoutName + " (" + orientation + ")")
-      commands.run(argv, function(result, exitCode) {
-        if (exitCode !== 0 || String(result).trim() !== "ok") {
-          rotationStatus = { requests: rotationStatus.requests, transform: transform,
-            error: "hyprctl eval failed (" + exitCode + "): " + String(result).trim().slice(0, 120) }
-          return
-        }
-        applyTouch(output, transform)
-      })
-    })
-  }
-
-  // Hyprland does not map touch through a runtime output transform, so the
-  // touchscreen gets the same transform: per device when the Display names its
-  // touch_devices, else the global touchdevice option. Idempotent.
-  function applyTouch(output, transform) {
-    var devices = display.touchDevices || []
-    var argvs = []
-    if (devices.length === 0) argvs.push(CommandPolicy.touchTransform(transform))
-    for (var i = 0; i < devices.length; i++) argvs.push(CommandPolicy.deviceTransform(devices[i], output, transform))
-    touch = { transform: transform, devices: devices, error: "" }
-    for (var j = 0; j < argvs.length; j++) {
-      commands.run(argvs[j], function(result, exitCode) {
-        if (exitCode !== 0 || String(result).trim() !== "ok")
-          touch = { transform: transform, devices: devices, error: "touch transform failed (" + exitCode + ")" }
-      })
-    }
-    if (transform !== touchLogged) log("touch transform " + transform + (devices.length > 0 ? " for " + devices.join(", ") : " (all touch devices)"))
-    touchLogged = transform
+  // Shows, hides or toggles a Dock ("show", "hide", "toggle"), as an Override
+  // per Display. `output` names the Dock; "" is the first Dock.
+  // -> "shown", "hidden", or why nothing happened.
+  function dockAction(action, output) {
+    var target = DockPolicy.dockTarget(config.displays, output)
+    if (target.error !== "") return target.error
+    var deck = deckNamed(target.name)
+    if (!deck) return "no dock " + target.name
+    if (!overridesLoaded) return "overrides not loaded yet"
+    return deck.applyDockAction(action) ? "shown" : "hidden"
   }
 
   // Each Agent List decides from its own recap setting whether to show it.
@@ -703,28 +664,15 @@ Item {
     nowSeconds = CacheTimerModel.nowSeconds(Date.now())
   }
 
-  function registerSurface(surface) {
-    if (!surface) return
-    activeSurface = surface
-    log("surface registered on " + displayName)
-  }
-
-  function unregisterSurface(surface) {
-    if (activeSurface !== surface) return
-    activeSurface = null
-    log("surface unregistered from " + displayName)
-  }
-
+  // Top-level `display`, `surface`, `modules` and `deck` describe the primary
+  // Display; `displays` lists every Display.
   function stateJson() {
-    var surface = activeSurface
+    var primary = primaryDeck ? primaryDeck.describe() : null
     return JSON.stringify({
       display: displayName,
-      displayPresent: displayScreens.length > 0,
-      surface: surface ? {
-        width: surface.width,
-        height: surface.height,
-        content: surface.contentRect
-      } : null,
+      displayPresent: !!primary && primary.present,
+      surface: primary ? primary.surface : null,
+      displays: decks.map(function(deck) { return deck.describe() }),
       bar: { position: barPosition, size: barSize, hidden: barHidden, inset: barInset },
       herdr: {
         socket: herdr.socketPath,
@@ -773,25 +721,8 @@ Item {
             stale: UsageModel.isStale(p.updatedAtMs, Date.now(), usageRefreshSeconds) }
         })
       },
-      modules: activeModules.map(function(module, index) {
-        var state = moduleStates[module.key] || {}
-        return { key: module.key, type: module.type, weight: module.weight, sort: state.sort, focus: state.focus,
-          rect: surface && surface.moduleRects ? (surface.moduleRects[index] || null) : null }
-      }),
-      deck: {
-        layouts: deckLayouts,
-        skipped: deckRead.skipped,
-        fallback: deckRead.fallback,
-        active: activeLayoutName,
-        orientation: activeOrientation,
-        surfaceOrientation: surfaceOrientation,
-        rotatable: display.rotatable,
-        tabs: tabsVisible,
-        tabEdge: surface ? surface.tabEdge : "",
-        badges: tabBadges,
-        rotation: rotationStatus,
-        touch: touch
-      },
+      modules: primary ? primary.modules : [],
+      deck: primary ? primary.deck : null,
       recap: {
         mode: recapMode,
         open: recapOpenMode,
@@ -900,28 +831,6 @@ Item {
 
   onAgentsChanged: applyAgents()
   onWorkspaceTreeChanged: treeExpanded = WorkspaceTreeModel.pruneExpanded(treeExpanded, workspaceTree)
-  onActiveLayoutNameChanged: {
-    closeRecapOverlay()
-    orientationTimer.restart()
-  }
-  onActiveOrientationChanged: orientationTimer.restart()
-  onOverridesLoadedChanged: orientationTimer.restart()
-
-  // Coalesces Layout, Config and hotplug changes into one rotation.
-  Timer {
-    id: orientationTimer
-    interval: 150
-    onTriggered: root.applyOrientation()
-  }
-
-  // `hyprctl reload` re-reads monitors.lua and drops the runtime rule, so the
-  // Layout's orientation is applied again once the reload has settled.
-  Connections {
-    target: Hyprland
-    function onRawEvent(event) {
-      if (event && event.name === "configreloaded") reloadTimer.restart()
-    }
-  }
 
   Timer {
     id: pollTimer
@@ -932,11 +841,6 @@ Item {
     onTriggered: root.pollRecaps()
   }
 
-  Timer {
-    id: reloadTimer
-    interval: 500
-    onTriggered: root.applyOrientation()
-  }
   onCacheTimersChanged: resort()
 
   FileView {
@@ -985,16 +889,12 @@ Item {
   }
 
   Component.onCompleted: {
-    log("service up, display " + displayName + (displayScreens.length > 0 ? " present" : " absent"))
+    log("service up, displays [" + displayEntries.join(", ") + "]")
     herdr.start()
   }
   Component.onDestruction: {
     herdr.stop()
     log("service down")
-  }
-  onDisplayScreensChanged: {
-    log("display " + displayName + (displayScreens.length > 0 ? " present" : " absent"))
-    if (displayScreens.length > 0) orientationTimer.restart()
   }
 
   IpcHandler {
@@ -1048,6 +948,21 @@ Item {
       return root.refreshUsage()
     }
 
+    // Shows, hides or toggles a Dock, kept as an Override. `output` names it,
+    // "" is the first Dock. Prints "shown", "hidden" or why nothing happened.
+    function toggleDock(output: string): string {
+      return root.dockAction("toggle", output)
+    }
+
+    function showDock(output: string): string {
+      return root.dockAction("show", output)
+    }
+
+    function hideDock(output: string): string {
+      return root.dockAction("hide", output)
+    }
+
+    // A Layout of the primary Display's Deck.
     function selectLayout(name: string): string {
       return root.selectLayout(name) ? root.activeLayoutName : "unknown layout"
     }
@@ -1070,13 +985,16 @@ Item {
     }
   }
 
+  // One Deck per Display. Keyed by kind and output, so a Config reload that
+  // leaves a Display as it was keeps its Deck and surface.
   Variants {
-    model: root.displayScreens
+    id: deckVariants
+    model: root.displayEntries
 
-    DeckSurface {
+    DisplayDeck {
       required property var modelData
 
-      screen: modelData
+      entry: modelData
       service: root
     }
   }

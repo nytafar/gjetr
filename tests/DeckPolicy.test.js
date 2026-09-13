@@ -145,3 +145,25 @@ test("badges count on Layouts with a Workspace List too, which reaches every Age
   const layouts = { a: { modules: [{ type: "agent-list" }] }, w: { modules: [{ type: "workspace-list" }] }, u: { modules: [{ type: "usage" }] } }
   assert.deepEqual(Array.from(DeckForBadges.badges(["a", "w", "u"], layouts, "a", 2)), [0, 2, 0])
 })
+
+test("the primary Display is the first surface, else the first Display", () => {
+  assert.equal(Deck.primaryIndex([{ kind: "dock" }, { kind: "surface" }, { kind: "surface" }]), 1)
+  assert.equal(Deck.primaryIndex([{ kind: "dock" }, { kind: "dock" }]), 0)
+  assert.equal(Deck.primaryIndex([]), -1)
+  assert.equal(Deck.primaryIndex(null), -1)
+})
+
+test("mergeModules lists every Module of every Deck, a shared key once", () => {
+  const surface = [{ key: "wide#0", type: "agent-list" }, { key: "wide#1", type: "usage" }]
+  const dock = [{ key: "dock#0", type: "agent-list" }, { key: "wide#1", type: "usage" }, null, { type: "usage" }]
+  assert.deepEqual(Deck.mergeModules([surface, dock, null]).map((m) => m.key), ["wide#0", "wide#1", "dock#0"])
+})
+
+test("firstModuleKey takes the first Module of a type, earlier Decks first", () => {
+  const surface = [{ key: "usage#0", type: "usage" }]
+  const dock = [{ key: "dock#0", type: "workspace-list" }, { key: "dock#1", type: "agent-list" }]
+  assert.equal(Deck.firstModuleKey([surface, dock], "agent-list"), "dock#1")
+  assert.equal(Deck.firstModuleKey([[{ key: "wide#2", type: "agent-list" }], dock], "agent-list"), "wide#2")
+  assert.equal(Deck.firstModuleKey([surface], "workspace-list"), "")
+  assert.equal(Deck.firstModuleKey(null, "usage"), "")
+})

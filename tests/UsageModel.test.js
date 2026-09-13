@@ -184,3 +184,15 @@ test("lists that arrive as array-likes (QML sequences through a Repeater's model
   assert.equal(Usage.dayBars({ length: -1 }, 7).length, 0)
   assert.equal(Usage.dayBars("2026-09-13", 7).length, 0)
 })
+
+test("refresh across Decks: the smallest of the Decks that show a Usage Module", () => {
+  assert.equal(Usage.deckRefreshSeconds([]), 900)
+  assert.equal(Usage.deckRefreshSeconds([{ displaySeconds: 300, modules: [] }]), 900)
+  assert.equal(Usage.deckRefreshSeconds([
+    { displaySeconds: 300, modules: [{ refreshSeconds: null }] },
+    { displaySeconds: null, modules: [{ refreshSeconds: 1200 }] },
+    { displaySeconds: 60, modules: [] },
+    null
+  ]), 300)
+  assert.equal(Usage.deckRefreshSeconds(null), 900)
+})

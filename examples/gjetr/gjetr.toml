@@ -40,3 +40,19 @@ background = "black"
 # Seconds between usage refreshes for Usage Modules on this Display, 60 to
 # 86400 (default 900). A Usage Module's own refresh_seconds wins.
 # refresh_seconds = 900
+
+# A Dock: a Display along one edge of an output, beside your windows. It stays
+# on every workspace, windows tile beside it (it reserves its strip), ordinary
+# windows never cover it, and it never takes keyboard focus. It has its own
+# Deck. Show or hide it with a keybinding (docs/CONFIGURATION.md, "Docks"):
+#   omarchy-shell nytafar.gjetr toggleDock DP-1
+#
+# [[display]]
+# kind = "dock"             # "surface" (default, the whole output) or "dock"
+# name = "DP-1"             # the output; one Display per output
+# edge = "right"            # required: "left", "right", "top" or "bottom"
+# size = 360                # logical px: width of a left/right Dock, height of
+#                           # a top/bottom one; 120 to 2000, at most half the output
+# visible = true            # shown at start; toggleDock keeps its choice as an Override
+# deck = ["dock"]           # layouts/dock.toml: Agents over usage, portrait
+# background = "theme"

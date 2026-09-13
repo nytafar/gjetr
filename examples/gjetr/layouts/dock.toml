@@ -1,0 +1,25 @@
+# Dock, portrait: Agents on top, usage underneath, for a Dock along the left or
+# right edge of a main monitor. Use it as the deck of a kind = "dock" Display in
+# gjetr.toml (see the commented Dock there).
+#
+# A left or right Dock is portrait and a top or bottom Dock landscape, from its
+# shape; a Dock never rotates its output. Modules stack in portrait.
+
+orientation = "portrait"
+
+# Two thirds of the height for the Agent List.
+[[module]]
+type = "agent-list"
+weight = 2
+sort = "priority"
+# compact fits a narrow Dock: glyph, kind, name and Cache timer on one line.
+preset = "compact"
+focus = "window"
+# Inline Recaps grow only the Cards that have one.
+recap = "inline"
+
+# The rest for rate limits.
+[[module]]
+type = "usage"
+weight = 1
+show = ["limits"]

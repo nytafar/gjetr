@@ -63,6 +63,8 @@ Item {
   readonly property int gap: Style.spacing.lg
   readonly property int minCardWidth: 440
   readonly property int columns: LayoutPolicy.columnsFor(width - gap, minCardWidth, 3)
+  // A narrow list (a Dock) shows its header toggles as bare values.
+  readonly property bool compactHeader: CardPolicy.compactHeader(width)
 
   function syncCards() {
     var map = {}
@@ -131,7 +133,12 @@ Item {
       color: headerTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent) : "transparent"
 
       Text {
-        anchors { left: parent.left; leftMargin: root.gap * 2; verticalCenter: parent.verticalCenter }
+        anchors {
+          left: parent.left; leftMargin: root.gap * 2
+          right: sortLabel.left; rightMargin: root.gap
+          verticalCenter: parent.verticalCenter
+        }
+        elide: Text.ElideRight
         text: root.agents.length === 1 ? "1 agent" : root.agents.length + " agents"
         color: Color.foreground
         font.family: Style.font.family
@@ -140,8 +147,9 @@ Item {
       }
 
       Text {
+        id: sortLabel
         anchors { right: parent.right; rightMargin: root.gap * 2; verticalCenter: parent.verticalCenter }
-        text: "sort  " + root.sortMode
+        text: CardPolicy.headerCaption("sort", root.sortMode, root.compactHeader)
         // Accent while an Override shadows the Config default.
         color: root.moduleState && root.moduleState.sortOverridden ? Color.accent : Color.muted
         font.family: Style.font.family
@@ -171,7 +179,7 @@ Item {
       Text {
         id: focusLabel
         anchors.centerIn: parent
-        text: "focus  " + root.focusMode
+        text: CardPolicy.headerCaption("focus", root.focusMode, root.compactHeader)
         color: root.moduleState && root.moduleState.focusOverridden ? Color.accent : Color.muted
         font.family: Style.font.family
         font.pixelSize: Math.round(Style.font.body * root.textScale)

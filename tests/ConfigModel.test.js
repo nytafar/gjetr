@@ -17,7 +17,7 @@ test("a missing gjetr.toml yields the defaults without errors", () => {
   assert.deepEqual(Array.from(read.errors), [])
   assert.deepEqual(plain(read.config), {
     socket: "/home/test/.config/herdr/herdr.sock",
-    displays: [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black", touchDevices: [], refreshSeconds: null }]
+    displays: [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black", touchDevices: [], refreshSeconds: null, kind: "surface", edge: "", size: 0, visible: true }]
   })
 })
 
@@ -40,8 +40,8 @@ background = "theme"
   assert.deepEqual(plain(read.config), {
     socket: "/home/test/run/herdr.sock",
     displays: [
-      { name: "HDMI-A-2", deck: ["agents", "overview"], rotatable: true, background: "#101315", touchDevices: [], refreshSeconds: null },
-      { name: "DP-2", deck: ["agents"], rotatable: false, background: "theme", touchDevices: [], refreshSeconds: null }
+      { name: "HDMI-A-2", deck: ["agents", "overview"], rotatable: true, background: "#101315", touchDevices: [], refreshSeconds: null, kind: "surface", edge: "", size: 0, visible: true },
+      { name: "DP-2", deck: ["agents"], rotatable: false, background: "theme", touchDevices: [], refreshSeconds: null, kind: "surface", edge: "", size: 0, visible: true }
     ]
   })
 })
@@ -67,7 +67,7 @@ colour = "red"
 `, HOME)
   const config = plain(read.config)
   assert.equal(config.socket, "/home/test/.config/herdr/herdr.sock")
-  assert.deepEqual(config.displays, [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black", touchDevices: [], refreshSeconds: null }])
+  assert.deepEqual(config.displays, [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black", touchDevices: [], refreshSeconds: null, kind: "surface", edge: "", size: 0, visible: true }])
   const text = read.errors.join("\n")
   assert.match(text, /gjetr\.toml: socket: /)
   assert.match(text, /display\[0\]\.deck\[1\]: /)
@@ -381,4 +381,100 @@ test("a Display may set refresh_seconds for its Usage Modules", () => {
   const big = Config.readMain('[[display]]\nname = "DP-1"\nrefresh_seconds = 999999\n', HOME)
   assert.equal(big.config.displays[0].refreshSeconds, 86400)
   assert.match(big.errors.join("\n"), /display\[0\]\.refresh_seconds: expected whole seconds from 60 to 86400, got 999999; using 86400/)
+})
+
+test("a dock reads its edge, size and visibility, and never rotates", () => {
+  const read = Config.readMain(`
+[[display]]
+name = "HDMI-A-2"
+deck = ["agents"]
+
+[[display]]
+kind = "dock"
+name = "DP-1"
+edge = "right"
+size = 420
+visible = false
+deck = ["dock"]
+background = "theme"
+`, HOME)
+  assert.deepEqual(Array.from(read.errors), [])
+  assert.deepEqual(plain(read.config.displays[1]), {
+    name: "DP-1", kind: "dock", edge: "right", size: 420, visible: false, deck: ["dock"], rotatable: false,
+    background: "theme", touchDevices: [], refreshSeconds: null
+  })
+  assert.equal(read.config.displays[0].kind, "surface")
+})
+
+test("a dock's size defaults to 360 and clamps out of range with an error", () => {
+  const plainDock = Config.readMain('[[display]]\nkind = "dock"\nname = "DP-1"\nedge = "left"\n', HOME)
+  assert.equal(plainDock.config.displays[0].size, 360)
+  assert.equal(plainDock.config.displays[0].visible, true)
+  assert.deepEqual(Array.from(plainDock.errors), [])
+
+  const small = Config.readMain('[[display]]\nkind = "dock"\nname = "DP-1"\nedge = "top"\nsize = 10\n', HOME)
+  assert.equal(small.config.displays[0].size, 120)
+  assert.match(small.errors.join("\n"), /display\[0\]\.size: expected whole logical pixels from 120 to 2000, got 10; using 120/)
+
+  const junk = Config.readMain('[[display]]\nkind = "dock"\nname = "DP-1"\nedge = "top"\nsize = "big"\nvisible = "yes"\n', HOME)
+  assert.equal(junk.config.displays[0].size, 360)
+  assert.equal(junk.config.displays[0].visible, true)
+  assert.match(junk.errors.join("\n"), /display\[0\]\.size: expected whole logical pixels/)
+  assert.match(junk.errors.join("\n"), /display\[0\]\.visible: expected true or false/)
+})
+
+test("a dock without a valid edge is skipped with an error", () => {
+  for (const edge of ['', 'edge = "middle"\n', 'edge = 3\n']) {
+    const read = Config.readMain('[[display]]\nname = "HDMI-A-2"\n\n[[display]]\nkind = "dock"\nname = "DP-1"\n' + edge, HOME)
+    assert.deepEqual(read.config.displays.map((d) => d.name), ["HDMI-A-2"], edge)
+    assert.match(read.errors.join("\n"), /display\[1\]\.edge: a dock needs one of left, right, top, bottom, got .*; display skipped/, edge)
+  }
+})
+
+test("a dock ignores rotation and touch keys; a surface ignores dock keys", () => {
+  const read = Config.readMain(`
+[[display]]
+name = "HDMI-A-2"
+edge = "left"
+size = 300
+visible = false
+
+[[display]]
+kind = "dock"
+name = "DP-1"
+edge = "bottom"
+rotatable = true
+touch_devices = ["wch.cn-usb2iic_ctp_control"]
+`, HOME)
+  const [surface, dock] = plain(read.config.displays)
+  assert.equal(surface.edge, "")
+  assert.equal(surface.size, 0)
+  assert.equal(surface.visible, true)
+  assert.equal(dock.rotatable, false)
+  assert.deepEqual(dock.touchDevices, [])
+  const text = read.errors.join("\n")
+  assert.match(text, /display\[0\]\.edge: only for kind = "dock" \(ignored\)/)
+  assert.match(text, /display\[0\]\.size: only for kind = "dock" \(ignored\)/)
+  assert.match(text, /display\[0\]\.visible: only for kind = "dock" \(ignored\)/)
+  assert.match(text, /display\[1\]\.rotatable: a dock never rotates its output \(ignored\)/)
+  assert.match(text, /display\[1\]\.touch_devices: a dock never rotates its output \(ignored\)/)
+})
+
+test("an unknown kind skips the display", () => {
+  const read = Config.readMain('[[display]]\nname = "HDMI-A-2"\n\n[[display]]\nkind = "dok"\nname = "DP-1"\nedge = "left"\n', HOME)
+  assert.deepEqual(read.config.displays.map((d) => d.name), ["HDMI-A-2"])
+  assert.match(read.errors.join("\n"), /display\[1\]\.kind: expected one of surface, dock, got "dok"; display skipped/)
+})
+
+test("a second display on the same output is skipped", () => {
+  const read = Config.readMain('[[display]]\nname = "DP-1"\n\n[[display]]\nkind = "dock"\nname = "DP-1"\nedge = "left"\n', HOME)
+  assert.deepEqual(read.config.displays.map((d) => d.kind), ["surface"])
+  assert.match(read.errors.join("\n"), /display\[1\]\.name: "DP-1" is already a Display; display skipped/)
+})
+
+test("displayNamed finds a Display by output", () => {
+  const read = Config.readMain('[[display]]\nname = "HDMI-A-2"\n\n[[display]]\nkind = "dock"\nname = "DP-1"\nedge = "left"\n', HOME)
+  assert.equal(Config.displayNamed(read.config, "DP-1").kind, "dock")
+  assert.equal(Config.displayNamed(read.config, "DP-9"), null)
+  assert.equal(Config.displayNamed(null, "DP-1"), null)
 })
