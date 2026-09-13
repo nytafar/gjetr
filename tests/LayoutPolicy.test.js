@@ -69,3 +69,17 @@ test("contentRect never goes negative on a transient zero-size surface", () => {
   const rect = Layout.contentRect(0, 0, Layout.barInset("left", 28, false))
   assert.deepEqual({ ...rect }, { x: 28, y: 0, width: 0, height: 0 })
 })
+
+test("columnsFor fits as many columns as keep the minimum width", () => {
+  assert.equal(Layout.columnsFor(572, 440, 3), 1)
+  assert.equal(Layout.columnsFor(996, 440, 3), 2)
+  assert.equal(Layout.columnsFor(1400, 440, 3), 3)
+  assert.equal(Layout.columnsFor(4000, 440, 3), 3)
+})
+
+test("columnsFor is at least one, even for a surface before its first configure", () => {
+  assert.equal(Layout.columnsFor(0, 440, 3), 1)
+  assert.equal(Layout.columnsFor(NaN, 440, 3), 1)
+  assert.equal(Layout.columnsFor(900, 0, 3), 1)
+  assert.equal(Layout.columnsFor(900, 440, 0), 1)
+})

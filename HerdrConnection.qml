@@ -39,6 +39,8 @@ QtObject {
   property int eventsSeen: 0
   property int snapshots: 0
   property int publishes: 0
+  property int focuses: 0
+  property string lastFocusError: ""
 
   // Internal.
   property var model: HerdrModel.fromSnapshot(null)
@@ -49,6 +51,10 @@ QtObject {
   property var request: null
   property bool requestConnected: false
   property string requestLine: ""
+  property var focusSocket: null
+  property bool focusConnected: false
+  property string focusRequestLine: ""
+  property string focusPaneId: ""
 
   function log(message) {
     console.info("[gjetr] herdr " + message)
@@ -176,6 +182,46 @@ QtObject {
     }
   }
 
+  // Focus one pane over its own one-shot socket. A newer tap replaces a request
+  // still in flight. Focus never touches connection state: a failure is
+  // logged, and the snapshot after herdr's pane_focused event shows the result.
+  function focusPane(paneId) {
+    var line = HerdrModel.focusLine(nextId("focus"), paneId)
+    if (line === "" || socketPath === "") return false
+    dropFocus()
+    focusRequestLine = line
+    focusPaneId = String(paneId)
+    focusConnected = false
+    focusSocket = commandComponent.createObject(root, { path: socketPath })
+    focusTimeout.restart()
+    focusSocket.connected = true
+    return true
+  }
+
+  function dropFocus() {
+    focusTimeout.stop()
+    drop(focusSocket)
+    focusSocket = null
+  }
+
+  function failFocus(reason) {
+    dropFocus()
+    lastFocusError = reason
+    log("focus " + focusPaneId + " failed: " + reason)
+  }
+
+  function handleFocusLine(socket, line) {
+    if (socket !== focusSocket) return
+    var reply = HerdrModel.parseReplyLine(line)
+    if (!reply.ok) {
+      failFocus(reply.error.code + " " + reply.error.message)
+      return
+    }
+    dropFocus()
+    lastFocusError = ""
+    focuses++
+  }
+
   function publish() {
     agents = HerdrModel.agents(model)
     publishes++
@@ -227,6 +273,30 @@ QtObject {
     }
   }
 
+  property Component commandComponent: Component {
+    Socket {
+      id: socket
+      parser: SplitParser {
+        onRead: function(line) { root.handleFocusLine(socket, line) }
+      }
+      onConnectedChanged: {
+        if (socket !== root.focusSocket || !socket.connected) return
+        root.focusConnected = true
+        socket.write(root.focusRequestLine)
+        socket.flush()
+      }
+      onError: function(error) {
+        if (socket !== root.focusSocket) return
+        if (!root.focusConnected) root.failFocus("socket error " + error)
+      }
+    }
+  }
+
+  property Timer focusTimeout: Timer {
+    interval: 3000
+    onTriggered: root.failFocus("timeout")
+  }
+
   property Timer connectTimeout: Timer {
     interval: 3000
     onTriggered: root.fail("connect timeout")
@@ -252,5 +322,8 @@ QtObject {
 
   onSocketPathChanged: if (phase !== "idle") reconnect()
 
-  Component.onDestruction: stop()
+  Component.onDestruction: {
+    dropFocus()
+    stop()
+  }
 }

@@ -420,3 +420,14 @@ test("backoff treats nonsense attempts as the first", () => {
   assert.equal(H.backoffDelay(undefined), 500)
   assert.equal(H.backoffDelay(1e9), 30000)
 })
+
+test("focusLine asks herdr to focus exactly one pane", () => {
+  const line = H.focusLine("gjetr:9:focus", "w4:pT")
+  assert.ok(line.endsWith("\n"))
+  assert.deepEqual(JSON.parse(line), { id: "gjetr:9:focus", method: "pane.focus", params: { pane_id: "w4:pT" } })
+})
+
+test("focusLine refuses an empty pane id", () => {
+  assert.equal(H.focusLine("x", ""), "")
+  assert.equal(H.focusLine("x", undefined), "")
+})

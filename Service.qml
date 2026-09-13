@@ -7,6 +7,7 @@ import "lib/HerdrModel.js" as HerdrModel
 import "lib/NamePolicy.js" as NamePolicy
 import "lib/SortPolicy.js" as SortPolicy
 import "lib/CacheTimerModel.js" as CacheTimerModel
+import "lib/CardPolicy.js" as CardPolicy
 
 // Owns Display selection, the herdr connection and everything that must
 // outlive a surface. The surface itself is created per matching screen and
@@ -62,6 +63,16 @@ Item {
   property int nowSeconds: CacheTimerModel.nowSeconds(Date.now())
   readonly property bool cacheClockNeeded: CacheTimerModel.hasLiveTimer(agents, cacheTimers, nowSeconds)
 
+  // Card preset for the Agent List. T06 replaces the default with Config.
+  property string cardPreset: CardPolicy.DEFAULT_PRESET
+
+  // Kind icons are the marks Omarchy's agents plugin ships; read in place.
+  // Writable on purpose: the shell injects omarchyPath into every service it
+  // creates, and a read-only property makes that throw and the service load
+  // twice.
+  property string omarchyPath: Quickshell.env("OMARCHY_PATH") || "/usr/share/omarchy"
+  readonly property bool lightBackground: (0.2126 * background.r + 0.7152 * background.g + 0.0722 * background.b) > 0.5
+
   // Agents in the current Sort mode. Replaced only when the order or the
   // Agents themselves change, so Cards are not rebuilt on every tick.
   property var sortedAgents: []
@@ -88,6 +99,24 @@ Item {
 
   function cacheTimerFor(agent, now) {
     return CacheTimerModel.cacheTimer(agent, cacheTimers, now, cacheSettings)
+  }
+
+  function kindIconUrl(kind) {
+    var file = CardPolicy.kindIconFile(kind, lightBackground)
+    return file === "" ? "" : "file://" + omarchyPath + "/shell/plugins/agents/assets/" + file
+  }
+
+  // Focus is only ever asked for a pane that is a known Agent.
+  function focusPane(paneId) {
+    var id = String(paneId || "")
+    for (var i = 0; i < agents.length; i++) {
+      if (agents[i].paneId === id) return herdr.focusPane(id)
+    }
+    return false
+  }
+
+  function focusAgent(agent) {
+    return !!agent && focusPane(agent.paneId)
   }
 
   function applyCacheTimers(text) {
@@ -135,6 +164,8 @@ Item {
         publishes: herdr.publishes
       },
       sortMode: sortMode,
+      cardPreset: cardPreset,
+      focus: { requests: herdr.focuses, lastError: herdr.lastFocusError },
       cache: {
         timers: Object.keys(cacheTimers).length,
         error: cacheTimersError,
@@ -211,6 +242,10 @@ Item {
 
     function reconnect(): void {
       herdr.reconnect()
+    }
+
+    function focus(paneId: string): string {
+      return root.focusPane(paneId) ? "requested" : "unknown pane"
     }
   }
 

@@ -6,6 +6,7 @@ An omarchy-shell (Quickshell 0.3.1) plugin: a herdr dashboard for a secondary to
 - `docs/PRD.md` is the spec; `docs/tickets/README.md` is the work order; `docs/adr/` records hard decisions.
 - Logic goes in `lib/*.js`: pure, no Qt imports, `.pragma library` when stateless, tested with `node --test tests/`. `*Policy.js` decides, `*Model.js` transforms.
 - QML components render only; state is owned by `Service.qml`.
+- The shell sets `omarchyPath`, `shell`, `manifest`, `barWidgetRegistry` and `pluginRegistry` on a service that declares them. Keep those properties writable: a read-only one makes the assignment throw and the service load twice.
 - herdr socket: one JSON request per connection; only `events.subscribe` stays open. Match replies on the first line, not the id.
 - Never edit `/usr/share/omarchy`. Never write the user's Config. Validate `hyprctl reload` changes with `hyprctl configerrors`.
 - Install for testing: symlink the repo to `~/.config/omarchy/plugins/<id>`, then `omarchy-shell shell rescanPlugins`.

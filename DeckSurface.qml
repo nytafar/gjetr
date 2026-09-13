@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Wayland
 import qs.Commons
 import "lib/LayoutPolicy.js" as LayoutPolicy
+import "modules/AgentList"
 
 // The full-output surface on one Display. Renders only: every value comes from
 // the service it registers with.
@@ -39,29 +40,9 @@ PanelWindow {
     height: root.contentRect.height
     clip: true
 
-    // Placeholder until the Agent List Module lands: connection state and the
-    // Agent count, greyed while Offline.
-    Column {
-      anchors.centerIn: parent
-      spacing: 12
-
-      Text {
-        anchors.horizontalCenter: parent.horizontalCenter
-        text: root.service ? root.service.agents.length + " agents" : ""
-        color: Color.foreground
-        opacity: root.service && root.service.herdrOnline ? 1 : 0.4
-        font.family: Style.fontFamily
-        font.pixelSize: 28
-      }
-
-      Text {
-        anchors.horizontalCenter: parent.horizontalCenter
-        visible: !!root.service && !root.service.herdrOnline
-        text: root.service && root.service.herdrOffline ? "herdr offline, retrying" : "connecting to herdr"
-        color: Color.muted
-        font.family: Style.fontFamily
-        font.pixelSize: 18
-      }
+    AgentList {
+      anchors.fill: parent
+      service: root.service
     }
   }
 }
