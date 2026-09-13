@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
@@ -25,6 +27,12 @@ PanelWindow {
   readonly property var tabRect: DeckPolicy.tabRect(width, height, inset, tabEdge, tabThickness)
   readonly property var contentRect: LayoutPolicy.contentRect(width, height,
     DeckPolicy.withTabs(inset, tabEdge, tabThickness, tabsShown))
+
+  // Where each Module of the active Layout goes in the content area: side by
+  // side on a landscape area, stacked on a portrait one, sized by weight.
+  readonly property int moduleGap: Style.spacing.lg
+  readonly property var moduleRects: LayoutPolicy.moduleRects(contentRect.width, contentRect.height,
+    service ? service.activeModules.map(function(module) { return module.weight }) : [], moduleGap)
 
   // Modules are placed into the content area, which never sits under the bar.
   default property alias content: contentArea.data
@@ -61,11 +69,56 @@ PanelWindow {
     height: root.contentRect.height
     clip: true
 
-    AgentList {
-      anchors.fill: parent
-      service: root.service
-      onHeaderTapped: if (root.service) root.service.cycleSortMode()
-      onFocusToggled: if (root.service) root.service.toggleFocusMode()
+    // Every Module of the active Layout, each in its own rectangle and keyed
+    // <layout>#<index>, so its Overrides and session state are its own.
+    Repeater {
+      model: root.service ? root.service.activeModules : []
+
+      Item {
+        id: slot
+        required property var modelData
+        required property int index
+
+        readonly property var rect: root.moduleRects[index] || ({ x: 0, y: 0, width: 0, height: 0 })
+
+        x: rect.x
+        y: rect.y
+        width: rect.width
+        height: rect.height
+        clip: true
+
+        Loader {
+          anchors.fill: parent
+          sourceComponent: slot.modelData.type === "agent-list" ? agentList : null
+        }
+
+        Component {
+          id: agentList
+
+          AgentList {
+            service: root.service
+            moduleKey: slot.modelData.key
+          }
+        }
+      }
+    }
+
+    // A hairline between neighbouring Modules, in the middle of the gap.
+    Repeater {
+      model: Math.max(0, root.moduleRects.length - 1)
+
+      Rectangle {
+        required property int index
+
+        readonly property var next: root.moduleRects[index + 1]
+        readonly property bool row: next.x > 0
+
+        color: Util.alpha(Color.foreground, 0.12)
+        x: row ? next.x - Math.ceil(root.moduleGap / 2) : 0
+        y: row ? 0 : next.y - Math.ceil(root.moduleGap / 2)
+        width: row ? 1 : contentArea.width
+        height: row ? contentArea.height : 1
+      }
     }
 
     // Swipe between Layouts. Sits above the Module but only takes a passive

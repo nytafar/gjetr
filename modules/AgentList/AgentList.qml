@@ -6,26 +6,32 @@ import "../../lib/CardPolicy.js" as CardPolicy
 import "../../lib/LayoutPolicy.js" as LayoutPolicy
 import "../../lib/ListSyncPolicy.js" as ListSyncPolicy
 
-// The Agent List Module: every Agent as a Card, in the service's Sort mode.
-// Presentation only. Data, Sort mode and preset come from the service; a tap
-// asks the service to focus the pane, and a header tap is reported upward.
-// Which Recaps are open, in Cards or the overlay, is the service's state.
+// The Agent List Module: every Agent as a Card, in this Module's Sort mode.
+// Presentation only. Its settings (Config shadowed by Overrides) come from the
+// service under its Module key; taps ask the service to focus a pane, cycle the
+// Sort mode or flip Focus behaviour for this Module. Which Recaps are open, in
+// Cards or the overlay, is the service's state.
 Item {
   id: root
 
   property var service: null
-  property string preset: service ? service.cardPreset : CardPolicy.DEFAULT_PRESET
+  // <layout>#<index>: this Module's Overrides and session state.
+  property string moduleKey: ""
 
-  signal headerTapped()
-  signal focusToggled()
+  readonly property var moduleState: service && service.moduleStates[moduleKey] ? service.moduleStates[moduleKey] : null
+  readonly property string preset: moduleState ? moduleState.preset : CardPolicy.DEFAULT_PRESET
+  readonly property string sortMode: moduleState ? moduleState.sort : "spaces"
+  readonly property string focusMode: moduleState ? moduleState.focus : "herdr"
 
-  readonly property string recapMode: service ? service.recapMode : "off"
-  // The Agent whose Recap is open in the overlay (recap_open = "overlay"), or null.
-  readonly property string recapPane: service && service.recapOpenMode === "overlay" ? service.recapOverlayPane : ""
+  readonly property string recapMode: moduleState ? moduleState.recap : "off"
+  // The Agent whose Recap is open in this Module's overlay (recap_open =
+  // "overlay"), or null.
+  readonly property string recapPane: service && moduleState && moduleState.recapOpen === "overlay"
+    && service.recapOverlay.key === moduleKey ? service.recapOverlay.pane : ""
   readonly property var recapAgent: recapPane !== "" ? (agentByPane[recapPane] || null) : null
 
   readonly property var fields: CardPolicy.fieldsFor(preset)
-  readonly property var agents: service ? service.sortedAgents : []
+  readonly property var agents: service ? (service.sortedByMode[sortMode] || []) : []
   // Cards are keyed by pane id in a ListModel that is updated in place, so a
   // new snapshot or a re-sort keeps every Card, its pulse and the scroll
   // position. Each Card finds its Agent in agentByPane.
@@ -124,16 +130,16 @@ Item {
 
       Text {
         anchors { right: parent.right; rightMargin: root.gap * 2; verticalCenter: parent.verticalCenter }
-        text: "sort  " + (root.service ? root.service.sortMode : "")
+        text: "sort  " + root.sortMode
         // Accent while an Override shadows the Config default.
-        color: root.service && root.service.sortOverridden ? Color.accent : Color.muted
+        color: root.moduleState && root.moduleState.sortOverridden ? Color.accent : Color.muted
         font.family: Style.font.family
         font.pixelSize: Math.round(Style.font.body * root.textScale)
       }
 
       TapHandler {
         id: headerTap
-        onTapped: root.headerTapped()
+        onTapped: if (root.service) root.service.cycleSortMode(root.moduleKey)
       }
     }
 
@@ -154,15 +160,15 @@ Item {
       Text {
         id: focusLabel
         anchors.centerIn: parent
-        text: "focus  " + (root.service ? root.service.focusMode : "")
-        color: root.service && root.service.focusOverridden ? Color.accent : Color.muted
+        text: "focus  " + root.focusMode
+        color: root.moduleState && root.moduleState.focusOverridden ? Color.accent : Color.muted
         font.family: Style.font.family
         font.pixelSize: Math.round(Style.font.body * root.textScale)
       }
 
       TapHandler {
         id: focusTap
-        onTapped: root.focusToggled()
+        onTapped: if (root.service) root.service.toggleFocusMode(root.moduleKey)
       }
     }
 
@@ -228,9 +234,9 @@ Item {
         attention: root.service ? root.service.attentionFor(agent, root.service.attention) : ""
         recapMode: root.recapMode
         recapText: root.service ? root.service.recapFor(agent, root.service.recaps) : ""
-        recapOpen: root.service ? root.service.recapOpenFor(agent, root.service.recapOpen) : false
-        onTapped: if (agent) root.service.focusAgent(agent)
-        onRecapRequested: if (root.service) root.service.toggleRecap(paneId)
+        recapOpen: root.service ? root.service.recapOpenFor(agent, root.service.recapOpen, root.moduleKey) : false
+        onTapped: if (agent) root.service.focusAgent(agent, root.moduleKey)
+        onRecapRequested: if (root.service) root.service.toggleRecap(paneId, root.moduleKey)
         onHeightChanged: root.setCardHeight(paneId, height)
         Component.onCompleted: root.setCardHeight(paneId, height)
       }

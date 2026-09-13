@@ -67,9 +67,40 @@ A Layout: the Modules on a Display and the orientation they are built for.
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `orientation` | string | `"portrait"` | `"portrait"`, `"landscape"` or `"any"` |
-| `[[module]]` | tables | one Agent List | The Modules, in order. Only the first `agent-list` is drawn today |
+| `[[module]]` | tables | one Agent List | The Modules, in order. Every one is drawn |
 
 A missing Layout file gives the default Agent List, with a logged error.
+
+### Several Modules
+
+Every `[[module]]` of a Layout is drawn, in order. On a landscape Display they
+sit side by side as columns; on a portrait one they are stacked as rows. By
+default each gets an equal share. A hairline separates neighbours.
+
+Each Module is its own: it has its own settings, its own Overrides (a header
+tap on one Agent List changes only that one) and its own open Recaps. Two Agent
+Lists with different Sort modes side by side are fine.
+
+Keys every `[[module]]` takes, whatever its type:
+
+| Key | Values | Default | Meaning |
+|---|---|---|---|
+| `type` | `"agent-list"` | required | Module type. Unknown types are skipped |
+| `weight` | number above 0, at most 100 | `1` | The Module's share of the width (landscape) or height (portrait). `weight = 2` beside a `weight = 1` takes two thirds |
+
+```toml
+orientation = "landscape"
+
+[[module]]
+type = "agent-list"
+sort = "priority"
+weight = 2
+
+[[module]]
+type = "agent-list"
+sort = "cache"
+preset = "compact"
+```
 
 ### `[[module]]` with `type = "agent-list"`
 
@@ -77,7 +108,6 @@ Every Agent across workspaces as a Card.
 
 | Key | Values | Default | Meaning |
 |---|---|---|---|
-| `type` | `"agent-list"` | required | Module type. Unknown types are skipped |
 | `sort` | `"spaces"`, `"priority"`, `"cache"` | `"spaces"` | Default Sort mode. Tapping the list header cycles it as an Override |
 | `preset` | `"detailed"`, `"compact"` | `"detailed"` | Card Fields: detailed shows status, kind, name, workspace › tab and Cache timer; compact drops workspace › tab |
 | `focus` | `"herdr"`, `"window"` | `"herdr"` | Focus behaviour on tap. Tapping `focus` in the header flips it as an Override |
@@ -196,7 +226,8 @@ notifications; herdr owns those.
 }
 ```
 
-A Module is keyed by `<layout>#<position>`, a Display by its output name. An
+A Module is keyed by `<layout>#<position>` (its place among the Layout's valid
+Modules, from 0), a Display by its output name. An
 Override equal to the Config value removes itself, so a later Config edit applies
 again. Reset every Override with:
 
@@ -223,12 +254,12 @@ omarchy-shell nytafar.gjetr <function> [argument]
 
 | Function | Does |
 |---|---|
-| `state` | JSON: Display, bar inset, herdr connection, Config summary and errors, Deck, Overrides, Attention, Recap, every Card |
+| `state` | JSON: Display, bar inset, herdr connection, Config summary and errors, the active Layout's `modules` (key, type, weight, rectangle), Deck, Overrides, Attention, Recap, every Card. `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
 | `reconnect` | Drop and reopen the herdr connection |
 | `focus <pane-id>` | Focus an Agent's pane, as a tap does |
-| `toggleRecap <pane-id>` | Open or close an Agent's full Recap, as a tap on `recap` does. Prints `open`, `closed`, or why nothing happened (`unknown pane`, `no recap`, `recap is inline, not expand`). `state` → `recap.openCards` lists the open Cards |
-| `cycleSort` | Next Sort mode, as a header tap does |
-| `toggleFocus` | Flip Focus behaviour |
+| `toggleRecap <pane-id>` | Open or close an Agent's full Recap in the first Agent List, as a tap on `recap` does. Prints `open`, `closed`, or why nothing happened (`unknown pane`, `no agent list`, `no recap`, `recap is inline, not expand`). `state` → `recap.openCards` lists the open Cards |
+| `cycleSort` | Next Sort mode of the first Agent List, as a header tap does |
+| `toggleFocus` | Flip Focus behaviour of the first Agent List |
 | `selectLayout <name>` | Show a Layout of the Deck |
 | `nextLayout`, `previousLayout` | The step a swipe takes |
 | `resetOverrides` | Clear every Override |
@@ -239,4 +270,4 @@ omarchy-shell nytafar.gjetr <function> [argument]
 - Config files over 64 KB are refused.
 - One herdr server per Config. Watch a second server with a second plugin
   instance or Config later; multi-server discovery is out of scope.
-- Only the first `[[display]]` and the first Agent List of a Layout are drawn.
+- Only the first `[[display]]` is drawn.

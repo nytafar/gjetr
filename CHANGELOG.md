@@ -8,6 +8,13 @@ All notable changes to gjetr. The format follows
 
 ### Added
 
+- A Layout draws every `[[module]]`, not only the first Agent List: side by
+  side as equal columns on a landscape Display, stacked on a portrait one, with
+  a hairline between them. A per-Module `weight` (default 1) sets its share.
+  Each Module keeps its own settings, Overrides (`<layout>#<index>`) and open
+  Recaps, so two Agent Lists with different Sort modes can sit side by side.
+- `state` → `modules` lists the active Layout's Modules with key, type, weight
+  and rectangle.
 - `recap_open = "card" | "overlay"` per Agent List, default `card`: with
   `recap = "expand"` the full Recap opens inside its Card, under the Fields,
   and the Card grows. Several Cards can be open at once; open Cards follow
@@ -18,6 +25,8 @@ All notable changes to gjetr. The format follows
 
 ### Changed
 
+- IPC `cycleSort`, `toggleFocus` and `toggleRecap` act on the first Agent List
+  of the active Layout, and say `no agent list` when it has none.
 - The Agent List places Cards by measured height instead of a uniform grid,
   so a Card can grow.
 

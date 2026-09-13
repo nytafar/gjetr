@@ -159,7 +159,7 @@ focus = "window"
   assert.deepEqual(plain(read.layout), {
     name: "agents",
     orientation: "landscape",
-    modules: [{ type: "agent-list", sort: "cache", preset: "compact", focus: "window", recap: "off", recapOpen: "card" }]
+    modules: [{ type: "agent-list", sort: "cache", preset: "compact", focus: "window", recap: "off", recapOpen: "card", weight: 1 }]
   })
 })
 
@@ -168,7 +168,7 @@ test("a missing layout file is the default Agent List, with an error", () => {
   assert.deepEqual(plain(read.layout), {
     name: "agents",
     orientation: "portrait",
-    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card" }]
+    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1 }]
   })
   assert.match(read.errors.join("\n"), /layouts\/agents\.toml: not found/)
 })
@@ -186,7 +186,7 @@ extra = true
   assert.deepEqual(plain(read.layout), {
     name: "side",
     orientation: "portrait",
-    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card" }]
+    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1 }]
   })
   const text = read.errors.join("\n")
   for (const key of ["orientation", "module[0].sort", "module[0].preset", "module[0].focus", "module[0].extra"]) {
@@ -196,7 +196,7 @@ extra = true
 
 test("unknown module types are skipped; no modules left means the default", () => {
   const read = Config.readLayout("x", '[[module]]\ntype = "usage"\n')
-  assert.deepEqual(plain(read.layout.modules), [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card" }])
+  assert.deepEqual(plain(read.layout.modules), [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1 }])
   assert.match(read.errors.join("\n"), /module\[0\]\.type: /)
   assert.match(read.errors.join("\n"), /no valid module/)
 })
@@ -212,6 +212,7 @@ test("agentList finds the first Agent List of a layout, or the defaults", () => 
   assert.equal(Config.agentList(layout).index, 0)
   assert.equal(Config.agentList(layout).settings.sort, "priority")
   assert.equal(Config.agentList(null).settings.sort, "spaces")
+  assert.equal(Config.agentList(null).index, -1)
 })
 
 test("prototype keys in TOML never reach the config", () => {
@@ -261,4 +262,40 @@ test("recap_open is card or overlay per Agent List, default card", () => {
     assert.equal(read.layout.modules[0].recapOpen, "card", bad)
     assert.match(read.errors.join("\n"), /layouts\/agents\.toml: module\[0\]\.recap_open: expected one of card, overlay/, bad)
   }
+})
+
+test("every [[module]] of a Layout is read, in order, with an optional weight", () => {
+  const read = Config.readLayout("wide", `
+orientation = "landscape"
+[[module]]
+type = "agent-list"
+sort = "priority"
+weight = 2
+[[module]]
+type = "agent-list"
+sort = "cache"
+`)
+  assert.deepEqual(Array.from(read.errors), [])
+  const modules = plain(Config.layoutModules(read.layout))
+  assert.deepEqual(modules.map(m => [m.index, m.key, m.type, m.weight, m.settings.sort]),
+    [[0, "wide#0", "agent-list", 2, "priority"], [1, "wide#1", "agent-list", 1, "cache"]])
+})
+
+test("weight must be a positive number up to 100", () => {
+  for (const good of ["1", "0.5", "3", "100"]) {
+    const read = Config.readLayout("x", `[[module]]\ntype = "agent-list"\nweight = ${good}\n`)
+    assert.deepEqual(Array.from(read.errors), [], good)
+    assert.equal(read.layout.modules[0].weight, Number(good))
+  }
+  for (const bad of ["0", "-1", "101", '"2"', "true", "nan", "inf"]) {
+    const read = Config.readLayout("x", `[[module]]\ntype = "agent-list"\nweight = ${bad}\n`)
+    assert.equal(read.layout.modules[0].weight, 1, bad)
+    assert.match(read.errors.join("\n"), /layouts\/x\.toml: module\[0\]\.weight: expected a number above 0/, bad)
+  }
+})
+
+test("layoutModules keys Modules by their position among valid Modules", () => {
+  const read = Config.readLayout("mix", '[[module]]\ntype = "nope"\n[[module]]\ntype = "agent-list"\n')
+  assert.deepEqual(plain(Config.layoutModules(read.layout)).map(m => m.key), ["mix#0"])
+  assert.deepEqual(plain(Config.layoutModules(null)), [])
 })

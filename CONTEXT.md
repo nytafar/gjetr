@@ -56,7 +56,10 @@ The state when herdr cannot be reached. Last known Cards stay visible, greyed ou
 The Module listing every Agent across workspaces as Cards, in a Sort mode.
 
 **Workspace List**:
-The Module for navigating herdr's hierarchy of workspace, tab and pane, including panes that hold no Agent.
+The Module for navigating herdr's hierarchy of workspace, tab and pane, including panes that hold no Agent. Shown as a tree that expands in place; whether tapping a row expands it (default) or focuses it is a Module setting.
+
+**Focused workspace**:
+The workspace herdr has focused. Other Modules on the same Layout highlight what belongs to it (the Agent List highlights its Agents); they never filter by it.
 
 **Focus**:
 Making an Agent the active pane in herdr, and optionally bringing its hosting terminal window forward.

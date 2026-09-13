@@ -121,3 +121,24 @@ test("a state file from before Deck Overrides still reads", () => {
   assert.equal(read.error, "")
   assert.deepEqual(plain(read.overrides.displays), {})
 })
+
+test("moduleStates shadows each Module's sort and focus with its own Overrides", () => {
+  const modules = [
+    { index: 0, key: "wide#0", type: "agent-list", weight: 1, settings: { type: "agent-list", sort: "spaces", focus: "herdr", preset: "compact" } },
+    { index: 1, key: "wide#1", type: "agent-list", weight: 2, settings: { type: "agent-list", sort: "cache", focus: "herdr", preset: "detailed" } },
+    { index: 2, key: "bad key", type: "agent-list", weight: 1, settings: { sort: "spaces" } }
+  ]
+  const overrides = Override.set(Override.empty(), "wide#1", "focus", "window", "herdr")
+  const states = JSON.parse(JSON.stringify(Override.moduleStates(modules, overrides)))
+  assert.deepEqual(Object.keys(states), ["wide#0", "wide#1"])
+  assert.equal(states["wide#0"].sort, "spaces")
+  assert.equal(states["wide#0"].focus, "herdr")
+  assert.equal(states["wide#0"].focusOverridden, false)
+  assert.equal(states["wide#0"].preset, "compact")
+  assert.equal(states["wide#1"].sort, "cache")
+  assert.equal(states["wide#1"].focus, "window")
+  assert.equal(states["wide#1"].focusOverridden, true)
+  assert.equal(states["wide#1"].config.focus, "herdr")
+  assert.equal(states["wide#1"].weight, 2)
+  assert.deepEqual(JSON.parse(JSON.stringify(Override.moduleStates(null, overrides))), {})
+})

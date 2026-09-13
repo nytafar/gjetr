@@ -5,8 +5,13 @@
 # Layout turns the output to match; "any" leaves the output as it is.
 orientation = "portrait"
 
+# Every [[module]] is drawn, in order: side by side on a landscape Display,
+# stacked on a portrait one. Each has its own settings and Overrides.
 [[module]]
 type = "agent-list"
+
+# Share of the width (landscape) or height (portrait) beside other Modules.
+# weight = 1
 
 # Default Sort mode, matching herdr's own agent panel: "spaces" (herdr's
 # workspace, tab and pane order), "priority" (herdr's attention queue: blocked,

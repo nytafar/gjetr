@@ -74,21 +74,33 @@ Item {
   // session id under ~/.claude/projects and re-read when the transcript's
   // modification time or size changes. Polled only while an Agent List shows
   // Recaps.
-  readonly property string recapMode: agentListConfig.settings.recap
-  // Where an expanded Recap opens: "card" (inside the Card) or "overlay".
-  readonly property string recapOpenMode: agentListConfig.settings.recapOpen
+  // The first Agent List's Recap settings, for `state` and IPC. Each Agent
+  // List reads its own from moduleStates.
+  readonly property string recapMode: primaryModule && primaryModule.recap ? primaryModule.recap : "off"
+  readonly property string recapOpenMode: primaryModule && primaryModule.recapOpen ? primaryModule.recapOpen : RecapModel.DEFAULT_OPEN
+  // Recaps are read while any Agent List on the active Layout shows them.
+  readonly property bool recapNeeded: activeModules.some(function(module) {
+    return module.type === "agent-list" && module.settings.recap !== "off"
+  })
   // Session state, never written: the Cards whose Recap is open, per Module key
-  // and pane id (RecapModel open state), and the pane shown in the overlay.
+  // and pane id (RecapModel open state), and the overlay's Module and pane.
   // Both follow pane ids, so they survive re-sorts and updates.
   property var recapOpen: RecapModel.emptyOpen()
-  property string recapOverlayPane: ""
+  property var recapOverlay: ({ key: "", pane: "" })
   readonly property string claudeProjectsDir: RecapModel.projectsDir(home)
   property var recapPaths: ({})
   property var recapLocated: ({})
   property var recapStamps: ({})
   property var recaps: ({})
   property bool recapPolling: false
+  // Every Module of the active Layout, keyed <layout>#<index>, and each
+  // Module's settings shadowed by its own Overrides.
+  readonly property var activeModules: ConfigModel.layoutModules(activeLayout)
+  readonly property var moduleStates: OverrideModel.moduleStates(activeModules, overrides)
+  // The first Agent List: what `state` reports, and what the IPC functions that
+  // name no Module act on. Empty key when the Layout has none.
   readonly property var agentListConfig: ConfigModel.agentList(activeLayout)
+  readonly property var primaryModule: moduleStates[agentListKey] || null
   readonly property var configErrors: collectConfigErrors(mainRead, layoutTexts, deckNames)
   readonly property string configSummary: "display " + display.name + (display.rotatable ? " rotatable" : "")
     + ", deck [" + deckLayouts.join(", ") + "]"
@@ -134,10 +146,18 @@ Item {
   readonly property bool herdrOffline: !herdr.online && herdr.attempt > 0
 
   // Module settings: Config, shadowed by Overrides.
-  readonly property string sortMode: OverrideModel.effective(overrides, agentListKey, "sort", agentListConfig.settings.sort)
-  readonly property bool sortOverridden: sortMode !== agentListConfig.settings.sort
-  readonly property string focusMode: OverrideModel.effective(overrides, agentListKey, "focus", agentListConfig.settings.focus)
-  readonly property bool focusOverridden: focusMode !== agentListConfig.settings.focus
+  // The first Agent List's, for `state`.
+  readonly property string sortMode: primaryModule ? primaryModule.sort : SortPolicy.DEFAULT_MODE
+  readonly property bool sortOverridden: !!primaryModule && primaryModule.sortOverridden
+  readonly property string focusMode: primaryModule ? primaryModule.focus : "herdr"
+  readonly property bool focusOverridden: !!primaryModule && primaryModule.focusOverridden
+  // Whether a Module on screen uses the cache Sort mode, so the clock re-sorts.
+  readonly property bool cacheSortShown: {
+    for (var key in moduleStates) if (moduleStates[key].sort === "cache") return true
+    return false
+  }
+  // Focus behaviour of the Module whose tap is in flight.
+  property string pendingFocusMode: "herdr"
 
   // Focus behaviour `window`: the last attempt to bring the hosting terminal
   // window forward. Newer taps supersede older lookups by sequence.
@@ -156,7 +176,7 @@ Item {
   readonly property bool cacheClockNeeded: CacheTimerModel.hasLiveTimer(agents, cacheTimers, nowSeconds)
 
   // Card preset for the Agent List.
-  readonly property string cardPreset: agentListConfig.settings.preset
+  readonly property string cardPreset: primaryModule ? primaryModule.preset : CardPolicy.DEFAULT_PRESET
 
   // Kind icons are the marks Omarchy's agents plugin ships; read in place.
   // Writable on purpose: the shell injects omarchyPath into every service it
@@ -170,9 +190,11 @@ Item {
   property var attention: AttentionModel.empty()
   readonly property int attentionCount: AttentionModel.count(attention)
 
-  // Agents in the current Sort mode. Replaced only when the order or the
-  // Agents themselves change, so Cards are not rebuilt on every tick.
-  property var sortedAgents: []
+  // Agents in every Sort mode. Each list is replaced only when its order or its
+  // Agents change, so Cards are not rebuilt on every tick. An Agent List reads
+  // the list for its own Sort mode.
+  property var sortedByMode: ({ spaces: [], priority: [], cache: [] })
+  readonly property var sortedAgents: sortedByMode[sortMode] || []
 
   function log(message) {
     console.info("[gjetr] " + message)
@@ -271,8 +293,9 @@ Item {
     touchLogged = transform
   }
 
+  // Each Agent List decides from its own recap setting whether to show it.
   function recapFor(agent, map) {
-    if (!agent || recapMode === "off") return ""
+    if (!agent) return ""
     var entry = map[agent.sessionId]
     return entry ? entry.text : ""
   }
@@ -283,29 +306,40 @@ Item {
     return null
   }
 
-  // Pass `recapOpen` from a binding so a Card re-evaluates when it changes.
-  function recapOpenFor(agent, open) {
-    return !!agent && recapMode === "expand" && recapOpenMode === "card"
-      && RecapModel.isOpen(open, agentListKey, agent.paneId)
+  // A Module key, or the first Agent List's when none is given.
+  function moduleKeyOr(moduleKey) {
+    return moduleKey ? String(moduleKey) : agentListKey
   }
 
-  // Opens or closes an Agent's full Recap, in its Card or in the overlay as the
-  // Module's recap_open says. -> "open", "closed" or why nothing happened.
-  function toggleRecap(paneId) {
+  // Pass `recapOpen` from a binding so a Card re-evaluates when it changes.
+  function recapOpenFor(agent, open, moduleKey) {
+    var state = moduleStates[moduleKey]
+    return !!agent && !!state && state.recap === "expand" && state.recapOpen === "card"
+      && RecapModel.isOpen(open, moduleKey, agent.paneId)
+  }
+
+  // Opens or closes an Agent's full Recap in one Agent List, in its Card or in
+  // the overlay as that Module's recap_open says.
+  // -> "open", "closed" or why nothing happened.
+  function toggleRecap(paneId, moduleKey) {
     var agent = agentByPane(paneId)
     if (!agent) return "unknown pane"
-    if (recapMode !== "expand") return "recap is " + recapMode + ", not expand"
+    var key = moduleKeyOr(moduleKey)
+    var state = moduleStates[key]
+    if (!state || state.type !== "agent-list") return "no agent list"
+    if (state.recap !== "expand") return "recap is " + state.recap + ", not expand"
     if (recapFor(agent, recaps) === "") return "no recap"
-    if (recapOpenMode === "overlay") {
-      recapOverlayPane = recapOverlayPane === agent.paneId ? "" : agent.paneId
-      return recapOverlayPane === agent.paneId ? "open" : "closed"
+    if (state.recapOpen === "overlay") {
+      var shown = recapOverlay.key === key && recapOverlay.pane === agent.paneId
+      recapOverlay = shown ? { key: "", pane: "" } : { key: key, pane: agent.paneId }
+      return shown ? "closed" : "open"
     }
-    recapOpen = RecapModel.toggleOpen(recapOpen, agentListKey, agent.paneId)
-    return RecapModel.isOpen(recapOpen, agentListKey, agent.paneId) ? "open" : "closed"
+    recapOpen = RecapModel.toggleOpen(recapOpen, key, agent.paneId)
+    return RecapModel.isOpen(recapOpen, key, agent.paneId) ? "open" : "closed"
   }
 
   function closeRecapOverlay() {
-    recapOverlayPane = ""
+    recapOverlay = { key: "", pane: "" }
   }
 
   // Open Recaps of panes that are no longer Agents are forgotten, so a later
@@ -313,7 +347,7 @@ Item {
   function pruneRecapOpen() {
     var ids = agents.map(function(agent) { return agent.paneId })
     recapOpen = RecapModel.pruneOpen(recapOpen, ids)
-    if (recapOverlayPane !== "" && ids.indexOf(recapOverlayPane) < 0) recapOverlayPane = ""
+    if (recapOverlay.pane !== "" && ids.indexOf(recapOverlay.pane) < 0) closeRecapOverlay()
   }
 
   function recapSessions() {
@@ -344,7 +378,7 @@ Item {
   }
 
   function pollRecaps() {
-    if (recapMode === "off" || recapPolling) return
+    if (!recapNeeded || recapPolling) return
     var sessions = recapSessions()
     var now = Date.now()
     var paths = []
@@ -408,21 +442,34 @@ Item {
     return true
   }
 
-  function cycleSortMode() {
-    if (agentListKey === "") return sortMode
-    var next = SortPolicy.nextMode(sortMode)
-    writeOverrides(OverrideModel.set(overrides, agentListKey, "sort", next, agentListConfig.settings.sort))
-    log("sort " + next + (next !== agentListConfig.settings.sort ? " (override)" : ""))
+  // Next Sort mode of one Module, as an Override. -> the new mode, or "" when
+  // the Module has no Sort mode.
+  function cycleSortMode(moduleKey) {
+    var key = moduleKeyOr(moduleKey)
+    var state = moduleStates[key]
+    if (!state || state.sort === undefined) return ""
+    var next = SortPolicy.nextMode(state.sort)
+    writeOverrides(OverrideModel.set(overrides, key, "sort", next, state.config.sort))
+    log(key + " sort " + next + (next !== state.config.sort ? " (override)" : ""))
     return next
   }
 
-  function toggleFocusMode() {
-    if (agentListKey === "") return focusMode
+  // Flips one Module's Focus behaviour, as an Override. -> the new behaviour,
+  // or "" when the Module has none.
+  function toggleFocusMode(moduleKey) {
+    var key = moduleKeyOr(moduleKey)
+    var state = moduleStates[key]
+    if (!state || state.focus === undefined) return ""
     var modes = ConfigModel.FOCUS_MODES
-    var next = modes[(modes.indexOf(focusMode) + 1) % modes.length]
-    writeOverrides(OverrideModel.set(overrides, agentListKey, "focus", next, agentListConfig.settings.focus))
-    log("focus " + next + (next !== agentListConfig.settings.focus ? " (override)" : ""))
+    var next = modes[(modes.indexOf(state.focus) + 1) % modes.length]
+    writeOverrides(OverrideModel.set(overrides, key, "focus", next, state.config.focus))
+    log(key + " focus " + next + (next !== state.config.focus ? " (override)" : ""))
     return next
+  }
+
+  function focusModeFor(moduleKey) {
+    var state = moduleStates[moduleKeyOr(moduleKey)]
+    return state && state.focus ? state.focus : "herdr"
   }
 
   // After herdr focused a pane: find the most recently focused Hyprland window
@@ -473,9 +520,17 @@ Item {
   }
 
   function resort() {
-    var remaining = sortMode === "cache" ? CacheTimerModel.remainingByPane(agents, cacheTimers, nowSeconds) : null
-    var next = SortPolicy.sortAgents(agents, sortMode, remaining)
-    if (!SortPolicy.sameOrder(next, sortedAgents)) sortedAgents = next
+    var remaining = CacheTimerModel.remainingByPane(agents, cacheTimers, nowSeconds)
+    var next = {}
+    var changed = false
+    for (var i = 0; i < SortPolicy.MODES.length; i++) {
+      var mode = SortPolicy.MODES[i]
+      var current = sortedByMode[mode] || []
+      var list = SortPolicy.sortAgents(agents, mode, mode === "cache" ? remaining : null)
+      next[mode] = SortPolicy.sameOrder(list, current) ? current : list
+      if (next[mode] !== current) changed = true
+    }
+    if (changed) sortedByMode = next
   }
 
   // Field helpers for Modules. Pass `nowSeconds` from a binding so the Cache
@@ -497,12 +552,14 @@ Item {
     return file === "" ? "" : "file://" + omarchyPath + "/shell/plugins/agents/assets/" + file
   }
 
-  // Focus is only ever asked for a pane that is a known Agent.
-  function focusPane(paneId) {
+  // Focus is only ever asked for a pane that is a known Agent. The Module that
+  // asked decides the Focus behaviour.
+  function focusPane(paneId, moduleKey) {
     var id = String(paneId || "")
     for (var i = 0; i < agents.length; i++) {
       if (agents[i].paneId !== id) continue
       attention = AttentionModel.acknowledge(attention, id)
+      pendingFocusMode = focusModeFor(moduleKey)
       return herdr.focusPane(id)
     }
     return false
@@ -530,8 +587,8 @@ Item {
     return true
   }
 
-  function focusAgent(agent) {
-    return !!agent && focusPane(agent.paneId)
+  function focusAgent(agent, moduleKey) {
+    return !!agent && focusPane(agent.paneId, moduleKey)
   }
 
   function applyCacheTimers(text) {
@@ -585,6 +642,11 @@ Item {
       windowFocus: windowFocus,
       commands: { started: commands.started, refused: commands.refused, lastError: commands.lastError },
       config: { dir: configDir, summary: configSummary, errors: configErrors },
+      modules: activeModules.map(function(module, index) {
+        var state = moduleStates[module.key] || {}
+        return { key: module.key, type: module.type, weight: module.weight, sort: state.sort, focus: state.focus,
+          rect: surface && surface.moduleRects ? (surface.moduleRects[index] || null) : null }
+      }),
       deck: {
         layouts: deckLayouts,
         skipped: deckRead.skipped,
@@ -603,7 +665,7 @@ Item {
         mode: recapMode,
         open: recapOpenMode,
         openCards: RecapModel.openPanes(recapOpen, agentListKey),
-        overlay: recapOverlayPane,
+        overlay: recapOverlay.pane,
         sessions: recapSessions().length,
         located: Object.keys(recapPaths).length,
         recaps: Object.keys(recaps).length
@@ -636,7 +698,7 @@ Item {
   HerdrConnection {
     id: herdr
     socketPath: root.herdrSocketPath
-    onPaneFocused: if (root.focusMode === "window") root.focusHostWindow()
+    onPaneFocused: if (root.pendingFocusMode === "window") root.focusHostWindow()
   }
 
   CommandRunner {
@@ -688,7 +750,7 @@ Item {
 
   onAgentsChanged: applyAgents()
   onActiveLayoutNameChanged: {
-    recapOverlayPane = ""
+    closeRecapOverlay()
     orientationTimer.restart()
   }
   onActiveOrientationChanged: orientationTimer.restart()
@@ -715,7 +777,7 @@ Item {
     interval: 5000
     repeat: true
     triggeredOnStart: true
-    running: root.recapMode !== "off" && root.agents.length > 0
+    running: root.recapNeeded && root.agents.length > 0
     onTriggered: root.pollRecaps()
   }
 
@@ -724,7 +786,6 @@ Item {
     interval: 500
     onTriggered: root.applyOrientation()
   }
-  onSortModeChanged: resort()
   onCacheTimersChanged: resort()
 
   FileView {
@@ -751,7 +812,7 @@ Item {
     running: root.cacheClockNeeded
     onTriggered: {
       root.nowSeconds = CacheTimerModel.nowSeconds(Date.now())
-      if (root.sortMode === "cache") root.resort()
+      if (root.cacheSortShown) root.resort()
     }
   }
 
@@ -780,11 +841,12 @@ Item {
     }
 
     function focus(paneId: string): string {
-      return root.focusPane(paneId) ? "requested" : "unknown pane"
+      return root.focusPane(paneId, "") ? "requested" : "unknown pane"
     }
 
+    // The first Agent List of the active Layout, as a header tap does.
     function cycleSort(): string {
-      return root.cycleSortMode()
+      return root.cycleSortMode("") || "no agent list"
     }
 
     function resetOverrides(): void {
@@ -792,12 +854,12 @@ Item {
     }
 
     function toggleFocus(): string {
-      return root.toggleFocusMode()
+      return root.toggleFocusMode("") || "no agent list"
     }
 
     // Opens or closes a Card's full Recap, as a tap on its recap area does.
     function toggleRecap(paneId: string): string {
-      return root.toggleRecap(paneId)
+      return root.toggleRecap(paneId, "")
     }
 
     function selectLayout(name: string): string {

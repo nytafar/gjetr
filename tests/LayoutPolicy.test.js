@@ -128,3 +128,30 @@ test("keepScroll holds the Card at the top of the view when a Card above it chan
   assert.equal(Layout.keepScroll(before, Layout.cardPlacement(keys, { a: 300 }, 1, 100, 0), keys, 0), 0)
   assert.equal(Layout.keepScroll(null, null, keys, 120), 120)
 })
+
+test("moduleRects puts Modules side by side in equal columns on a landscape area", () => {
+  const rects = Layout.moduleRects(940, 600, [1, 1], 9)
+  assert.deepEqual(rects.map(r => ({ ...r })), [
+    { x: 0, y: 0, width: 465, height: 600 },
+    { x: 474, y: 0, width: 466, height: 600 }
+  ])
+})
+
+test("moduleRects stacks Modules on a portrait area", () => {
+  const rects = Layout.moduleRects(572, 968, [1, 1, 1], 8)
+  assert.deepEqual(rects.map(r => [r.y, r.height, r.width]), [[0, 317, 572], [325, 317, 572], [650, 318, 572]])
+})
+
+test("moduleRects shares the length by weight, the last Module taking the rounding", () => {
+  const rects = Layout.moduleRects(1000, 500, [2, 1], 10)
+  assert.deepEqual(rects.map(r => [r.x, r.width]), [[0, 660], [670, 330]])
+  assert.equal(rects[1].x + rects[1].width, 1000)
+})
+
+test("moduleRects treats junk weights as 1 and never goes negative", () => {
+  assert.deepEqual(Layout.moduleRects(300, 100, [0, NaN, "x"], 0).map(r => r.width), [100, 100, 100])
+  assert.deepEqual(Layout.moduleRects(0, 0, [1, 1], 8).map(r => ({ ...r })),
+    [{ x: 0, y: 0, width: 0, height: 0 }, { x: 0, y: 0, width: 0, height: 0 }])
+  assert.deepEqual(Layout.moduleRects(500, 300, [], 8), [])
+  assert.deepEqual(Layout.moduleRects(500, 300, [1], 8).map(r => ({ ...r })), [{ x: 0, y: 0, width: 500, height: 300 }])
+})

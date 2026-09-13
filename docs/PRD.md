@@ -48,6 +48,7 @@ touchscreen.
 | M17 | Leaves room for the Omarchy bar's strip on the Display |
 | M18 | Recap Field for Claude Agents: latest `away_summary` from the session transcript herdr names; per Module `recap = off / inline / expand`, expand by a disclosure area or long press, opening in the Card (growing it; several at once, open state per pane, not persisted) or an overlay per `recap_open = card / overlay`; plain text only |
 | M19 | Touch input rotates with a runtime rotation (per named device, or the global touchdevice transform) |
+| M20 | A Layout draws every `[[module]]`: side by side as equal columns in landscape, stacked in portrait, with an optional per-Module `weight`; each Module keeps its own settings, Overrides and session state under `<layout>#<index>` |
 
 ### Status
 
@@ -75,6 +76,7 @@ As of v0.1.0. "Live" means checked on the real panel and recorded in
 | M17 | Done, live | T02, T09 |
 | M18 | Done, partly live | Recaps read for 17 of 21 real Claude Agents; Recap opened in a Card via IPC `toggleRecap` on the panel; neither Card nor overlay opened by touch |
 | M19 | Done, partly live | Touch transform follows rotation (`getoption`); tap accuracy in portrait to be confirmed on the panel |
+| M20 | Done, partly live | Two Agent Lists (priority, cache) side by side on the panel; `cycleSort` changed only `split#0`. Portrait stacking and weights by tests |
 
 ### Next
 
@@ -104,7 +106,7 @@ lib/*.js             pure, no Qt imports, node-tested:
   CacheTimerModel.js   timers.json -> Cache timer + level
   AttentionModel.js    status transitions + focus -> Attention
   ConfigModel.js       TOML -> validated Deck/Layout/Module config
-  LayoutPolicy.js      orientation, bar inset, tab edge
+  LayoutPolicy.js      bar inset, Module rectangles, Card placement
   vendor/toml.js       bundled parser
 tests/               node for lib, qmltestrunner for components
 ```
