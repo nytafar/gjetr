@@ -3,10 +3,12 @@ import Quickshell
 import Quickshell.Io
 import qs.Commons
 import "lib/LayoutPolicy.js" as LayoutPolicy
+import "lib/HerdrModel.js" as HerdrModel
 
-// Owns Display selection and everything that must outlive a surface. The
-// surface itself is created per matching screen and registers back here, so
-// state and the IPC target survive the Display being unplugged.
+// Owns Display selection, the herdr connection and everything that must
+// outlive a surface. The surface itself is created per matching screen and
+// registers back here, so state and the IPC target survive the Display being
+// unplugged.
 //
 // Service-owns-surface with hotplug re-registration follows OmaDeck's
 // Service.qml (github.com/TheAirick/OmaDeck, MIT, Copyright (c) 2026 Erik Holum).
@@ -19,6 +21,8 @@ Item {
   // The Display this service draws on. T06 replaces the default with Config.
   property string displayName: "HDMI-A-2"
   property color background: "black"
+  // T06 replaces the default with Config.
+  property string herdrSocketPath: HerdrModel.socketPath(Quickshell.env("HOME"))
 
   property var activeSurface: null
 
@@ -33,6 +37,12 @@ Item {
     : (barVertical ? Style.bar.sizeVertical : Style.bar.sizeHorizontal)
   readonly property bool barHidden: !!(shell && shell.bar && shell.bar.barHidden)
   readonly property var barInset: LayoutPolicy.barInset(barPosition, barSize, barHidden)
+
+  // herdr. Agents stay at their last known value while Offline.
+  readonly property var agents: herdr.agents
+  readonly property bool herdrOnline: herdr.online
+  // Offline once a connection attempt has failed; before that, still connecting.
+  readonly property bool herdrOffline: !herdr.online && herdr.attempt > 0
 
   function log(message) {
     console.info("[gjetr] " + message)
@@ -60,13 +70,36 @@ Item {
         height: surface.height,
         content: surface.contentRect
       } : null,
-      bar: { position: barPosition, size: barSize, hidden: barHidden, inset: barInset }
+      bar: { position: barPosition, size: barSize, hidden: barHidden, inset: barInset },
+      herdr: {
+        socket: herdr.socketPath,
+        phase: herdr.phase,
+        online: herdr.online,
+        offline: herdrOffline,
+        agents: herdr.agents.length,
+        attempt: herdr.attempt,
+        retryInMs: herdr.retryInMs,
+        lastError: herdr.lastError,
+        eventsSeen: herdr.eventsSeen,
+        snapshots: herdr.snapshots,
+        publishes: herdr.publishes
+      }
     })
   }
 
-  Component.onCompleted: log("service up, display " + displayName
-    + (displayScreens.length > 0 ? " present" : " absent"))
-  Component.onDestruction: log("service down")
+  HerdrConnection {
+    id: herdr
+    socketPath: root.herdrSocketPath
+  }
+
+  Component.onCompleted: {
+    log("service up, display " + displayName + (displayScreens.length > 0 ? " present" : " absent"))
+    herdr.start()
+  }
+  Component.onDestruction: {
+    herdr.stop()
+    log("service down")
+  }
   onDisplayScreensChanged: log("display " + displayName
     + (displayScreens.length > 0 ? " present" : " absent"))
 
@@ -75,6 +108,10 @@ Item {
 
     function state(): string {
       return root.stateJson()
+    }
+
+    function reconnect(): void {
+      herdr.reconnect()
     }
   }
 
