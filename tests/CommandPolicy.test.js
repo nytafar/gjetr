@@ -147,3 +147,21 @@ test("moveCursor builds the Lua cursor dispatch for whole coordinates only", () 
   assert.equal(Command.allowed(["hyprctl", "dispatch", "hl.dsp.cursor.move({ x = 1, y = 2 }) os.execute('x')"]), false)
   assert.equal(Command.allowed(["hyprctl", "dispatch", "movecursor 1 2"]), false)
 })
+
+test("gitRepo asks git for the toplevel and branch of an absolute cwd only", () => {
+  const argv = Command.gitRepo("/home/test/code/gjetr")
+  assert.deepEqual(Array.from(argv), ["git", "-C", "/home/test/code/gjetr", "rev-parse", "--show-toplevel", "--abbrev-ref", "HEAD"])
+  assert.equal(Command.allowed(argv), true)
+  for (const bad of ["", "relative", "-c", "/a/../etc", "/a\nb", "/a‮b", null, 7]) {
+    assert.deepEqual(Array.from(Command.gitRepo(bad)), [], JSON.stringify(bad))
+  }
+  for (const other of [
+    ["git", "-C", "/srv/x", "rev-parse", "--show-toplevel", "--abbrev-ref", "HEAD", "--git-dir"],
+    ["git", "-C", "/srv/x", "status"],
+    ["git", "-c", "core.fsmonitor=evil", "rev-parse", "--show-toplevel", "--abbrev-ref", "HEAD"],
+    ["git", "-C", "relative", "rev-parse", "--show-toplevel", "--abbrev-ref", "HEAD"],
+    ["git", "-C", "/srv/x", "rev-parse", "--show-toplevel", "--abbrev-ref", "main"]
+  ]) {
+    assert.equal(Command.allowed(other), false, JSON.stringify(other))
+  }
+})

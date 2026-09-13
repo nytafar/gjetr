@@ -8,6 +8,11 @@ All notable changes to gjetr. The format follows
 
 ### Added
 
+- Repo: each Agent's git repository and branch, from its cwd, else a short
+  path (`~/…/a/b`). gjetr runs `git -C <cwd> rev-parse --show-toplevel
+  --abbrev-ref HEAD` once per distinct cwd, when it appears and again every
+  30 s while an Agent List is shown; the cwd is checked first and the answer is
+  cleaned of control characters. `state` reports it per Card and in `repos`.
 - Density: Agent Lists and Workspace Lists choose it from their size and
   whether the Display is used by touch (a surface) or the mouse (a Dock).
   Touch keeps the comfortable Cards; a Dock and touch columns under 360 px get

@@ -17,6 +17,7 @@ import "lib/AttentionModel.js" as AttentionModel
 import "lib/DeckPolicy.js" as DeckPolicy
 import "lib/DockPolicy.js" as DockPolicy
 import "lib/RecapModel.js" as RecapModel
+import "lib/RepoModel.js" as RepoModel
 import "lib/WorkspaceTreeModel.js" as WorkspaceTreeModel
 import "lib/ThemeModel.js" as ThemeModel
 import "lib/UsageModel.js" as UsageModel
@@ -147,6 +148,16 @@ Item {
   readonly property bool usageShown: shownModules.some(function(module) { return module.type === "usage" })
   // Clock for reset countdowns and ages; ticks only while a Usage Module shows.
   property double usageNowMs: Date.now()
+
+  // Repo: the git repository and branch of each Agent's cwd, else a short path
+  // (RepoModel). git is asked once per distinct cwd, when it first appears and
+  // again every 30 s, while an Agent List is shown. `repos` (cwd -> info or
+  // null) changes only when an answer does; when each cwd was last asked and
+  // which are running are plain bookkeeping no binding reads. Never written.
+  property var repos: ({})
+  property var repoChecked: ({})
+  property var repoInFlight: ({})
+  readonly property bool repoNeeded: shownModules.some(function(module) { return module.type === "agent-list" })
 
   // Session state, never written: the expanded workspaces and tabs of each
   // Workspace List (WorkspaceTreeModel expansion state), pruned as they go away.
@@ -430,6 +441,32 @@ Item {
     })
   }
 
+  function pollRepos() {
+    if (!repoNeeded) return
+    var pruned = RepoModel.prune(repos, agents)
+    if (pruned !== repos) repos = pruned
+    repoChecked = RepoModel.prune(repoChecked, agents)
+    var due = RepoModel.dueCwds(agents, repoChecked, repoInFlight, Date.now(), RepoModel.REFRESH_MS)
+    for (var i = 0; i < due.length; i++) resolveRepo(due[i])
+  }
+
+  function resolveRepo(cwd) {
+    repoInFlight[cwd] = true
+    commands.run(CommandPolicy.gitRepo(cwd), function(text, code) {
+      delete repoInFlight[cwd]
+      repoChecked[cwd] = Date.now()
+      var info = RepoModel.parseRevParse(text, code)
+      var known = Object.prototype.hasOwnProperty.call(repos, cwd)
+      if (!known || !RepoModel.sameInfo(repos[cwd], info)) setEntry("repos", cwd, info)
+    })
+  }
+
+  // Pass `repos` from a binding so a Card re-evaluates when it changes.
+  // -> { repo, branch, path, text }
+  function agentRepo(agent, map) {
+    return RepoModel.label(RepoModel.infoFor(agent, map), agent ? agent.cwd : "", home)
+  }
+
   function setLayoutText(name, text) {
     if (layoutTexts[name] === text) return
     var next = {}
@@ -685,6 +722,7 @@ Item {
     var entered = AttentionModel.count(next) > AttentionModel.count(attention)
     attention = next
     pruneRecapOpen()
+    if (repoNeeded) Qt.callLater(pollRepos)
     if (entered) log("attention " + Object.keys(next.attention).join(", ").replace(/p:/g, ""))
     resort()
   }
@@ -788,6 +826,12 @@ Item {
         settings: cacheSettings,
         clock: cacheClockNeeded
       },
+      repos: {
+        needed: repoNeeded,
+        cwds: Object.keys(repos).length,
+        inRepo: Object.keys(repos).filter(function(cwd) { return !!repos[cwd] }).length,
+        running: Object.keys(repoInFlight).length
+      },
       cards: sortedAgents.map(function(agent) {
         var timer = cacheTimerFor(agent, nowSeconds)
         return {
@@ -798,6 +842,7 @@ Item {
           inFocusedWorkspace: focusedWorkspaceId !== "" && agent.workspaceId === focusedWorkspaceId,
           name: agentName(agent),
           location: agentLocation(agent),
+          repo: agentRepo(agent, repos).text,
           cache: timer ? timer.label + " " + timer.level : ""
         }
       })
@@ -884,6 +929,14 @@ Item {
     triggeredOnStart: true
     running: root.recapNeeded && root.agents.length > 0
     onTriggered: root.pollRecaps()
+  }
+
+  Timer {
+    interval: 5000
+    repeat: true
+    triggeredOnStart: true
+    running: root.repoNeeded && root.agents.length > 0
+    onTriggered: root.pollRepos()
   }
 
   onCacheTimersChanged: resort()

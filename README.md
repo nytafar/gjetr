@@ -67,8 +67,8 @@ lives beside the Omarchy bar, and needs no daemon.
   the Recap Field
 
 gjetr has no other dependencies. It uses `hyprctl`, `ps`, `find`, `stat`,
-`grep` and, for the Usage Module, `omarchy-agent-usage-update`, all of which
-Omarchy already ships.
+`grep`, `git` (for each Agent's repository and branch) and, for the Usage
+Module, `omarchy-agent-usage-update`, all of which Omarchy already ships.
 
 ## Install
 
