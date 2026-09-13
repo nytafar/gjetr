@@ -59,6 +59,7 @@ test("Agents carry the fields later policies need", () => {
     displayKind: "claude",
     status: "idle",
     title: "Fix bug",
+    name: "",
     paneLabel: "",
     cwd: "/home/x/a",
     stateChangeSeq: null,
@@ -91,6 +92,29 @@ test("snapshot agents add state_change_seq, the Claude session id and herdr's Ag
   assert.equal(agents[0].stateChangeSeq, 650)
   assert.equal(agents[0].sessionId, "", "only kind id is a session id")
   assert.equal(agents[1].sessionId, "cf43ca7f-58ec-4ecd-a3ae-8efb244388cc")
+})
+
+test("snapshot agents carry herdr's agent name, to the Agents and the tree", () => {
+  const snap = snapshot()
+  snap.agents = [
+    { pane_id: "w1:p1", agent: "claude", name: "touchdisplay" },
+    { pane_id: "w2:p1", agent: "codex", name: null }
+  ]
+  const state = H.fromSnapshot(snap)
+  const byPane = Object.fromEntries(H.agents(state).map(a => [a.paneId, a]))
+  assert.equal(byPane["w1:p1"].name, "touchdisplay")
+  assert.equal(byPane["w2:p1"].name, "")
+  const treePane = H.tree(state).workspaces.find(w => w.workspaceId === "w1").tabs[0].panes[0]
+  assert.equal(treePane.name, "touchdisplay")
+})
+
+test("pane events keep herdr's agent name, which only the snapshot carries", () => {
+  const snap = snapshot()
+  snap.agents = [{ pane_id: "w1:p1", agent: "claude", name: "touchdisplay" }]
+  const state = H.fromSnapshot(snap)
+  const out = H.applyEvent(state, ev("pane_updated", { pane: Object.assign(paneOf(state, "w1:p1"), { agent_status: "working" }) }))
+  assert.equal(out.changed, true)
+  assert.equal(H.agents(out.state).find(a => a.paneId === "w1:p1").name, "touchdisplay")
 })
 
 test("unsafe session ids and bad sequence numbers are dropped", () => {

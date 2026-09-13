@@ -118,6 +118,9 @@ All notable changes to gjetr. The format follows
 
 ### Fixed
 
+- An Agent named in herdr (`herdr agent start <name>`, `agents[].name` in the
+  snapshot) shows that name on its Card and Workspace List row, ahead of the
+  pane label and terminal title. Unnamed Agents are named as before.
 - With `recap = "inline"`, Cards without a Recap no longer reserve two empty
   lines under their name.
 

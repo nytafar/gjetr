@@ -15,6 +15,17 @@ function agent(fields) {
   }
 }
 
+test("herdr's agent name wins over pane label and title", () => {
+  assert.equal(Name.agentName(agent({ name: "touchdisplay", paneLabel: "reviewer", title: "Noracle review" })), "touchdisplay")
+  assert.equal(Name.agentName(agent({ name: "claude", title: "Fix bug" })), "claude", "a name that matches the kind is still the user's name")
+})
+
+test("an empty or missing herdr name leaves the Agent named as before", () => {
+  assert.equal(Name.agentName(agent({ name: " ", paneLabel: "reviewer" })), "reviewer")
+  assert.equal(Name.agentName(agent({ name: null, title: "Fix bug" })), "Fix bug")
+  assert.equal(Name.agentName(agent({ title: "Fix bug" })), "Fix bug")
+})
+
 test("pane label wins when present", () => {
   assert.equal(Name.agentName(agent({ paneLabel: "reviewer", title: "Noracle review", tabLabel: "efforts" })), "reviewer")
 })

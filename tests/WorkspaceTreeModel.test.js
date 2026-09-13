@@ -84,6 +84,13 @@ test("an expanded tab shows its panes, with shells included and named like Agent
   assert.deepEqual([rows[4].name, rows[4].kindLabel, rows[4].isAgent, rows[4].status], ["logs", "codex", true, "working"])
 })
 
+test("a pane with herdr's agent name is named by it, as a Card is", () => {
+  const named = plain(tree)
+  named.workspaces[0].tabs[1].panes[1].name = "reviewer"
+  const rows = plain(Tree.rows(named, open(["w:w1", "t:w1:t2"]), "ws#0", noAttention))
+  assert.equal(rows.find(r => r.key === "p:w1:p3").name, "reviewer")
+})
+
 test("a tab stays hidden under a collapsed workspace even when it is expanded itself", () => {
   assert.deepEqual(plain(Tree.rows(tree, open(["t:w1:t2"]), "ws#0", noAttention)).map(r => r.key), ["w:w1", "w:w2"])
 })
