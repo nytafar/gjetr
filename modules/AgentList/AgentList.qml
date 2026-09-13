@@ -72,6 +72,7 @@ Item {
     compact ? density.rowGap : gap)
   readonly property bool online: !!service && service.herdrOnline
   readonly property bool offline: !!service && service.herdrOffline
+  readonly property string mismatchCue: service ? service.herdrMismatchCue : ""
   // Touch panels are read from further away than a desk monitor, so
   // comfortable scales the Omarchy type ramp rather than replacing it (and
   // `omarchy display text size` still applies); compact uses it as it is.
@@ -218,10 +219,12 @@ Item {
   Text {
     id: banner
     anchors { top: header.bottom; left: parent.left; right: parent.right; topMargin: root.gap }
-    visible: !root.online
+    // Offline wins; online to an untested herdr protocol shows a quiet cue.
+    visible: !root.online || root.mismatchCue !== ""
     height: visible ? implicitHeight : 0
     horizontalAlignment: Text.AlignHCenter
-    text: root.offline ? "herdr offline, retrying" : "connecting to herdr"
+    elide: Text.ElideRight
+    text: !root.online ? (root.offline ? "herdr offline, retrying" : "connecting to herdr") : root.mismatchCue
     color: Color.muted
     font.family: Style.font.family
     font.pixelSize: Math.round(Style.font.body * root.textScale)

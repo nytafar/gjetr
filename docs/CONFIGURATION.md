@@ -39,6 +39,17 @@ bytes). A named herdr session lives at `~/.config/herdr/sessions/<name>/herdr.so
 socket = "~/.config/herdr/sessions/work/herdr.sock"
 ```
 
+gjetr is tested with herdr 0.8.2 (API protocol 20) and 0.9.0 (protocol 22).
+On each connection it pings herdr and records its version and protocol
+(`state` → `herdr.version`, `herdr.protocol`). With a protocol outside that
+set gjetr still connects and works as far as herdr allows; Agent Lists and
+Workspace Lists show a quiet `untested herdr 0.10.0 (protocol 23)` line and
+`state` → `herdr.protocolMismatch` names the server. When herdr does not know
+a request gjetr sends (it answers `unknown variant`), only that feature is
+switched off and listed in `herdr.unsupported`: a refused subscription type is
+dropped and gjetr subscribes again at once, and a refused focus request fails
+that tap alone.
+
 ### `[[display]]`
 
 A place the dashboard is shown. Every `[[display]]` is drawn, each with its own
@@ -578,7 +589,7 @@ omarchy-shell nytafar.gjetr <function> [argument]
 
 | Function | Does |
 |---|---|
-| `state` | JSON: `displays` (every Display: kind, edge, size, shown, surface with layer and exclusive zone, Deck, Modules). The rest describes the primary Display, the first surface: Display, bar inset, herdr connection, Config summary and errors, the active Layout's `modules` (key, type, weight, rectangle), `workspaces` (Focused workspace, expansion and rows of the first Workspace List), Deck, Overrides, Attention, Recap, every Card (with its `name`, `kind`, `kindLabel` and `kindMark`: the SVG file or the letter drawn). `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
+| `state` | JSON: `displays` (every Display: kind, edge, size, shown, surface with layer and exclusive zone, Deck, Modules). The rest describes the primary Display, the first surface: Display, bar inset, herdr connection (with the server's `version` and `protocol`, the `supported` set, `protocolMismatch`, `pingError` and `unsupported`), Config summary and errors, the active Layout's `modules` (key, type, weight, rectangle), `workspaces` (Focused workspace, expansion and rows of the first Workspace List), Deck, Overrides, Attention, Recap, every Card (with its `name`, `kind`, `kindLabel` and `kindMark`: the SVG file or the letter drawn). `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
 | `reconnect` | Drop and reopen the herdr connection |
 | `focus <pane-id>` | Focus an Agent's pane, as a tap on a touch surface does, with the first Agent List's Focus behaviour |
 | `pointerFocus <pane-id>` | The same, as a mouse click on a Dock does: with Focus behaviour `window`, the pointer goes back where it was once the window is focused. `state` → `windowFocus.cursor` says `restored x,y` or why not |

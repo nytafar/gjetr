@@ -193,6 +193,8 @@ Item {
   readonly property bool herdrOnline: herdr.online
   // Offline once a connection attempt has failed; before that, still connecting.
   readonly property bool herdrOffline: !herdr.online && herdr.attempt > 0
+  // A quiet line while connected to a herdr protocol gjetr is not tested with.
+  readonly property string herdrMismatchCue: HerdrModel.mismatchCue(herdr.protocolMismatch)
 
   // Module settings: Config, shadowed by Overrides.
   // The first Agent List's, for `state`.
@@ -768,7 +770,13 @@ Item {
         lastError: herdr.lastError,
         eventsSeen: herdr.eventsSeen,
         snapshots: herdr.snapshots,
-        publishes: herdr.publishes
+        publishes: herdr.publishes,
+        version: herdr.serverVersion,
+        protocol: herdr.serverProtocol,
+        supported: HerdrModel.SUPPORTED,
+        protocolMismatch: herdr.protocolMismatch,
+        pingError: herdr.pingError,
+        unsupported: herdr.unsupported
       },
       sortMode: sortMode,
       cardPreset: cardPreset,

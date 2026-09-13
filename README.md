@@ -62,7 +62,8 @@ lives beside the Omarchy bar, and needs no daemon.
 ## Requirements
 
 - Omarchy 4 with the Quickshell-based Omarchy shell and Hyprland
-- [herdr](https://herdr.dev) 0.8.x, running on the same machine
+- [herdr](https://herdr.dev) 0.8.2 or 0.9.0, running on the same machine.
+  Other versions connect too, with a quiet "untested herdr" note
 - A second output for the dashboard. It is built for a 7" 1024x600
   touchscreen but works on any output, touch or not
 - Optional: the [cache-ttl](https://github.com/nytafar/herdr-cache-ttl) herdr
@@ -182,6 +183,7 @@ omarchy-shell nytafar.gjetr state | jq
 |---|---|
 | Nothing on the display | `state` → `displayPresent`. The name in `[[display]]` must match `hyprctl monitors` exactly |
 | "herdr offline, retrying" | Is herdr running? `state` → `herdr.socket` must be the socket `herdr status server` reports |
+| "untested herdr ..." under the header | herdr speaks an API protocol gjetr is not tested with (it supports 0.8.2 and 0.9.0). It keeps working; `state` → `herdr.protocolMismatch` and `herdr.unsupported` say what differs |
 | Config seems ignored | `state` → `config.errors` names the file, line and key that fell back to a default |
 | Taps land in the wrong place | Bind the touch device to the output (above). After a rotation, see `state` → `deck.touch` |
 | No Cache timers | The cache-ttl herdr plugin is not installed, or the agent is not Claude |

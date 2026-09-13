@@ -17,6 +17,14 @@ All notable changes to gjetr. The format follows
   kind (`claude-code`, `antigravity_cli`, ...) resolve to it. Workspace List
   rows name the kind by its label; `state` cards carry `kind`, `kindLabel`
   and `kindMark`.
+- herdr version and protocol: gjetr pings herdr once per connection and
+  reports `version`, `protocol`, the `supported` set (herdr 0.8.2, protocol
+  20; 0.9.0, protocol 22) and `protocolMismatch` under `state` → `herdr`.
+  Outside that set it keeps working and Agent Lists and Workspace Lists show a
+  quiet `untested herdr <version> (protocol <n>)` line. A request herdr answers
+  with `unknown variant` switches off only that feature (`herdr.unsupported`):
+  a refused subscription type is dropped and gjetr subscribes again at once
+  instead of reconnecting on the backoff.
 
 - Comfortable Cards draw a thin bar under a live Cache timer that drains as
   the cache ages, in its level's colour (green, accent, urgent); their size

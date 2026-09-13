@@ -16,6 +16,13 @@ import "lib/HerdrModel.js" as HerdrModel
 // published only when the new snapshot differs. Any failure drops both
 // sockets and retries on the backoff schedule, keeping last known Agents.
 //
+// Once subscribed, one ping records the server's version and protocol and
+// publishes a mismatch when it is outside HerdrModel.SUPPORTED; a ping that
+// fails only records why. herdr rejects a method or subscription type it does
+// not know as invalid_request "unknown variant": that turns one feature off
+// (`unsupported`), and a refused subscription type is dropped and the stream
+// subscribes again at once, never through the backoff.
+//
 // Every connection attempt and every request uses a freshly created Socket.
 // Quickshell 0.3.1's Socket reports a failed connect only once per object and
 // ignores later `connected = true`, so a reused Socket never retries
@@ -46,8 +53,19 @@ QtObject {
   property int publishes: 0
   property int focuses: 0
   property string lastFocusError: ""
+  // The server, from the ping of the current connection (HerdrModel.protocolStatus).
+  property string serverVersion: ""
+  property var serverProtocol: null
+  property var protocolMismatch: null
+  property string pingError: ""
+  // Methods and subscription types this server refused as unknown variants.
+  property var unsupported: []
 
   // Internal.
+  property var subscriptionTypes: HerdrModel.SUBSCRIPTION_TYPES
+  property var pingSocket: null
+  property bool pingConnected: false
+  property string pingRequestLine: ""
   property var model: HerdrModel.fromSnapshot(null)
   property int sequence: 0
   property double staleSince: 0
@@ -80,9 +98,17 @@ QtObject {
     socket.destroy()
   }
 
+  // A new connection asks for every subscription type again: the server may
+  // have been upgraded since one was refused.
   function start() {
     if (socketPath === "" || (phase !== "idle" && phase !== "waiting")) return
     retryTimer.stop()
+    subscriptionTypes = HerdrModel.SUBSCRIPTION_TYPES
+    unsupported = []
+    openSubscription()
+  }
+
+  function openSubscription() {
     phase = "connecting"
     drop(subscription)
     subscription = subscriptionComponent.createObject(root, { path: socketPath })
@@ -100,6 +126,66 @@ QtObject {
     subscription = null
     drop(request)
     request = null
+    dropPing()
+  }
+
+  function markUnsupported(feature) {
+    if (feature === "" || unsupported.indexOf(feature) >= 0) return
+    unsupported = unsupported.concat([feature])
+    log("does not know " + feature + ", that feature is off")
+  }
+
+  // herdr refused one subscription type: subscribe again without it, at once,
+  // keeping the Agents already shown. The phase changes first so closing the
+  // old stream does not count as a failure.
+  function resubscribeWithout(type) {
+    markUnsupported(type)
+    subscriptionTypes = HerdrModel.withoutType(subscriptionTypes, type)
+    phase = "connecting"
+    resetWork()
+    openSubscription()
+  }
+
+  function ping() {
+    dropPing()
+    pingRequestLine = HerdrModel.pingLine(nextId("ping"))
+    pingConnected = false
+    pingSocket = pingComponent.createObject(root, { path: socketPath })
+    pingTimeout.restart()
+    pingSocket.connected = true
+  }
+
+  function dropPing() {
+    pingTimeout.stop()
+    drop(pingSocket)
+    pingSocket = null
+  }
+
+  function failPing(reason) {
+    dropPing()
+    pingError = reason
+    log("ping failed: " + reason)
+  }
+
+  function handlePingLine(socket, line) {
+    if (socket !== pingSocket) return
+    dropPing()
+    var reply = HerdrModel.parseReplyLine(line)
+    if (!reply.ok) {
+      markUnsupported(HerdrModel.unsupportedVariant(reply.error))
+      failPing(reply.error.code + " " + reply.error.message)
+      return
+    }
+    var status = HerdrModel.protocolStatus(HerdrModel.pongFromReply(reply))
+    if (status.protocol === null) {
+      failPing("no pong")
+      return
+    }
+    pingError = ""
+    serverVersion = status.version
+    serverProtocol = status.protocol
+    protocolMismatch = status.mismatch
+    log("server " + status.version + ", protocol " + status.protocol + (status.mismatch ? ": " + HerdrModel.mismatchCue(status.mismatch) : ""))
   }
 
   function stop() {
@@ -156,6 +242,9 @@ QtObject {
     var reply = HerdrModel.parseReplyLine(line)
     var snapshot = HerdrModel.snapshotFromReply(reply)
     if (!snapshot) {
+      // Agents come only from session.snapshot, so a server without it stays
+      // offline; it is still recorded as the missing feature.
+      if (reply.error) markUnsupported(HerdrModel.unsupportedVariant(reply.error))
       fail("snapshot " + (reply.error ? reply.error.code + " " + reply.error.message : "missing"))
       return
     }
@@ -187,9 +276,14 @@ QtObject {
       if ((phase === "snapshot" || phase === "live") && HerdrModel.eventInvalidates(model, item.envelope, treeWanted))
         markStale()
     } else if (item.kind === "started") {
-      if (phase === "subscribing") requestSnapshot()
+      if (phase === "subscribing") {
+        requestSnapshot()
+        ping()
+      }
     } else if (item.kind === "error") {
-      fail("subscribe " + item.error.code + " " + item.error.message)
+      var refused = HerdrModel.unsupportedVariant(item.error)
+      if (refused !== "" && subscriptionTypes.indexOf(refused) >= 0) resubscribeWithout(refused)
+      else fail("subscribe " + item.error.code + " " + item.error.message)
     }
   }
 
@@ -231,6 +325,7 @@ QtObject {
     if (socket !== focusSocket) return
     var reply = HerdrModel.parseReplyLine(line)
     if (!reply.ok) {
+      markUnsupported(HerdrModel.unsupportedVariant(reply.error))
       failFocus(reply.error.code + " " + reply.error.message)
       return
     }
@@ -256,7 +351,7 @@ QtObject {
         if (socket.connected) {
           if (root.phase !== "connecting") return
           root.phase = "subscribing"
-          socket.write(HerdrModel.subscribeLine(root.nextId("subscribe")))
+          socket.write(HerdrModel.subscribeLine(root.nextId("subscribe"), root.subscriptionTypes))
           socket.flush()
         } else if (root.phase === "subscribing" || root.phase === "snapshot" || root.phase === "live") {
           root.fail("subscription closed")
@@ -308,6 +403,30 @@ QtObject {
         if (!root.focusConnected) root.failFocus("socket error " + error)
       }
     }
+  }
+
+  property Component pingComponent: Component {
+    Socket {
+      id: socket
+      parser: SplitParser {
+        onRead: function(line) { root.handlePingLine(socket, line) }
+      }
+      onConnectedChanged: {
+        if (socket !== root.pingSocket || !socket.connected) return
+        root.pingConnected = true
+        socket.write(root.pingRequestLine)
+        socket.flush()
+      }
+      onError: function(error) {
+        if (socket !== root.pingSocket) return
+        if (!root.pingConnected) root.failPing("socket error " + error)
+      }
+    }
+  }
+
+  property Timer pingTimeout: Timer {
+    interval: 3000
+    onTriggered: root.failPing("timeout")
   }
 
   property Timer focusTimeout: Timer {

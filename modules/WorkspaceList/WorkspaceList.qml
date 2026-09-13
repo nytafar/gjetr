@@ -173,10 +173,13 @@ Item {
   Text {
     id: banner
     anchors { top: header.bottom; left: parent.left; right: parent.right; topMargin: root.gap }
-    visible: !root.online
+    // Offline wins; online to an untested herdr protocol shows a quiet cue.
+    visible: !root.online || (root.service ? root.service.herdrMismatchCue !== "" : false)
     height: visible ? implicitHeight : 0
     horizontalAlignment: Text.AlignHCenter
-    text: root.offline ? "herdr offline, retrying" : "connecting to herdr"
+    elide: Text.ElideRight
+    text: !root.online ? (root.offline ? "herdr offline, retrying" : "connecting to herdr")
+      : (root.service ? root.service.herdrMismatchCue : "")
     color: Color.muted
     font.family: Style.font.family
     font.pixelSize: Math.round(Style.font.body * root.textScale)
