@@ -51,7 +51,11 @@ Item {
   readonly property int textX: t.pad + (fields.status || fields.kind ? t.statusWidth + t.gap : 0)
   // The top of the Recap: under the name line and the status and repo line.
   readonly property int headHeight: t.padY + t.lineHeight + t.lineGap + t.secondLineHeight
+  // A cold cache has nothing left to drain: no number column, so the name gets
+  // the whole width, and a small `cold` at the end of the status line.
+  readonly property bool cacheCold: !!cacheTimer && cacheTimer.level === "cold"
   readonly property int textRight: cacheColumn.visible ? cacheColumn.x - t.gap : width - t.pad
+  readonly property int metaRight: coldText.visible ? Math.min(textRight, coldText.x - t.gap) : textRight
 
   implicitHeight: recapShown ? headHeight + t.recapGap + recapPanel.height + t.padY : baseHeight
 
@@ -218,7 +222,7 @@ Item {
 
   Text {
     id: repoLabel
-    readonly property int room: Math.max(0, root.textRight - x)
+    readonly property int room: Math.max(0, root.metaRight - x)
     x: statusWord.x + statusWord.implicitWidth + root.t.gap
     anchors.verticalCenter: metaLine.verticalCenter
     width: Math.min(implicitWidth, room)
@@ -237,7 +241,7 @@ Item {
     readonly property int startX: repoLabel.visible ? repoLabel.x + repoLabel.width + root.t.gap * 1.5 : repoLabel.x
     x: startX
     anchors.verticalCenter: metaLine.verticalCenter
-    visible: root.fields.location && text !== "" && root.textRight - startX >= implicitWidth
+    visible: root.fields.location && text !== "" && root.metaRight - startX >= implicitWidth
     text: root.locationText
     textFormat: Text.PlainText
     color: Color.muted
@@ -250,7 +254,7 @@ Item {
   // full (a fresh cache) to empty (cold), in the level's colour.
   Item {
     id: cacheColumn
-    visible: root.fields.cache && root.cacheTimer !== null
+    visible: root.fields.cache && root.cacheTimer !== null && !root.cacheCold
     x: root.width - root.t.pad - width
     y: nameLine.y
     width: Math.max(cacheText.implicitWidth, root.t.cacheBarWidth)
@@ -262,9 +266,8 @@ Item {
       y: Math.round((root.t.lineHeight - height) / 2)
       text: root.cacheTimer ? root.cacheTimer.label : ""
       color: root.cacheColor
-      opacity: root.cacheTimer && root.cacheTimer.level === "cold" ? 0.55 : 1
       font.family: Style.font.family
-      font.pixelSize: root.cacheTimer && root.cacheTimer.level === "cold" ? root.t.metaPx + 2 : root.t.cachePx
+      font.pixelSize: root.t.cachePx
       font.weight: root.cacheTimer && root.cacheTimer.level === "critical" ? Font.Bold : Font.Medium
       font.features: { "tnum": 1 }
     }
@@ -286,6 +289,18 @@ Item {
         Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
       }
     }
+  }
+
+  Text {
+    id: coldText
+    visible: root.fields.cache && root.cacheCold
+    x: root.width - root.t.pad - implicitWidth
+    anchors.verticalCenter: metaLine.verticalCenter
+    text: "cold"
+    color: Color.muted
+    opacity: 0.7
+    font.family: Style.font.family
+    font.pixelSize: root.t.metaPx
   }
 
   // The name and status lines focus the Agent; without a Recap, the whole Card.

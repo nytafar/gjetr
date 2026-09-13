@@ -274,8 +274,9 @@ The densities:
   directory shortened to `~/…/parent/dir` outside a repository. Workspace › tab
   follows, dimmed, when the preset shows it and it fits. The Cache timer is a
   large number at the right over a bar that drains from full to empty as the
-  cache ages, green while ok, accent in warn, urgent when critical, and
-  `cold` over an empty track once it expires. With `recap = "inline"` or `"expand"`, the
+  cache ages, green while ok, accent in warn, urgent when critical. An expired
+  cache has no number or bar: a small `cold` ends the status line and the name
+  takes the whole width. With `recap = "inline"` or `"expand"`, the
   first two lines of the Recap sit under the Card's lines; clicking them opens
   the whole Recap inside the Card on an accent-tinted panel (or the overlay
   with `recap_open = "overlay"`), and clicking again closes it. Clicking the
