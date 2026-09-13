@@ -1,6 +1,6 @@
 # gjetr
 
-![gjetr on a 7" touchscreen beside the desk](preview.png)
+![gjetr on a 7" touchscreen: every herdr agent as a Card with its kind logo, status, Recap and Cache timer](preview.png)
 
 **A herdr dashboard for a secondary touchscreen.** gjetr shows every agent
 [herdr](https://herdr.dev) is running as a live Card on a small display next to
@@ -11,9 +11,68 @@ screen space on your main monitor for herdr's sidebar.
 It is an [Omarchy](https://omarchy.org) shell plugin: it follows your theme,
 lives beside the Omarchy bar, and needs no daemon.
 
+## herdr's sidebar, outside herdr
+
+<img src="assets/sidebar.png" alt="A Dock on the left of a 4K monitor: thirteen agents with logos, statuses, repository and branch, Recaps and Cache timers, and usage limits pinned at the bottom" width="310" align="right">
+
+No touchscreen? Dock gjetr along the left edge of your main monitor and it
+does the job of herdr's sidebar there, for every herdr workspace at once and
+without taking columns from your panes. It stays on every workspace, windows
+tile beside it, and a key shows or hides it.
+
+Each agent reads at a glance: its kind's logo lit in its status (moving while
+it works, flashing when blocked, green when done), the name you gave it, the
+repository and branch it works in, a draining Cache timer, and the first lines
+of Claude's latest Recap. Click one to jump to its pane and window. Rate limits
+for Claude, Codex and the other providers sit pinned under the list, as tall
+as their lines.
+
+`~/.config/gjetr/gjetr.toml`:
+
+```toml
+[[display]]
+kind = "dock"
+name = "DP-1"              # your main monitor
+edge = "left"
+size = 360
+deck = ["sidebar"]
+```
+
+`~/.config/gjetr/layouts/sidebar.toml`:
+
+```toml
+orientation = "portrait"
+
+[[module]]
+type = "agent-list"
+density = "full"
+sort = "priority"
+recap = "inline"
+indicator = "icon"
+focus = "window"
+
+[[module]]
+type = "usage"
+show = ["limits"]
+pin = "end"
+```
+
+Bind the toggle in `~/.config/hypr/bindings.lua`:
+
+```lua
+o.bind("SUPER + CTRL + G", "Toggle gjetr dock", "omarchy-shell nytafar.gjetr toggleDock DP-1")
+```
+
+<br clear="right">
+
+## Gallery
+
 <p>
-  <img src="assets/landscape.png" alt="Landscape: Deck tabs on the left, two columns of Cards, two pulsing" width="58%">
-  <img src="assets/portrait.png" alt="Portrait: tabs on top, one column of Cards" width="34%">
+  <img src="assets/portrait.png" alt="Portrait panel: Deck tabs on top, Agent Cards sorted by Cache timer" width="30%">
+  <img src="assets/workspaces.png" alt="Workspace List of four herdr workspaces beside a compact Agent List" width="66%">
+</p>
+<p>
+  <img src="assets/usage.png" alt="Agent List beside Usage: Claude and Codex limits, today's tokens and a week of daily bars" width="66%">
 </p>
 
 ## Features
@@ -48,6 +107,8 @@ lives beside the Omarchy bar, and needs no daemon.
 - **Dock.** Dock gjetr along an edge of your main monitor too, with its own
   Deck: it stays on every workspace, windows tile beside it, ordinary windows
   never cover it, and a keybinding shows or hides it. Works with the mouse.
+  Pin the Usage Module to its bottom and it takes only the height its lines
+  need.
 - **Density that fits.** Touchscreens get big Cards; a Dock and narrow columns
   get compact rows, so a Dock beside your windows lists sixteen agents at once.
   Or set `density = "full"` for Cards you can read leaning back: big names,

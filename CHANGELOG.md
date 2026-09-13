@@ -18,6 +18,13 @@ All notable changes to gjetr. The format follows
   Agent List or Workspace List it is logged and ignored.
   `examples/gjetr/layouts/dock.toml` pins its usage; `state` → `modules[].pin`.
 
+### Changed
+
+- README: new screenshots taken from a demo herdr and demo usage records (the
+  Dock as herdr's sidebar on a 4K monitor, the panel in landscape and portrait,
+  the Workspace List and Usage), a section on using a Dock in place of herdr's
+  sidebar with its Config and keybinding, and a gallery.
+
 ## [0.2.0] - 2026-09-13
 
 ### Added
