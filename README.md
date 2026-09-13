@@ -34,6 +34,9 @@ lives beside the Omarchy bar, and needs no daemon.
 - **Workspace List.** herdr's workspaces, tabs and panes as a tree that
   expands in place, plain shells included, so any pane is a tap away. Agent
   Lists quietly highlight the agents in herdr's focused workspace.
+- **Usage.** Rate limits and usage for Claude, Codex and every other provider
+  Omarchy's usage collectors know: meters with time to reset, today's tokens,
+  a week of daily bars and tokens by model.
 - **Recap.** For Claude agents, the latest session recap Claude Code wrote,
   inline on the Card or on request.
 - **Decks of Layouts.** Several Layouts per display, with tabs on a short edge,
@@ -56,8 +59,9 @@ lives beside the Omarchy bar, and needs no daemon.
 - Optional: [Claude Code](https://claude.com/claude-code) agents in herdr, for
   the Recap Field
 
-gjetr has no other dependencies. It uses `hyprctl`, `ps`, `find`, `stat` and
-`grep`, which Omarchy already ships.
+gjetr has no other dependencies. It uses `hyprctl`, `ps`, `find`, `stat`,
+`grep` and, for the Usage Module, `omarchy-agent-usage-update`, all of which
+Omarchy already ships.
 
 ## Install
 
@@ -130,6 +134,7 @@ rotatable = true
 | Tap a tab, or swipe sideways | Change Layout |
 | Tap a workspace or tab row | Open or close it (`tap = "expand"`), or focus it in herdr (`tap = "focus"`, where the chevron opens it) |
 | Tap a pane row | Focus that pane, agent or shell |
+| Tap the Usage header | Refresh usage now |
 | Tap `recap` on a Card, or long press | Open or close the full Recap in the Card, or over the list with `recap_open = "overlay"` (with `recap = "expand"`) |
 
 These choices are remembered until you reset them with
@@ -190,7 +195,6 @@ window focus when you tap with Focus behaviour `window`.
 ## Roadmap
 
 - A docked surface on the main monitor that reserves space across workspaces
-- A usage Module
 - Client mode: work in a herdr pane on the display when the desk is away
 - Long-press actions on Cards
 - Several herdr servers and several displays at once

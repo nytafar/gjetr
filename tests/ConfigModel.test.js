@@ -17,7 +17,7 @@ test("a missing gjetr.toml yields the defaults without errors", () => {
   assert.deepEqual(Array.from(read.errors), [])
   assert.deepEqual(plain(read.config), {
     socket: "/home/test/.config/herdr/herdr.sock",
-    displays: [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black", touchDevices: [] }]
+    displays: [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black", touchDevices: [], refreshSeconds: null }]
   })
 })
 
@@ -40,8 +40,8 @@ background = "theme"
   assert.deepEqual(plain(read.config), {
     socket: "/home/test/run/herdr.sock",
     displays: [
-      { name: "HDMI-A-2", deck: ["agents", "overview"], rotatable: true, background: "#101315", touchDevices: [] },
-      { name: "DP-2", deck: ["agents"], rotatable: false, background: "theme", touchDevices: [] }
+      { name: "HDMI-A-2", deck: ["agents", "overview"], rotatable: true, background: "#101315", touchDevices: [], refreshSeconds: null },
+      { name: "DP-2", deck: ["agents"], rotatable: false, background: "theme", touchDevices: [], refreshSeconds: null }
     ]
   })
 })
@@ -67,7 +67,7 @@ colour = "red"
 `, HOME)
   const config = plain(read.config)
   assert.equal(config.socket, "/home/test/.config/herdr/herdr.sock")
-  assert.deepEqual(config.displays, [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black", touchDevices: [] }])
+  assert.deepEqual(config.displays, [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black", touchDevices: [], refreshSeconds: null }])
   const text = read.errors.join("\n")
   assert.match(text, /gjetr\.toml: socket: /)
   assert.match(text, /display\[0\]\.deck\[1\]: /)
@@ -195,7 +195,7 @@ extra = true
 })
 
 test("unknown module types are skipped; no modules left means the default", () => {
-  const read = Config.readLayout("x", '[[module]]\ntype = "usage"\n')
+  const read = Config.readLayout("x", '[[module]]\ntype = "clock"\n')
   assert.deepEqual(plain(read.layout.modules), [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true }])
   assert.match(read.errors.join("\n"), /module\[0\]\.type: /)
   assert.match(read.errors.join("\n"), /no valid module/)
@@ -325,4 +325,54 @@ test("highlight_workspace is on by default and may be turned off per Agent List"
   const bad = Config.readLayout("a", '[[module]]\ntype = "agent-list"\nhighlight_workspace = "no"\n')
   assert.equal(bad.layout.modules[0].highlightWorkspace, true)
   assert.match(bad.errors.join("\n"), /layouts\/a\.toml: module\[0\]\.highlight_workspace: expected true or false/)
+})
+
+test("a usage Module reads show, providers and refresh_seconds", () => {
+  const read = Config.readLayout("u", `
+[[module]]
+type = "usage"
+show = ["limits", "today", "recent_days", "models", "cost_30d", "today"]
+providers = ["claude", "codex"]
+refresh_seconds = 300
+weight = 2
+`)
+  assert.deepEqual(Array.from(read.errors), [])
+  assert.deepEqual(plain(read.layout.modules), [{ type: "usage", show: ["limits", "today", "recent_days", "models", "cost_30d"],
+    providers: ["claude", "codex"], refreshSeconds: 300, weight: 2 }])
+  assert.deepEqual(plain(Config.readLayout("u", '[[module]]\ntype = "usage"\n').layout.modules),
+    [{ type: "usage", show: ["limits"], providers: [], refreshSeconds: null, weight: 1 }])
+})
+
+test("usage values fall back per item with clear errors", () => {
+  const read = Config.readLayout("u", `
+[[module]]
+type = "usage"
+show = ["limits", "weather", 3]
+providers = ["claude", "../x"]
+refresh_seconds = 30
+`)
+  const module = plain(read.layout.modules[0])
+  assert.deepEqual(module.show, ["limits"])
+  assert.deepEqual(module.providers, ["claude"])
+  assert.equal(module.refreshSeconds, 60)
+  const text = read.errors.join("\n")
+  assert.match(text, /layouts\/u\.toml: module\[0\]\.show\[1\]: expected one of limits, today, recent_days, models, cost_30d/)
+  assert.match(text, /module\[0\]\.show\[2\]: /)
+  assert.match(text, /module\[0\]\.providers\[1\]: expected a provider id/)
+  assert.match(text, /module\[0\]\.refresh_seconds: expected whole seconds from 60 to 86400, got 30; using 60/)
+  const empty = Config.readLayout("u", '[[module]]\ntype = "usage"\nshow = []\nrefresh_seconds = "15m"\nproviders = "claude"\n')
+  assert.deepEqual(plain(empty.layout.modules[0].show), ["limits"])
+  assert.equal(empty.layout.modules[0].refreshSeconds, null)
+  assert.match(empty.errors.join("\n"), /module\[0\]\.show: no valid items, using \["limits"\]/)
+  assert.match(empty.errors.join("\n"), /module\[0\]\.refresh_seconds: expected whole seconds/)
+  assert.match(empty.errors.join("\n"), /module\[0\]\.providers: expected a list of provider ids/)
+})
+
+test("a Display may set refresh_seconds for its Usage Modules", () => {
+  const read = Config.readMain('[[display]]\nname = "DP-1"\nrefresh_seconds = 600\n', HOME)
+  assert.deepEqual(Array.from(read.errors), [])
+  assert.equal(read.config.displays[0].refreshSeconds, 600)
+  const big = Config.readMain('[[display]]\nname = "DP-1"\nrefresh_seconds = 999999\n', HOME)
+  assert.equal(big.config.displays[0].refreshSeconds, 86400)
+  assert.match(big.errors.join("\n"), /display\[0\]\.refresh_seconds: expected whole seconds from 60 to 86400, got 999999; using 86400/)
 })

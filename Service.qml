@@ -18,6 +18,8 @@ import "lib/DeckPolicy.js" as DeckPolicy
 import "lib/RecapModel.js" as RecapModel
 import "lib/WorkspaceTreeModel.js" as WorkspaceTreeModel
 import "lib/ThemeModel.js" as ThemeModel
+import "lib/UsageModel.js" as UsageModel
+import "sources"
 
 // Owns Display selection, the herdr connection and everything that must
 // outlive a surface. The surface itself is created per matching screen and
@@ -116,6 +118,25 @@ Item {
   // highlight the Agents in it; nothing filters by it.
   readonly property var workspaceTree: herdr.tree
   readonly property string focusedWorkspaceId: workspaceTree ? workspaceTree.focusedWorkspaceId : ""
+  // Usage (docs/adr/0002): providers from Omarchy's usage records, refreshed
+  // and watched while any Layout of the Deck has a Usage Module.
+  readonly property var deckUsageModules: {
+    var out = []
+    for (var i = 0; i < deckLayouts.length; i++) {
+      var layout = layoutsByName[deckLayouts[i]]
+      var modules = layout && Array.isArray(layout.modules) ? layout.modules : []
+      for (var j = 0; j < modules.length; j++) if (modules[j] && modules[j].type === "usage") out.push(modules[j])
+    }
+    return out
+  }
+  readonly property int usageRefreshSeconds: UsageModel.refreshSeconds(display.refreshSeconds, deckUsageModules)
+  readonly property string usageDir: UsageModel.usageDir(home, Quickshell.env("XDG_STATE_HOME"))
+  readonly property var usageProviders: usageSource.providers
+  readonly property bool usageRefreshing: usageSource.refreshing
+  readonly property bool usageShown: activeModules.some(function(module) { return module.type === "usage" })
+  // Clock for reset countdowns and ages; ticks only while a Usage Module shows.
+  property double usageNowMs: Date.now()
+
   // Session state, never written: the expanded workspaces and tabs of each
   // Workspace List (WorkspaceTreeModel expansion state), pruned as they go away.
   property var treeExpanded: WorkspaceTreeModel.emptyExpanded()
@@ -542,6 +563,14 @@ Item {
     return herdr.focusTarget(kind, value)
   }
 
+  // Runs omarchy-agent-usage-update now. -> "started", "already running" or
+  // "no usage module".
+  function refreshUsage() {
+    if (deckUsageModules.length === 0) return "no usage module"
+    if (usageSource.refreshing) return "already running"
+    return usageSource.refresh() ? "started" : "refused"
+  }
+
   function focusModeFor(moduleKey) {
     var state = moduleStates[moduleKeyOr(moduleKey)]
     return state && state.focus ? state.focus : "herdr"
@@ -728,6 +757,22 @@ Item {
               attention: row.attention, expanded: row.expanded }
           })
       },
+      usage: {
+        active: usageSource.active,
+        dir: usageDir,
+        refreshSeconds: usageRefreshSeconds,
+        refreshing: usageSource.refreshing,
+        runs: usageSource.runs,
+        lastExit: usageSource.lastExit,
+        lastRun: usageSource.lastRunMs > 0 ? new Date(usageSource.lastRunMs).toISOString() : "",
+        records: usageSource.ids,
+        errors: usageSource.errors,
+        providers: Object.keys(usageSource.providers).sort().map(function(id) {
+          var p = usageSource.providers[id]
+          return { id: id, ready: p.ready, limits: p.limits.length, updated: UsageModel.ageLabel(p.updatedAtMs, Date.now()),
+            stale: UsageModel.isStale(p.updatedAtMs, Date.now(), usageRefreshSeconds), cost30d: p.cost30d }
+        })
+      },
       modules: activeModules.map(function(module, index) {
         var state = moduleStates[module.key] || {}
         return { key: module.key, type: module.type, weight: module.weight, sort: state.sort, focus: state.focus,
@@ -793,6 +838,22 @@ Item {
   CommandRunner {
     id: commands
   }
+
+  OmarchyUsageSource {
+    id: usageSource
+    runner: commands
+    dir: root.usageDir
+    active: root.deckUsageModules.length > 0
+    refreshSeconds: root.usageRefreshSeconds
+  }
+
+  Timer {
+    interval: 30000
+    repeat: true
+    running: root.usageShown
+    onTriggered: root.usageNowMs = Date.now()
+  }
+  onUsageShownChanged: if (usageShown) usageNowMs = Date.now()
 
   onConfigErrorsChanged: {
     for (var i = 0; i < configErrors.length; i++) log("config: " + configErrors[i])
@@ -980,6 +1041,11 @@ Item {
     function tapRow(nodeKey: string, zone: string): string {
       var row = root.workspaceRowByKey(nodeKey)
       return row ? root.tapWorkspaceRow("", row, zone === "chevron" ? "chevron" : "row") : "unknown row"
+    }
+
+    // Runs omarchy-agent-usage-update now, as a tap on a Usage header does.
+    function refreshUsage(): string {
+      return root.refreshUsage()
     }
 
     function selectLayout(name: string): string {

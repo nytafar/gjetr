@@ -1,0 +1,32 @@
+# Usage, landscape: the Agent List beside each AI provider's limits and usage.
+# Add "usage" to a Display's deck in gjetr.toml to use it.
+
+orientation = "landscape"
+
+[[module]]
+type = "agent-list"
+sort = "cache"
+preset = "compact"
+
+# The Usage Module reads the records Omarchy's usage collectors write to
+# ~/.local/state/omarchy/agents/usage/ and runs omarchy-agent-usage-update
+# itself to keep them fresh. Tap its header to refresh now.
+[[module]]
+type = "usage"
+
+# What each provider shows, in this order:
+# "limits"      rate limit meters with percent used and time to reset (default)
+# "today"       today's tokens, prompts and sessions
+# "recent_days" a small bar chart of tokens per day
+# "models"      today's tokens by model
+# "cost_30d"    cost over the last 30 days. Omarchy's records hold no cost, so
+#               this reads "not in usage data" until a source provides one.
+show = ["limits", "today", "recent_days"]
+
+# Which providers, in order. Leave it out to show every provider that is ready.
+# A named provider that is not ready, or has no record, is shown quietly.
+# providers = ["claude", "codex"]
+
+# Seconds between refreshes, 60 to 86400. Overrides refresh_seconds in
+# gjetr.toml; the smallest value of any Usage Module in the Deck wins.
+# refresh_seconds = 900

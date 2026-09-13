@@ -113,3 +113,20 @@ test("touch transforms follow a rotation, globally or per device", () => {
   assert.deepEqual(Array.from(Command.deviceTransform('x", enabled = false, y = "', "HDMI-A-2", 1)), [])
   assert.equal(Command.allowed(["hyprctl", "eval", 'hl.device({ name = "x", enabled = false })']), false)
 })
+
+test("usage: the refresh script takes no arguments, and the listing only reads the usage dir", () => {
+  const Policy = loadLib("lib/CommandPolicy.js")
+  assert.deepEqual(Array.from(Policy.USAGE_UPDATE), ["omarchy-agent-usage-update"])
+  assert.equal(Policy.allowed(["omarchy-agent-usage-update"]), true)
+  assert.equal(Policy.allowed(["omarchy-agent-usage-update", "--force"]), false)
+  assert.equal(Policy.allowed(["omarchy-agent-usage-update", "claude"]), false)
+  const dir = "/home/x/.local/state/omarchy/agents/usage"
+  const argv = Policy.listUsageFiles(dir)
+  assert.deepEqual(Array.from(argv), ["find", dir, "-maxdepth", "1", "-type", "f", "-name", "*.json", "-printf", "%f\\n"])
+  assert.equal(Policy.allowed(argv), true)
+  for (const bad of ["/home/x/.local/state/omarchy/agents", "/home/x/../etc/omarchy/agents/usage", "relative/omarchy/agents/usage", "/a\nb/omarchy/agents/usage"]) {
+    assert.deepEqual(Array.from(Policy.listUsageFiles(bad)), [], bad)
+  }
+  assert.equal(Policy.allowed(["find", dir, "-maxdepth", "1", "-type", "f", "-name", "*", "-printf", "%f\\n"]), false)
+  assert.equal(Policy.allowed(["find", dir, "-maxdepth", "1", "-type", "f", "-name", "*.json", "-delete", "%f\\n"]), false)
+})

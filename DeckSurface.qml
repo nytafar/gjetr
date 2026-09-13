@@ -9,6 +9,7 @@ import "lib/DeckPolicy.js" as DeckPolicy
 import "lib/CardPolicy.js" as CardPolicy
 import "modules/AgentList"
 import "modules/WorkspaceList"
+import "modules/Usage"
 
 // The full-output surface on one Display. Renders only: every value comes from
 // the service it registers with.
@@ -92,6 +93,7 @@ PanelWindow {
           anchors.fill: parent
           sourceComponent: slot.modelData.type === "agent-list" ? agentList
             : slot.modelData.type === "workspace-list" ? workspaceList
+            : slot.modelData.type === "usage" ? usage
             : null
         }
 
@@ -108,6 +110,15 @@ PanelWindow {
           id: workspaceList
 
           WorkspaceList {
+            service: root.service
+            moduleKey: slot.modelData.key
+          }
+        }
+
+        Component {
+          id: usage
+
+          Usage {
             service: root.service
             moduleKey: slot.modelData.key
           }

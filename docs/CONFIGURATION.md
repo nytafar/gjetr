@@ -23,6 +23,7 @@ no Config at all, gjetr shows one Agent List on `HDMI-A-2`.
   layouts/
     agents.toml         one file per Layout
     workspaces.toml
+    usage.toml
 ```
 
 ## `gjetr.toml`
@@ -48,6 +49,7 @@ A place the dashboard is shown. Only the first `[[display]]` is used today.
 | `rotatable` | boolean | `false` | May gjetr rotate the output to fit the active Layout's orientation |
 | `touch_devices` | list of device names | `[]` | Touchscreens that rotate with the Display (see [Rotation and touch](#rotation-and-touch)) |
 | `background` | string | `"black"` | `"black"`, `"theme"` (Omarchy theme background), `"wallpaper"` (the Omarchy wallpaper shows through), `"transparent"` (same as wallpaper), `"#rrggbb"`, or `"#aarrggbb"` to tint the wallpaper |
+| `refresh_seconds` | whole number, 60 to 86400 | `900` | Seconds between usage refreshes for the Usage Modules in this Display's Deck. Out of range clamps, with a logged error |
 
 ```toml
 [[display]]
@@ -86,7 +88,7 @@ Keys every `[[module]]` takes, whatever its type:
 
 | Key | Values | Default | Meaning |
 |---|---|---|---|
-| `type` | `"agent-list"`, `"workspace-list"` | required | Module type. Unknown types are skipped |
+| `type` | `"agent-list"`, `"workspace-list"`, `"usage"` | required | Module type. Unknown types are skipped |
 | `weight` | number above 0, at most 100 | `1` | The Module's share of the width (landscape) or height (portrait). `weight = 2` beside a `weight = 1` takes two thirds |
 
 ```toml
@@ -249,6 +251,50 @@ herdr has one Focused workspace. With `highlight_workspace = true` (the
 default), an Agent List tints the Cards of Agents in it; the Workspace List
 draws its row selected. Neither ever hides anything.
 
+### `[[module]]` with `type = "usage"`
+
+Each AI provider's rate limits and usage, from the records Omarchy's usage
+collectors write to `~/.local/state/omarchy/agents/usage/` (one JSON file per
+provider). gjetr reads them, watches each file, and runs
+`omarchy-agent-usage-update` itself every `refresh_seconds`, so the numbers
+stay fresh without Omarchy's agents bar widget. Only one run goes at a time.
+Tap the Module's header to refresh now.
+
+| Key | Values | Default | Meaning |
+|---|---|---|---|
+| `show` | list of `"limits"`, `"today"`, `"recent_days"`, `"models"`, `"cost_30d"` | `["limits"]` | What each provider shows, in this order. Unknown items are skipped with an error |
+| `providers` | list of provider ids | every ready provider | Which providers, in this order. A named provider that is not ready, or has no record yet, is shown quietly |
+| `refresh_seconds` | whole number, 60 to 86400 | the Display's, else `900` | Seconds between refreshes. With several Usage Modules in the Deck, the smallest wins |
+
+```toml
+orientation = "landscape"
+
+[[module]]
+type = "agent-list"
+
+[[module]]
+type = "usage"
+show = ["limits", "today", "recent_days", "models"]
+providers = ["claude", "codex"]
+```
+
+Items:
+
+- `limits`: a meter per limit window (such as a 5-hour session or a week) with
+  the share used and the time to reset. The meter turns the theme's accent
+  colour from 75% and urgent from 90%.
+- `today`: today's tokens, prompts and sessions.
+- `recent_days`: tokens per day over the last 7 days as small bars, today in
+  accent.
+- `models`: today's tokens by model, largest first, up to 5.
+- `cost_30d`: cost over the last 30 days. Omarchy's records carry no cost, and
+  gjetr does not price tokens itself, so for now this reads
+  `not in usage data`.
+
+A provider whose collector reports it is not ready (signed out, unreachable)
+shows only its name and status line, muted. Numbers older than two refreshes
+show when they were last updated.
+
 ## Rotation and touch
 
 With `rotatable = true`, selecting a Layout whose orientation differs from the
@@ -323,6 +369,7 @@ omarchy-shell nytafar.gjetr resetOverrides
 | `~/.claude/projects/*/<session-id>.jsonl` | Claude Code | Recap (only when `recap` is not `off`) |
 | `$OMARCHY_PATH/shell/plugins/agents/assets/*.svg` | Omarchy | Agent kind marks |
 | `~/.local/state/omarchy/current/theme/colors.toml` | Omarchy theme | `green`, the colour of `done` |
+| `~/.local/state/omarchy/agents/usage/*.json` | `omarchy-agent-usage-update` | Usage Module (only while a Usage Module is in the Deck) |
 
 ## IPC
 
@@ -344,6 +391,7 @@ omarchy-shell nytafar.gjetr <function> [argument]
 | `nextLayout`, `previousLayout` | The step a swipe takes |
 | `toggleExpand <node>` | Open or close a workspace (`w:<id>`) or tab (`t:<id>`) in the first Workspace List. Prints `expanded`, `collapsed`, `unknown node` or `no workspace list`. `state` → `workspaces.rows` lists the rows drawn |
 | `tapRow <node> <zone>` | Tap a row (`w:<id>`, `t:<id>`, `p:<id>`) of the first Workspace List in zone `row` or `chevron`, as a finger does. Prints what it did |
+| `refreshUsage` | Run `omarchy-agent-usage-update` now, as a tap on a Usage header does. Prints `started`, `already running` or `no usage module`. `state` → `usage` shows records, errors, runs and each provider's age |
 | `resetOverrides` | Clear every Override |
 | `useConfigDir <path>` | Read Config from another directory until the shell restarts (testing). `""` goes back |
 

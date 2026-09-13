@@ -36,3 +36,7 @@ rotatable = false
 # wallpaper shows through), "transparent" (same as wallpaper), or a colour:
 # "#rrggbb", or "#aarrggbb" to tint the wallpaper, e.g. "#c0000000".
 background = "black"
+
+# Seconds between usage refreshes for Usage Modules on this Display, 60 to
+# 86400 (default 900). A Usage Module's own refresh_seconds wins.
+# refresh_seconds = 900

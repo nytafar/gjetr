@@ -29,6 +29,17 @@ All notable changes to gjetr. The format follows
 - IPC `toggleExpand <node>` and `tapRow <node> <zone>`; `state` → `workspaces`,
   and `inFocusedWorkspace` on each Card.
 - `examples/gjetr/layouts/workspaces.toml`.
+- The Usage Module, `type = "usage"`: each AI provider's rate limits and usage
+  from Omarchy's usage records. `show` picks `limits` (meters with percent and
+  time to reset, accent from 75% and urgent from 90%), `today` (tokens,
+  prompts, sessions), `recent_days` (bars per day), `models` (today's tokens by
+  model) and `cost_30d`; `providers` filters and orders them. gjetr runs
+  `omarchy-agent-usage-update` itself every `refresh_seconds` (900 by default,
+  from the Module or the Display), one run at a time, and watches the records.
+  Providers that are not ready, and stale numbers, are shown quietly. A tap on
+  the header refreshes.
+- IPC `refreshUsage`; `state` → `usage`.
+- `examples/gjetr/layouts/usage.toml`.
 - `recap_open = "card" | "overlay"` per Agent List, default `card`: with
   `recap = "expand"` the full Recap opens inside its Card, under the Fields,
   and the Card grows. Several Cards can be open at once; open Cards follow
