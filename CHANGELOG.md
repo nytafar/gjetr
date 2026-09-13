@@ -8,6 +8,16 @@ All notable changes to gjetr. The format follows
 
 ### Added
 
+- Kind logos: Pi, Gemini, Cursor, Cline, OpenCode, GitHub Copilot, Kimi, Qwen
+  Code, Devin, Antigravity, Mastra Code, Kiro, Amp, Grok, Hermes, Kilo Code,
+  Qoder and Oh My Pi draw their logo instead of a letter, from one-colour SVGs
+  shipped in `assets/kinds/` and drawn in the theme's muted colour (and in
+  their status with `indicator = "icon"`). Claude and Codex keep Omarchy's
+  brand-colour marks; Droid, Maki and Muse keep their letter. Sources and
+  licences (Simple Icons, CC0 1.0; Lobe Icons and oh-my-pi, MIT) are in
+  `assets/kinds/LICENSES.md`; a test checks every shipped SVG is a plain
+  currentColor shape with nothing that runs or loads. `state` → `cards[].kindMark`
+  names the SVG file for these kinds.
 - Status indicator: `indicator = "glyph" | "icon" | "both"` on Agent Lists and
   Workspace Lists, default `glyph` as before. With `icon` the kind mark
   (Omarchy's SVG or the letter mark) is drawn in its Agent's status: working in

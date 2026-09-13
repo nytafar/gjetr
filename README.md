@@ -230,9 +230,18 @@ header.
 
 The idea of finding herdr's terminal window by walking the process tree comes
 from [omaherdr](https://github.com/njpatel/omaherdr) (Apache-2.0); no code from
-it is used. Kind marks are read in place from Omarchy's agents plugin; the
-letters for other kinds follow
+it is used. Claude's and Codex's marks are read in place from Omarchy's agents
+plugin ([Omarchy](https://github.com/omacom/omarchy), Copyright (c) David
+Heinemeier Hansson, MIT); the letters for kinds without a logo follow
 [obsidian-herdr](https://github.com/nytafar/obsidian-herdr)'s badges.
+
+Bundled kind logos, in `assets/kinds/`: from [Simple Icons](https://simpleicons.org)
+(CC0 1.0), [Lobe Icons](https://github.com/lobehub/lobe-icons), Copyright (c)
+2023 LobeHub (MIT), and [oh-my-pi](https://github.com/can1357/oh-my-pi),
+Copyright (c) 2025 Mario Zechner, 2025-2026 Can Bölük, 2026 Stencil Labs, Inc.
+(MIT). Each file's source and licence is in
+[`assets/kinds/LICENSES.md`](assets/kinds/LICENSES.md). The logos are
+trademarks of their owners and are shown only to name each agent.
 
 ## License
 

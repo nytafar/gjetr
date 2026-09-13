@@ -96,6 +96,16 @@ test("the scan catches what must not ship", () => {
     '<title>Ok</title><path d="M0 0h24v24H0z"></path><circle cx="1" cy="1" r="1"/></svg>'), [])
 })
 
+test("assets/kinds/LICENSES.md credits every shipped mark, and the MIT sources with their notice", () => {
+  const licences = fs.readFileSync(path.join(DIR, "LICENSES.md"), "utf8")
+  for (const name of svgFiles()) assert.ok(licences.includes("`" + name + "`"), `${name} is credited`)
+  for (const holder of ["Copyright (c) 2023 LobeHub", "Copyright (c) 2025 Mario Zechner", "Omarchy"]) {
+    assert.ok(licences.includes(holder), holder)
+  }
+  assert.ok(licences.includes("Permission is hereby granted, free of charge"), "the MIT permission notice travels with the files")
+  assert.ok(licences.includes("CC0 1.0"), "Simple Icons' CC0 dedication is noted")
+})
+
 test("assets/kinds holds exactly one mark per kind the table ships, named by kind", () => {
   const shipped = Kind.KINDS.filter(kind => Kind.kindIcon(kind, false).origin === "gjetr")
   assert.deepEqual(svgFiles(), shipped.map(kind => kind + ".svg").sort())
