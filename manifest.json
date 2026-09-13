@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "nytafar.gjetr",
+  "name": "gjetr",
+  "version": "0.1.0",
+  "author": "Lasse Jellum",
+  "license": "MIT",
+  "description": "A herdr dashboard for a secondary touchscreen: every agent as a Card, live.",
+  "kinds": ["service"],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml"
+  }
+}
