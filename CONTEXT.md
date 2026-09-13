@@ -44,7 +44,7 @@ The latest session recap Claude Code wrote for an Agent's session, shown as a Fi
 _Avoid_: summary, away summary (Claude's internal name)
 
 **Sort mode**:
-The ordering of the Agent List, always the same as herdr's own agent panel: `spaces` (herdr's workspace, tab and pane order), `priority` (herdr's attention queue: blocked, done, working, idle, most recent change first) or `cache` (the cache-ttl plugin's order: warmest Cache timer first).
+The ordering of the Agent List: `spaces` (herdr's workspace, tab and pane order) or `priority` (herdr's attention queue: blocked, done, working, idle, most recent change first), both the same as herdr's own agent panel; or `cache` (soonest-expiring Cache timer first, then expired ones, then Agents without a timer).
 
 **Attention**:
 The state of an Agent that has become `blocked` or `done` and has not been focused since. Shown prominently (pulsing) on its Card, and as a badge on the tab of any Layout that contains it. gjetr never sends notifications; herdr owns those.

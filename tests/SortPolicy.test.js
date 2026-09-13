@@ -63,14 +63,21 @@ test("priority matches herdr's live sidebar order for idle and working agents", 
   assert.deepEqual(ids(Sort.sortAgents(live, "priority")), ["wA:p2", "wB:p1", "w2:pA", "w4:pT", "w1:p8", "w1:p2"])
 })
 
-test("cache is warmest first: most time left, then cold, then no timer", () => {
+test("cache is soonest-expiring first: least time left, then cold, then no timer", () => {
   const list = [
     a("w1:p1", "idle"), a("w1:p2", "idle"), a("w1:p3", "blocked"), a("w2:p1", "done"),
     a("w2:p2", "idle"), a("w2:p3", "working"), a("w3:p1", "blocked")
   ]
   const remaining = { "w1:p1": 2400, "w1:p2": 90, "w2:p1": -10, "w2:p2": 0, "w2:p3": 90 }
+  // 90 s ties go to working over idle; cold ties go to done over idle.
   assert.deepEqual(ids(Sort.sortAgents(list, "cache", remaining)),
-    ["w1:p1", "w2:p3", "w1:p2", "w2:p1", "w2:p2", "w1:p3", "w3:p1"])
+    ["w2:p3", "w1:p2", "w1:p1", "w2:p1", "w2:p2", "w1:p3", "w3:p1"])
+})
+
+test("cache keeps every live timer ahead of a cold one, however little is left", () => {
+  const list = [a("w1:p1", "blocked"), a("w1:p2", "idle"), a("w1:p3", "idle")]
+  const remaining = { "w1:p1": -3600, "w1:p2": 3599, "w1:p3": 1 }
+  assert.deepEqual(ids(Sort.sortAgents(list, "cache", remaining)), ["w1:p3", "w1:p2", "w1:p1"])
 })
 
 test("cache breaks equal timers by attention, then recency, then herdr order", () => {

@@ -27,9 +27,9 @@ lives beside the Omarchy bar, and needs no daemon.
   to the front, on whichever workspace it is.
 - **Attention.** When an agent becomes blocked or finishes, its Card pulses in
   your theme's colours until you look at it.
-- **The same order as herdr.** Sort modes `spaces`, `priority` and `cache`
-  match herdr's own agent panel and the cache-ttl plugin. Tap the header to
-  cycle.
+- **Sorting that fits the job.** `spaces` and `priority` match herdr's own
+  agent panel; `cache` puts the prompt cache closest to expiring on top. Tap
+  the header to cycle.
 - **Workspace List.** herdr's workspaces, tabs and panes as a tree that
   expands in place, plain shells included, so any pane is a tap away. Agent
   Lists quietly highlight the agents in herdr's focused workspace.

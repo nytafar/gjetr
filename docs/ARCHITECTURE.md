@@ -120,7 +120,7 @@ come from `CardPolicy`), or what a tap does.
 |---|---|---|
 | `HerdrModel.js` | Request lines (focus of a pane, tab or workspace), reply and stream parsing, snapshot to Agents (with herdr's order, `state_change_seq`, session id) and to the workspace tree (every pane, herdr's rolled-up statuses, focused ids), whether an event would change what is drawn, reconnect and debounce timing | Sockets, timers |
 | `WorkspaceTreeModel.js` | Tree to Workspace List rows (rolled-up status and Attention, counts, kinds, names), expansion state per Module and its pruning, what a tap on a row does in `expand` and `focus` mode | Drawing, Focus |
-| `SortPolicy.js` | `spaces`, `priority`, `cache`, matching herdr and cache-ttl | Cache timer arithmetic |
+| `SortPolicy.js` | `spaces` and `priority` matching herdr's agent panel; `cache` soonest-expiring first | Cache timer arithmetic |
 | `NamePolicy.js` | Agent name fallback and the workspace › tab Field | |
 | `CacheTimerModel.js` | `timers.json` and plugin thresholds to a Cache timer, level and label | File watching |
 | `CardPolicy.js` | Presets and Fields, status and cache tones, touch sizes, kind icons | Colours themselves |

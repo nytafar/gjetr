@@ -39,6 +39,10 @@ All notable changes to gjetr. The format follows
 
 ### Changed
 
+- The `cache` Sort mode is soonest-expiring first: live Cache timers by time
+  left, shortest first, then expired (`cold`) ones, then Agents without a
+  timer; ties by state (blocked, done, working, idle, unknown), then recency.
+  It deliberately no longer follows the cache-ttl plugin's warmest-first view.
 - gjetr also subscribes to herdr's `workspace.focused` and `tab.focused`, to
   follow the Focused workspace. They collapse unless the focus really moves.
 - Deck tab badges count on Layouts with a Workspace List too.

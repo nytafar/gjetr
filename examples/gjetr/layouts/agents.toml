@@ -13,11 +13,12 @@ type = "agent-list"
 # Share of the width (landscape) or height (portrait) beside other Modules.
 # weight = 1
 
-# Default Sort mode, matching herdr's own agent panel: "spaces" (herdr's
-# workspace, tab and pane order), "priority" (herdr's attention queue: blocked,
-# done, working, idle, most recent change first) or "cache" (the cache-ttl
-# plugin's order: warmest Cache timer first, cold ones after). Tapping the
-# list header cycles it as an Override, which is kept until reset.
+# Default Sort mode: "spaces" (herdr's workspace, tab and pane order) or
+# "priority" (herdr's attention queue: blocked, done, working, idle, most
+# recent change first), both as in herdr's own agent panel; or "cache"
+# (soonest-expiring Cache timer first, then cold ones, then Agents without a
+# timer). Tapping the list header cycles it as an Override, which is kept
+# until reset.
 sort = "spaces"
 
 # Card preset: "detailed" (status, kind, name, workspace › tab, Cache timer)

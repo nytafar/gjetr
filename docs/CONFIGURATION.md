@@ -130,16 +130,19 @@ recap_open = "card"
 
 #### Sort modes
 
-Each Sort mode shows the same order as herdr's own agent panel:
+`spaces` and `priority` show the same order as herdr's own agent panel;
+`cache` is gjetr's own:
 
 - `spaces`: herdr's workspace, tab and pane order.
 - `priority`: herdr's attention queue. Blocked first, then done (finished and
   not yet seen), working, idle, unknown. Within each, the most recent status
   change comes first.
-- `cache`: the [cache-ttl](https://github.com/nytafar/herdr-cache-ttl)
-  plugin's order, warmest first: most time left, expired (`cold`) timers after
-  every live one, Agents without a timer last. Ties go to attention, then
-  recency.
+- `cache`: soonest-expiring first, so the prompt cache about to go cold is on
+  top. Live [cache-ttl](https://github.com/nytafar/herdr-cache-ttl) timers by
+  time left, shortest first, then expired (`cold`) timers, then Agents without
+  a timer. Ties go to state (blocked, done, working, idle, unknown), then the
+  most recent status change. This is the reverse of the cache-ttl plugin's own
+  warmest-first view, on purpose.
 
 #### Focus behaviour
 
