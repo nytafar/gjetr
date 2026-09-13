@@ -118,13 +118,13 @@ test("sockets must be absolute, short enough for a unix socket and free of NUL",
   assert.equal(Config.readMain('socket = "/run/\\u0000h.sock"', HOME).errors.length, 1)
 })
 
-test("background accepts black, theme, transparent and hex colours", () => {
-  for (const value of ["black", "theme", "transparent", "#000", "#101315", "#80101315"]) {
+test("background accepts black, theme, wallpaper, transparent and hex colours", () => {
+  for (const value of ["black", "theme", "wallpaper", "transparent", "#000", "#101315", "#80101315"]) {
     const read = Config.readMain(`[[display]]\nname = "DP-1"\nbackground = "${value}"\n`, HOME)
     assert.deepEqual(Array.from(read.errors), [], value)
     assert.equal(read.config.displays[0].background, value)
   }
-  for (const value of ["#12", "#gggggg", "wallpaper", "rgb(0,0,0)"]) {
+  for (const value of ["#12", "#gggggg", "image", "rgb(0,0,0)"]) {
     const read = Config.readMain(`[[display]]\nname = "DP-1"\nbackground = "${value}"\n`, HOME)
     assert.equal(read.errors.length, 1, value)
   }

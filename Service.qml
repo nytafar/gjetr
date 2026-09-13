@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 import qs.Commons
 import "lib/LayoutPolicy.js" as LayoutPolicy
 import "lib/HerdrModel.js" as HerdrModel
@@ -13,6 +14,7 @@ import "lib/OverrideModel.js" as OverrideModel
 import "lib/WindowPolicy.js" as WindowPolicy
 import "lib/CommandPolicy.js" as CommandPolicy
 import "lib/AttentionModel.js" as AttentionModel
+import "lib/DeckPolicy.js" as DeckPolicy
 
 // Owns Display selection, the herdr connection and everything that must
 // outlive a surface. The surface itself is created per matching screen and
@@ -38,15 +40,39 @@ Item {
   property var layoutTexts: ({})
   readonly property var mainRead: ConfigModel.readMain(mainText, home)
   readonly property var config: mainRead.config
-  // One Display for now; T09 builds Decks across Displays.
+  // One Display for now: the first [[display]].
   readonly property var display: config.displays[0]
   readonly property var deckNames: ConfigModel.deckLayoutNames(config)
-  readonly property var activeLayoutRead: ConfigModel.readLayout(display.deck[0], layoutTexts[display.deck[0]])
-  readonly property var activeLayout: activeLayoutRead.layout
+  readonly property var layoutsByName: readLayouts(display.deck, layoutTexts)
+
+  // The Deck: the Layouts this Display can show now, and the active one. A
+  // fixed Display skips Layouts built for the other orientation; the active
+  // Layout is an Override per Display, defaulting to the Deck's first.
+  readonly property string surfaceOrientation: activeSurface
+    ? DeckPolicy.orientationOf(activeSurface.width, activeSurface.height) : ""
+  readonly property var deckRead: DeckPolicy.availableLayouts(
+    display.deck.map(function(name) { return layoutsByName[name] }), display.rotatable, surfaceOrientation)
+  readonly property var deckLayouts: deckRead.names
+  readonly property string activeLayoutName: DeckPolicy.activeName(deckLayouts,
+    OverrideModel.displayLayout(overrides, display.name, ""))
+  readonly property int activeLayoutIndex: deckLayouts.indexOf(activeLayoutName)
+  readonly property var activeLayout: layoutsByName[activeLayoutName] || ConfigModel.defaultLayout(activeLayoutName)
+  readonly property string activeOrientation: activeLayout.orientation
+  readonly property bool tabsVisible: DeckPolicy.tabsVisible(deckLayouts)
+  readonly property var tabBadges: DeckPolicy.badges(deckLayouts, layoutsByName, activeLayoutName, attentionCount)
+  // A swipe must travel this far, mostly sideways, to change Layout.
+  readonly property int swipeThreshold: 80
+
+  // Runtime rotation of a rotatable Display (never monitors.lua).
+  property int rotationSequence: 0
+  property var rotation: ({ requests: 0, transform: -1, error: "" })
   readonly property var agentListConfig: ConfigModel.agentList(activeLayout)
   readonly property var configErrors: collectConfigErrors(mainRead, layoutTexts, deckNames)
-  readonly property string configSummary: "display " + display.name + ", deck [" + display.deck.join(", ") + "], layout "
-    + activeLayout.name + " " + activeLayout.orientation
+  readonly property string configSummary: "display " + display.name + (display.rotatable ? " rotatable" : "")
+    + ", deck [" + deckLayouts.join(", ") + "]"
+    + (deckRead.skipped.length > 0 ? " skipping [" + deckRead.skipped.join(", ") + "]" : "")
+    + (deckRead.fallback ? " (no Layout fits " + surfaceOrientation + ", showing all)" : "")
+    + ", layout " + activeLayout.name + " " + activeLayout.orientation
 
   // Overrides, from ~/.local/state/gjetr/state.json. This service is the file's
   // only writer; writeOverrides is the only place it changes.
@@ -58,8 +84,10 @@ Item {
 
   // The Display this service draws on.
   readonly property string displayName: display.name
+  // "wallpaper" and "transparent" leave the Bottom-layer surface clear, so
+  // omarchy-background shows through.
   readonly property color background: display.background === "theme" ? Color.background
-    : display.background === "transparent" ? "transparent"
+    : display.background === "transparent" || display.background === "wallpaper" ? "transparent"
     : display.background === "black" ? "black" : display.background
   readonly property string herdrSocketPath: config.socket
 
@@ -137,6 +165,63 @@ Item {
       errors = errors.concat(ConfigModel.readLayout(names[i], texts[names[i]]).errors)
     }
     return errors
+  }
+
+  // A Layout whose file has not answered yet counts as `any`, so it is not
+  // skipped (and logged as skipped) while it loads.
+  function readLayouts(names, texts) {
+    var out = {}
+    for (var i = 0; i < names.length; i++) {
+      var layout = ConfigModel.readLayout(names[i], texts[names[i]]).layout
+      if (texts[names[i]] === undefined) layout.orientation = "any"
+      out[names[i]] = layout
+    }
+    return out
+  }
+
+  function selectLayout(name) {
+    var value = String(name || "")
+    if (deckLayouts.indexOf(value) < 0) return false
+    // The default is the first Layout this Display can show, so choosing it
+    // removes the Override.
+    writeOverrides(OverrideModel.setDisplayLayout(overrides, display.name, value, deckLayouts[0]))
+    return true
+  }
+
+  // dx, dy: the gesture's travel in surface pixels.
+  function swipeLayout(dx, dy) {
+    var index = DeckPolicy.swipeTarget(activeLayoutIndex, deckLayouts.length, dx, dy, swipeThreshold)
+    if (index === activeLayoutIndex || index < 0) return false
+    return selectLayout(deckLayouts[index])
+  }
+
+  // Turns a rotatable Display to the active Layout's orientation. Reads the
+  // output first so position and scale are written back unchanged.
+  function applyOrientation() {
+    if (!display.rotatable || !overridesLoaded || displayScreens.length === 0) return
+    if (activeOrientation !== "portrait" && activeOrientation !== "landscape") return
+    var sequence = ++rotationSequence
+    var output = display.name
+    var orientation = activeOrientation
+    var layoutName = activeLayoutName
+    commands.run(CommandPolicy.MONITORS, function(text, code) {
+      if (sequence !== rotationSequence) return
+      var monitor = code === 0 ? DeckPolicy.parseMonitor(text, output) : null
+      if (!monitor) {
+        rotation = { requests: rotation.requests, transform: -1, error: "output " + output + " not in hyprctl monitors" }
+        return
+      }
+      var transform = DeckPolicy.transformFor(orientation, monitor)
+      if (transform < 0) return
+      var argv = CommandPolicy.rotateOutput(output, transform, monitor.x, monitor.y, monitor.scale)
+      rotation = { requests: rotation.requests + 1, transform: transform, error: "" }
+      log("rotate " + output + " to transform " + transform + " for " + layoutName + " (" + orientation + ")")
+      commands.run(argv, function(result, exitCode) {
+        if (exitCode !== 0 || String(result).trim() !== "ok")
+          rotation = { requests: rotation.requests, transform: transform,
+            error: "hyprctl eval failed (" + exitCode + "): " + String(result).trim().slice(0, 120) }
+      })
+    })
   }
 
   function setLayoutText(name, text) {
@@ -341,6 +426,19 @@ Item {
       windowFocus: windowFocus,
       commands: { started: commands.started, refused: commands.refused, lastError: commands.lastError },
       config: { dir: configDir, summary: configSummary, errors: configErrors },
+      deck: {
+        layouts: deckLayouts,
+        skipped: deckRead.skipped,
+        fallback: deckRead.fallback,
+        active: activeLayoutName,
+        orientation: activeOrientation,
+        surfaceOrientation: surfaceOrientation,
+        rotatable: display.rotatable,
+        tabs: tabsVisible,
+        tabEdge: surface ? surface.tabEdge : "",
+        badges: tabBadges,
+        rotation: rotation
+      },
       overrides: { key: agentListKey, sortOverridden: sortOverridden, loaded: overridesLoaded,
         error: overridesError, modules: overrides.modules },
       focus: { requests: herdr.focuses, lastError: herdr.lastFocusError },
@@ -419,6 +517,31 @@ Item {
   }
 
   onAgentsChanged: applyAgents()
+  onActiveLayoutNameChanged: orientationTimer.restart()
+  onActiveOrientationChanged: orientationTimer.restart()
+  onOverridesLoadedChanged: orientationTimer.restart()
+
+  // Coalesces Layout, Config and hotplug changes into one rotation.
+  Timer {
+    id: orientationTimer
+    interval: 150
+    onTriggered: root.applyOrientation()
+  }
+
+  // `hyprctl reload` re-reads monitors.lua and drops the runtime rule, so the
+  // Layout's orientation is applied again once the reload has settled.
+  Connections {
+    target: Hyprland
+    function onRawEvent(event) {
+      if (event && event.name === "configreloaded") reloadTimer.restart()
+    }
+  }
+
+  Timer {
+    id: reloadTimer
+    interval: 500
+    onTriggered: root.applyOrientation()
+  }
   onSortModeChanged: resort()
   onCacheTimersChanged: resort()
 
@@ -458,8 +581,10 @@ Item {
     herdr.stop()
     log("service down")
   }
-  onDisplayScreensChanged: log("display " + displayName
-    + (displayScreens.length > 0 ? " present" : " absent"))
+  onDisplayScreensChanged: {
+    log("display " + displayName + (displayScreens.length > 0 ? " present" : " absent"))
+    if (displayScreens.length > 0) orientationTimer.restart()
+  }
 
   IpcHandler {
     target: "nytafar.gjetr"
@@ -486,6 +611,21 @@ Item {
 
     function toggleFocus(): string {
       return root.toggleFocusMode()
+    }
+
+    function selectLayout(name: string): string {
+      return root.selectLayout(name) ? root.activeLayoutName : "unknown layout"
+    }
+
+    // The same step a swipe towards the left (next) or right (previous) takes.
+    function nextLayout(): string {
+      root.swipeLayout(-root.swipeThreshold * 2, 0)
+      return root.activeLayoutName
+    }
+
+    function previousLayout(): string {
+      root.swipeLayout(root.swipeThreshold * 2, 0)
+      return root.activeLayoutName
     }
 
     // Testing aid: read Config from another directory until the shell

@@ -1,7 +1,8 @@
 # A Layout: the Modules on a Display and the orientation they are built for.
 # The file name (agents) is the name a Deck uses.
 
-# "portrait", "landscape" or "any".
+# "portrait", "landscape" or "any". On a rotatable Display, selecting this
+# Layout turns the output to match; "any" leaves the output as it is.
 orientation = "portrait"
 
 [[module]]

@@ -3,6 +3,8 @@ import Quickshell
 import Quickshell.Wayland
 import qs.Commons
 import "lib/LayoutPolicy.js" as LayoutPolicy
+import "lib/DeckPolicy.js" as DeckPolicy
+import "lib/CardPolicy.js" as CardPolicy
 import "modules/AgentList"
 
 // The full-output surface on one Display. Renders only: every value comes from
@@ -16,7 +18,13 @@ PanelWindow {
   property var service: null
 
   readonly property var inset: service ? service.barInset : ({ top: 0, right: 0, bottom: 0, left: 0 })
-  readonly property var contentRect: LayoutPolicy.contentRect(width, height, inset)
+  readonly property bool tabsShown: !!service && service.tabsVisible
+  readonly property string tabEdge: DeckPolicy.tabEdge(service ? service.barPosition : "", service ? service.barHidden : false,
+    width, height)
+  readonly property int tabThickness: CardPolicy.MIN_TOUCH_PX
+  readonly property var tabRect: DeckPolicy.tabRect(width, height, inset, tabEdge, tabThickness)
+  readonly property var contentRect: LayoutPolicy.contentRect(width, height,
+    DeckPolicy.withTabs(inset, tabEdge, tabThickness, tabsShown))
 
   // Modules are placed into the content area, which never sits under the bar.
   default property alias content: contentArea.data
@@ -32,6 +40,19 @@ PanelWindow {
   Component.onCompleted: if (service) service.registerSurface(root)
   Component.onDestruction: if (service) service.unregisterSurface(root)
 
+  DeckTabs {
+    visible: root.tabsShown
+    x: root.tabRect.x
+    y: root.tabRect.y
+    width: root.tabRect.width
+    height: root.tabRect.height
+    edge: root.tabEdge
+    names: root.service ? root.service.deckLayouts : []
+    active: root.service ? root.service.activeLayoutName : ""
+    badges: root.service ? root.service.tabBadges : []
+    onSelected: function(name) { if (root.service) root.service.selectLayout(name) }
+  }
+
   Item {
     id: contentArea
     x: root.contentRect.x
@@ -45,6 +66,31 @@ PanelWindow {
       service: root.service
       onHeaderTapped: if (root.service) root.service.cycleSortMode()
       onFocusToggled: if (root.service) root.service.toggleFocusMode()
+    }
+
+    // Swipe between Layouts. Sits above the Module but only takes a passive
+    // grab on press, so taps and vertical list scrolls still reach it; it
+    // takes over once a drag passes the threshold sideways.
+    Item {
+      anchors.fill: parent
+      z: 10
+      enabled: root.tabsShown
+
+      DragHandler {
+        id: swipe
+        target: null
+        yAxis.enabled: false
+        property point start: Qt.point(0, 0)
+
+        onActiveChanged: {
+          if (active) {
+            start = centroid.scenePressPosition
+            return
+          }
+          var end = centroid.scenePosition
+          if (root.service) root.service.swipeLayout(end.x - start.x, end.y - start.y)
+        }
+      }
     }
   }
 }

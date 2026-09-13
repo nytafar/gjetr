@@ -13,12 +13,19 @@
 # The output to draw on, as `hyprctl monitors` names it.
 name = "HDMI-A-2"
 
-# Layouts to tab through, in order. Each is layouts/<name>.toml.
+# The Deck: Layouts to tab through, in order. Each is layouts/<name>.toml.
+# With more than one, tabs appear on a short edge (opposite the bar) and a
+# sideways swipe moves between them. The chosen Layout is kept as an Override.
 deck = ["agents"]
 
-# May gjetr rotate this output to match a Layout's orientation?
+# May gjetr rotate this output to match the active Layout's orientation?
+# It rotates at runtime with hyprctl and never edits monitors.lua; the next
+# `hyprctl reload` resets the output and gjetr applies the rotation again.
+# When false, Layouts built for the other orientation are skipped (all are
+# kept if none fits).
 rotatable = false
 
-# "black", "theme" (the Omarchy theme background), "transparent", or a
-# "#rrggbb" / "#aarrggbb" colour.
+# "black", "theme" (the Omarchy theme background), "wallpaper" (the Omarchy
+# wallpaper shows through), "transparent" (same as wallpaper), or a colour:
+# "#rrggbb", or "#aarrggbb" to tint the wallpaper, e.g. "#c0000000".
 background = "black"

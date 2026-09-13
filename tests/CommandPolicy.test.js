@@ -36,3 +36,28 @@ test("allowed refuses anything else", () => {
     assert.equal(Command.allowed(argv), false, JSON.stringify(argv))
   }
 })
+
+test("rotateOutput writes every field of the runtime monitor rule", () => {
+  const argv = Command.rotateOutput("HDMI-A-2", 1, 1920, 0, 1)
+  assert.deepEqual(Array.from(argv), ["hyprctl", "eval",
+    'hl.monitor({ output = "HDMI-A-2", mode = "preferred", position = "1920x0", scale = 1, transform = 1 })'])
+  assert.equal(Command.allowed(argv), true)
+  assert.equal(Command.allowed(Command.rotateOutput("DP-1", 0, -1920, 1080, 1.333333)), true)
+  assert.equal(Command.allowed(Array.from(Command.MONITORS)), true)
+})
+
+test("rotateOutput refuses values outside the allowlist", () => {
+  for (const args of [
+    ['HDMI-A-2", disabled = true, x = "', 1, 0, 0, 1],
+    ["HDMI-A-2", 8, 0, 0, 1],
+    ["HDMI-A-2", 1.5, 0, 0, 1],
+    ["HDMI-A-2", "1", 0, 0, 1],
+    ["HDMI-A-2", 1, 0.5, 0, 1],
+    ["HDMI-A-2", 1, 0, 0, 0],
+    ["HDMI-A-2", 1, 0, 0, NaN],
+    ["", 1, 0, 0, 1]
+  ]) {
+    assert.deepEqual(Array.from(Command.rotateOutput(...args)), [], JSON.stringify(args))
+  }
+  assert.equal(Command.allowed(["hyprctl", "eval", 'hl.monitor({ output = "HDMI-A-2", disabled = true })']), false)
+})
