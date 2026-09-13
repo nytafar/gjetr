@@ -20,6 +20,8 @@ Item {
   // Whether the status word shows beside the glyph (not in the compact preset).
   property bool showStatusWord: true
   property color cacheColor: Color.muted
+  // The draining bar under a live Cache timer (CardPolicy.cacheBarTone).
+  property color cacheBarColor: Color.muted
   // The Agent is in herdr's Focused workspace (highlight_workspace).
   property bool inFocusedWorkspace: false
   // "blocked" or "done" while the Agent is in Attention, else "".
@@ -219,6 +221,23 @@ Item {
       font.pixelSize: Math.round(Style.font.title * root.textScale)
       font.bold: root.cacheTimer !== null && root.cacheTimer.level === "critical"
       font.features: { "tnum": 1 }
+    }
+
+    // Time left of the ttl, draining; not drawn once the cache is cold.
+    Rectangle {
+      anchors.right: parent.right
+      visible: root.fields.cache && root.cacheTimer !== null && root.cacheTimer.level !== "cold"
+      width: 40
+      height: 3
+      radius: 1.5
+      color: Util.alpha(Color.foreground, 0.12)
+
+      Rectangle {
+        anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
+        width: root.cacheTimer ? Math.round(parent.width * root.cacheTimer.fraction) : 0
+        radius: parent.radius
+        color: root.cacheBarColor
+      }
     }
 
     // The status word, beside the glyph's colour; dropped by the compact preset.

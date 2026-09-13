@@ -2,11 +2,13 @@ import QtQuick
 import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
 import "../../lib/StatusPolicy.js" as StatusPolicy
+import "../../lib/RepoModel.js" as RepoModel
 
 // One Agent as a compact row, for a pointer Display or a narrow column
 // (DensityPolicy): no box, one line of status glyph, small kind mark, name and
 // Cache timer, and a dim second line (the inline Recap clamped to one line, or
-// workspace › tab when there is room). Clicking the row focuses the Agent;
+// the Repo and workspace › tab when the preset shows location and there is
+// room). Clicking the row focuses the Agent;
 // clicking the Recap line, or the disclosure mark with recap = "expand",
 // opens the full Recap under the row. Same inputs as AgentCard.
 Item {
@@ -217,7 +219,8 @@ Item {
     height: root.t.secondLineHeight
     verticalAlignment: Text.AlignVCenter
     text: root.secondLine === "recap" ? root.recapText
-      : root.secondLine === "location" && root.service && root.agent ? root.service.agentLocation(root.agent) : ""
+      : root.secondLine === "location" && root.service && root.agent
+        ? RepoModel.withLocation(root.service.agentRepo(root.agent, root.service.repos).text, root.service.agentLocation(root.agent)) : ""
     textFormat: Text.PlainText
     color: Color.muted
     opacity: root.recapShown ? 0.5 : 0.85

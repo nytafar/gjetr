@@ -89,3 +89,10 @@ test("info for an Agent follows its cwd; answers compare by what they show", () 
   assert.equal(Repo.sameInfo(null, null), true)
   assert.equal(Repo.sameInfo(main, null), false)
 })
+
+test("a compact location line joins the Repo and workspace \u203a tab", () => {
+  assert.equal(Repo.withLocation("gjetr " + Repo.BRANCH_MARK + " main", "code \u203a 1"), "gjetr " + Repo.BRANCH_MARK + " main \u00b7 code \u203a 1")
+  assert.equal(Repo.withLocation("", "code \u203a 1"), "code \u203a 1")
+  assert.equal(Repo.withLocation("~/notes", ""), "~/notes")
+  assert.equal(Repo.withLocation(null, undefined), "")
+})

@@ -305,6 +305,7 @@ Item {
             statusColor: root.toneColor(cell.indicator.tone)
             showStatusWord: StatusPolicy.showsLabel(root.preset)
             cacheColor: root.toneColor(CardPolicy.cacheTone(cell.cacheTimer ? cell.cacheTimer.level : ""))
+            cacheBarColor: root.toneColor(CardPolicy.cacheBarTone(cell.cacheTimer ? cell.cacheTimer.level : ""))
             attention: cell.attention
             inFocusedWorkspace: cell.inFocusedWorkspace
             recapMode: root.recapMode

@@ -256,12 +256,15 @@ How big things are is set per Module with `density`. It is separate from
 The densities:
 
 - **Comfortable**, on a touch surface: boxed Cards sized for a finger, with a
-  large kind mark and type scaled up for reading from a distance.
+  large kind mark and type scaled up for reading from a distance. A live Cache
+  timer has a thin bar under it that drains as the cache ages, in its level's
+  colour.
 - **Compact**, on a Dock (a mouse), and on a touch surface in a column
   narrower than 360 pixels: no boxes, one tight row per Agent with the status
   glyph, a small kind mark, the name and the Cache timer, and the theme's own
   type sizes. Under it a dim second line shows the Recap clamped to one line
-  (with `recap = "inline"`), else workspace › tab when the preset shows it and
+  (with `recap = "inline"`), else the repository and branch (or short path)
+  and workspace › tab, as `gjetr  main · code › 1`, when the preset shows it and
   20 two-line rows fit. The status word is left out. Clicking the row focuses
   the Agent; clicking the Recap line, or the `▸` mark with `recap = "expand"`,
   opens the whole Recap under the row. The focused Agent has a thin accent bar,

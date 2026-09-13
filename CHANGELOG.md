@@ -8,6 +8,10 @@ All notable changes to gjetr. The format follows
 
 ### Added
 
+- Comfortable Cards draw a thin bar under a live Cache timer that drains as
+  the cache ages, in its level's colour (green, accent, urgent); their size
+  and touch targets are unchanged. A compact row's location line shows the
+  repository and branch before workspace › tab.
 - `density` per Module: `"auto"` (the default, chosen from size and input as
   before), `"compact"` or `"full"`. Full Agent List Cards are sized to be read
   leaning back from a 4K Dock: an 18 px name, the status glyph with its word,
