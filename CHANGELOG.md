@@ -9,7 +9,8 @@ All notable changes to gjetr. The format follows
 ### Added
 
 - Docks: `kind = "dock"` on a `[[display]]` puts gjetr along one `edge` of an
-  output (`left`, `right`, `top`, `bottom`; a Dock without one is skipped),
+  output (`left`, the default, `right`, `top` or `bottom`; any other value
+  skips the Dock),
   `size` logical pixels deep (default 360, at most half the output), with its
   own Deck. It sits on the Top layer, reserves its strip so windows tile
   beside it on every workspace, never takes keyboard focus, and survives

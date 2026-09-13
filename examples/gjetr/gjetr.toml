@@ -50,7 +50,7 @@ background = "black"
 # [[display]]
 # kind = "dock"             # "surface" (default, the whole output) or "dock"
 # name = "DP-1"             # the output; one Display per output
-# edge = "right"            # required: "left", "right", "top" or "bottom"
+# edge = "left"             # "left" (default), "right", "top" or "bottom"
 # size = 360                # logical px: width of a left/right Dock, height of
 #                           # a top/bottom one; 120 to 2000, at most half the output
 # visible = true            # shown at start; toggleDock keeps its choice as an Override

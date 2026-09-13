@@ -423,8 +423,16 @@ test("a dock's size defaults to 360 and clamps out of range with an error", () =
   assert.match(junk.errors.join("\n"), /display\[0\]\.visible: expected true or false/)
 })
 
-test("a dock without a valid edge is skipped with an error", () => {
-  for (const edge of ['', 'edge = "middle"\n', 'edge = 3\n']) {
+test("a dock without an edge docks left", () => {
+  const read = Config.readMain('[[display]]\nname = "HDMI-A-2"\n\n[[display]]\nkind = "dock"\nname = "DP-1"\n', HOME)
+  assert.deepEqual(Array.from(read.errors), [])
+  assert.equal(read.config.displays[1].kind, "dock")
+  assert.equal(read.config.displays[1].edge, "left")
+  assert.equal(read.config.displays[1].size, 360)
+})
+
+test("a dock with an invalid edge is skipped with an error", () => {
+  for (const edge of ['edge = ""\n', 'edge = "middle"\n', 'edge = 3\n']) {
     const read = Config.readMain('[[display]]\nname = "HDMI-A-2"\n\n[[display]]\nkind = "dock"\nname = "DP-1"\n' + edge, HOME)
     assert.deepEqual(read.config.displays.map((d) => d.name), ["HDMI-A-2"], edge)
     assert.match(read.errors.join("\n"), /display\[1\]\.edge: a dock needs one of left, right, top, bottom, got .*; display skipped/, edge)

@@ -20,6 +20,7 @@ test("a dock's orientation comes from its edge", () => {
 })
 
 test("isEdge accepts only the four edges", () => {
+  assert.equal(Dock.DEFAULT_EDGE, "left")
   for (const edge of ["left", "right", "top", "bottom"]) assert.equal(Dock.isEdge(edge), true, edge)
   for (const edge of ["", "Left", "center", null, 3]) assert.equal(Dock.isEdge(edge), false, String(edge))
 })

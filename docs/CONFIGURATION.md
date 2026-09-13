@@ -80,7 +80,7 @@ touchscreen.
 |---|---|---|---|
 | `kind` | string | | `"dock"` |
 | `name` | string | | The output, e.g. `"DP-1"` |
-| `edge` | string | required | `"left"`, `"right"`, `"top"` or `"bottom"`. A Dock without a valid edge is skipped, with a logged error |
+| `edge` | string | `"left"` | `"left"`, `"right"`, `"top"` or `"bottom"`. Any other value skips the Dock, with a logged error |
 | `size` | whole number, 120 to 2000 | `360` | Logical pixels: the width of a left or right Dock, the height of a top or bottom one. Out of range clamps, with a logged error. A Dock never takes more than half of its output |
 | `visible` | boolean | `true` | Shown when gjetr starts. `toggleDock` keeps its choice as an Override |
 | `deck`, `background`, `refresh_seconds` | | | As for any Display |
@@ -97,10 +97,12 @@ deck = ["wide", "usage"]
 [[display]]
 kind = "dock"
 name = "DP-1"
-edge = "right"
 size = 360
 deck = ["dock"]
 ```
+
+Without `edge` the Dock goes on the left; add `edge = "right"` (or `top`,
+`bottom`) to move it.
 
 with `layouts/dock.toml`, Agents over usage:
 
