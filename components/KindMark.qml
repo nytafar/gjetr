@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Effects
 import qs.Commons
 import "../lib/IndicatorPolicy.js" as IndicatorPolicy
+import "../lib/MotionPolicy.js" as MotionPolicy
 
 // An agent kind's mark: its SVG where it has one, else the kind's letter in a
 // thin frame. Plain, a brand-colour SVG (Omarchy's) draws as itself; a
@@ -19,10 +20,11 @@ import "../lib/IndicatorPolicy.js" as IndicatorPolicy
 // both. A tinted mark is the same mask over a still `plainColor` fill. A plain
 // brand-colour or letter mark has no layer or effect at all.
 //
-// One phase animation drives every motion. It runs only while the mark is
-// stateful, has a motion, is visible and `animate` (on screen, its window
-// shown), and resets when it stops; IndicatorPolicy.frame is neutral without a
-// motion, so no colour or glow is left behind when the status changes.
+// One phase drives every motion, read from the service's MotionClock (`clock`,
+// 20 frames a second). It moves only while the mark is stateful, has a motion,
+// is visible and `animate` (on screen, its window shown), and is 0 otherwise;
+// IndicatorPolicy.frame is neutral without a motion, so no colour or glow is
+// left behind when the status changes.
 Item {
   id: root
 
@@ -42,10 +44,12 @@ Item {
   // Theme colours for the hue effect, in order.
   property var palette: []
   property bool animate: true
+  // The service's MotionClock.
+  property var clock: null
 
   readonly property string motion: stateful && mark ? mark.motion : ""
   readonly property bool moving: motion !== "" && animate && visible && width > 0
-  property real phase: 0
+  readonly property real phase: moving && mark ? MotionPolicy.phase(phaseMotion.ms, mark.period) : 0
   readonly property var f: IndicatorPolicy.frame(moving ? motion : "", phase)
   readonly property color highlight: Qt.lighter(toneColor, IndicatorPolicy.SWEEP_HIGHLIGHT)
   readonly property color fillColor: {
@@ -64,17 +68,11 @@ Item {
   // carry this margin instead.
   readonly property int glowPad: Math.max(3, Math.round(Math.min(width, height) * 0.4))
 
-  NumberAnimation on phase {
-    id: phaseAnimation
+  Motion {
+    id: phaseMotion
+    clock: root.clock
     running: root.moving
-    from: 0
-    to: 1
-    duration: Math.max(1, root.mark ? root.mark.period : 1)
-    loops: Animation.Infinite
-    onRunningChanged: if (!running) root.phase = 0
   }
-
-  onMotionChanged: if (phaseAnimation.running) phaseAnimation.restart()
 
   Image {
     id: probe

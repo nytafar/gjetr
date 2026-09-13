@@ -3,6 +3,7 @@ import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
 import "../../lib/StatusPolicy.js" as StatusPolicy
 import "../../lib/IndicatorPolicy.js" as IndicatorPolicy
+import "../../lib/MotionPolicy.js" as MotionPolicy
 import "../../components"
 
 // One Agent as a Card. Shows the Fields its preset selects; colours arrive as
@@ -88,12 +89,12 @@ Item {
     border.width: 3
     border.color: root.attentionColor
 
-    SequentialAnimation on opacity {
+    opacity: pulseMotion.running ? MotionPolicy.pulseOpacity(pulseMotion.ms, 0.2) : 1
+
+    Motion {
+      id: pulseMotion
+      clock: root.service ? root.service.motionClock : null
       running: pulse.visible && root.animate
-      loops: Animation.Infinite
-      onRunningChanged: if (!running) pulse.opacity = 1
-      NumberAnimation { from: 1; to: 0.2; duration: 650; easing.type: Easing.InOutSine }
-      NumberAnimation { from: 0.2; to: 1; duration: 650; easing.type: Easing.InOutSine }
     }
   }
 
@@ -116,13 +117,12 @@ Item {
       font.pixelSize: Math.round(Style.font.title * root.textScale * 1.3)
       font.bold: root.indicator.status === "blocked" || root.indicator.status === "done"
 
-      RotationAnimation on rotation {
+      rotation: spinMotion.running ? MotionPolicy.spinAngle(spinMotion.ms) : 0
+
+      Motion {
+        id: spinMotion
+        clock: root.service ? root.service.motionClock : null
         running: root.indicator.motion === "spin" && root.visible && root.showGlyph && root.animate
-        from: 0
-        to: 360
-        duration: 1800
-        loops: Animation.Infinite
-        onRunningChanged: if (!running) glyph.rotation = 0
       }
     }
   }
@@ -151,6 +151,7 @@ Item {
     toneColor: root.markColor
     palette: root.palette
     animate: root.animate && root.visible
+    clock: root.service ? root.service.motionClock : null
   }
 
   Column {

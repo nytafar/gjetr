@@ -9,6 +9,7 @@ import "../../lib/LayoutPolicy.js" as LayoutPolicy
 import "../../lib/ListSyncPolicy.js" as ListSyncPolicy
 import "../../lib/StatusPolicy.js" as StatusPolicy
 import "../../lib/IndicatorPolicy.js" as IndicatorPolicy
+import "../../lib/MotionPolicy.js" as MotionPolicy
 import "../../components"
 
 // The Workspace List Module: herdr's workspaces, tabs and panes as a tree that
@@ -263,12 +264,12 @@ Item {
           border.width: 2
           border.color: rowItem.attentionColor
 
-          SequentialAnimation on opacity {
+          opacity: pulseMotion.running ? MotionPolicy.pulseOpacity(pulseMotion.ms, 0.2) : 1
+
+          Motion {
+            id: pulseMotion
+            clock: root.service ? root.service.motionClock : null
             running: pulse.visible && rowItem.onScreen
-            loops: Animation.Infinite
-            onRunningChanged: if (!running) pulse.opacity = 1
-            NumberAnimation { from: 1; to: 0.2; duration: 650; easing.type: Easing.InOutSine }
-            NumberAnimation { from: 0.2; to: 1; duration: 650; easing.type: Easing.InOutSine }
           }
         }
 
@@ -290,13 +291,12 @@ Item {
               : Math.round((rowItem.depth === 0 ? Style.font.title : Style.font.body) * root.textScale * 1.2)
             font.bold: rowItem.indicator.status === "blocked" || rowItem.indicator.status === "done"
 
-            RotationAnimation on rotation {
+            rotation: spinMotion.running ? MotionPolicy.spinAngle(spinMotion.ms) : 0
+
+            Motion {
+              id: spinMotion
+              clock: root.service ? root.service.motionClock : null
               running: rowItem.indicator.motion === "spin" && rowItem.visible && statusGlyph.visible && rowItem.onScreen
-              from: 0
-              to: 360
-              duration: 1800
-              loops: Animation.Infinite
-              onRunningChanged: if (!running) glyph.rotation = 0
             }
           }
         }
@@ -318,6 +318,7 @@ Item {
           toneColor: root.toneColor(rowItem.mark.tone)
           palette: root.service ? root.service.indicatorPalette : []
           animate: rowItem.onScreen
+          clock: root.service ? root.service.motionClock : null
         }
 
         Text {

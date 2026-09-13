@@ -22,6 +22,7 @@ import "lib/WorkspaceTreeModel.js" as WorkspaceTreeModel
 import "lib/ThemeModel.js" as ThemeModel
 import "lib/UsageModel.js" as UsageModel
 import "sources"
+import "components"
 
 // Owns the Displays, the herdr connection and everything that must outlive a
 // surface. Each [[display]] gets a DisplayDeck (its Deck, surface, rotation and
@@ -252,6 +253,9 @@ Item {
   property var themePalette: []
   readonly property var indicatorPalette: themePalette.length >= 2 ? themePalette
     : [String(Color.accent), String(successColor), String(Color.urgent)]
+  // The clock every motion on every Display reads (MotionPolicy): it ticks only
+  // while something moves on screen, so all windows redraw in the same frames.
+  readonly property QtObject motionClock: motionClockObject
   readonly property bool lightBackground: (0.2126 * background.r + 0.7152 * background.g + 0.0722 * background.b) > 0.5
 
   // Attention, from status transitions between published Agent lists and from
@@ -881,6 +885,10 @@ Item {
 
   CommandRunner {
     id: commands
+  }
+
+  MotionClock {
+    id: motionClockObject
   }
 
   OmarchyUsageSource {
