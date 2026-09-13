@@ -10,8 +10,10 @@ import "lib/HerdrModel.js" as HerdrModel
 //
 // Flow: open events.subscribe, wait for subscription_started, then take a
 // session.snapshot over a one-shot socket. Agents always come from a snapshot.
-// herdr replays recent history to every new subscriber (finding T01),
-// so events are never folded into state. An event that would change what a
+// herdr 0.8.2 replays recent history to every new subscriber (finding T01)
+// and 0.9.0 starts with live events, asking clients to subscribe before the
+// snapshot; subscribing first covers both, and events are never folded into
+// state. An event that would change what a
 // Module renders only schedules a debounced re-snapshot, and Agents are
 // published only when the new snapshot differs. Any failure drops both
 // sockets and retries on the backoff schedule, keeping last known Agents.

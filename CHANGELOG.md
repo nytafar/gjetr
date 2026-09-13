@@ -25,6 +25,16 @@ All notable changes to gjetr. The format follows
   with `unknown variant` switches off only that feature (`herdr.unsupported`):
   a refused subscription type is dropped and gjetr subscribes again at once
   instead of reconnecting on the backoff.
+- herdr 0.9.0 (protocol 22) is supported beside 0.8.2. Its schema and agent
+  kinds are recorded in `tests/fixtures/herdr-0.9.0/`, and
+  `scripts/gen-herdr-schema.mjs` generates `lib/HerdrSchema.js` (event names,
+  subscription types, methods, request params and the snapshot, agent, pane,
+  tab and workspace fields, per build) from the fixtures; `--capture` records
+  a herdr binary, `--check` fails when the table is stale or the installed
+  herdr differs from its fixture. Node tests hold the herdr model to both
+  schemas. The protocol 20 to 22 changes gjetr meets are the muse agent kind
+  and subscriptions no longer replaying history, which subscribing before the
+  snapshot already covers.
 
 - Comfortable Cards draw a thin bar under a live Cache timer that drains as
   the cache ages, in its level's colour (green, accent, urgent); their size

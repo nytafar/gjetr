@@ -2,19 +2,21 @@
 
 const test = require("node:test")
 const assert = require("node:assert/strict")
+const fs = require("node:fs")
+const path = require("node:path")
 const loadLib = require("./support/loadLib.cjs")
 
 const Kind = loadLib("lib/KindPolicy.js")
 
 // Every agent kind herdr reports in `pane.agent`: `Agent::as_str` in herdr's
-// src/detect/mod.rs, the same list `herdr agent start --help` offers for
-// `--kind`. herdr 0.8.2 (protocol 20):
-const HERDR_0_8_2_KINDS = [
-  "pi", "claude", "codex", "gemini", "cursor", "devin", "agy", "cline", "omp", "mastracode", "opencode",
-  "copilot", "kimi", "kiro", "droid", "amp", "grok", "hermes", "kilo", "qodercli", "qwen", "maki"
-]
-// herdr 0.9.0 (protocol 22) adds muse.
-const HERDR_0_9_0_KINDS = HERDR_0_8_2_KINDS.concat(["muse"])
+// src/detect/mod.rs, the list `herdr agent start --help` offers for `--kind`,
+// captured per build in tests/fixtures/herdr-<version>/agent-kinds.json.
+function fixtureKinds(version) {
+  const file = path.join(__dirname, "fixtures", "herdr-" + version, "agent-kinds.json")
+  return JSON.parse(fs.readFileSync(file, "utf8")).kinds
+}
+const HERDR_0_8_2_KINDS = fixtureKinds("0.8.2")
+const HERDR_0_9_0_KINDS = fixtureKinds("0.9.0")
 
 for (const [version, kinds] of [["0.8.2", HERDR_0_8_2_KINDS], ["0.9.0", HERDR_0_9_0_KINDS]]) {
   test(`every kind herdr ${version} reports has a label and a mark or a letter`, () => {

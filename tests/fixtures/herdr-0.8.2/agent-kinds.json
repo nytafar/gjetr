@@ -1,0 +1,28 @@
+{
+  "herdr": "0.8.2",
+  "source": "herdr agent start --help, --kind possible values",
+  "kinds": [
+    "pi",
+    "claude",
+    "codex",
+    "gemini",
+    "cursor",
+    "devin",
+    "agy",
+    "cline",
+    "omp",
+    "mastracode",
+    "opencode",
+    "copilot",
+    "kimi",
+    "kiro",
+    "droid",
+    "amp",
+    "grok",
+    "hermes",
+    "kilo",
+    "qodercli",
+    "qwen",
+    "maki"
+  ]
+}
