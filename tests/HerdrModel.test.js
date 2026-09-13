@@ -407,7 +407,7 @@ test("backoff doubles from 500 ms and caps at 30 s", () => {
 })
 
 // ---------------------------------------------------------------- reconciliation
-// herdr replays recent history to every new subscriber (docs/findings/T01.md),
+// herdr replays recent history to every new subscriber (finding T01),
 // so events cannot be trusted as state. They only decide when to re-snapshot.
 
 test("eventInvalidates is false for noise and true for renderable changes", () => {

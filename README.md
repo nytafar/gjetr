@@ -184,8 +184,7 @@ omarchy-shell nytafar.gjetr state | jq
 gjetr is a Quickshell service inside the Omarchy shell. It keeps one
 subscription to herdr's socket, uses events only to decide when to take a fresh
 snapshot, and draws a Bottom-layer surface on the configured output. All logic
-is plain JavaScript with node tests; QML only draws. The file-by-file map and
-what each part does not own are in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+is plain JavaScript with node tests; QML only draws.
 
 Every process gjetr starts is checked against a fixed allowlist and run without
 a shell. The only things it changes outside its own state file are a runtime

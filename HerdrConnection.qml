@@ -10,7 +10,7 @@ import "lib/HerdrModel.js" as HerdrModel
 //
 // Flow: open events.subscribe, wait for subscription_started, then take a
 // session.snapshot over a one-shot socket. Agents always come from a snapshot.
-// herdr replays recent history to every new subscriber (docs/findings/T01.md),
+// herdr replays recent history to every new subscriber (finding T01),
 // so events are never folded into state. An event that would change what a
 // Module renders only schedules a debounced re-snapshot, and Agents are
 // published only when the new snapshot differs. Any failure drops both
@@ -19,7 +19,7 @@ import "lib/HerdrModel.js" as HerdrModel
 // Every connection attempt and every request uses a freshly created Socket.
 // Quickshell 0.3.1's Socket reports a failed connect only once per object and
 // ignores later `connected = true`, so a reused Socket never retries
-// (docs/findings/T03.md).
+// (finding T03).
 //
 // The two-socket shape and one-shot EOF handling follow omarchy-herdr's
 // HerdrModel.qml (github.com/carlotran4/omarchy-herdr, MIT, Copyright (c) 2026

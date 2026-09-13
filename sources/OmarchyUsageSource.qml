@@ -5,7 +5,7 @@ import Quickshell.Io
 import "../lib/UsageModel.js" as UsageModel
 import "../lib/CommandPolicy.js" as CommandPolicy
 
-// The Omarchy usage Source (docs/adr/0002-usage-behind-a-source-seam.md). It
+// The Omarchy usage Source (ADR 0002). It
 // finds the records omarchy-agent-usage-update writes, watches each with a
 // FileView, and runs the script itself every refreshSeconds, one run at a
 // time. It publishes providers in UsageModel's provider-neutral shape. It

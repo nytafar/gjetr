@@ -118,7 +118,7 @@ Item {
   // highlight the Agents in it; nothing filters by it.
   readonly property var workspaceTree: herdr.tree
   readonly property string focusedWorkspaceId: workspaceTree ? workspaceTree.focusedWorkspaceId : ""
-  // Usage (docs/adr/0002): providers from Omarchy's usage records, refreshed
+  // Usage (ADR 0002): providers from Omarchy's usage records, refreshed
   // and watched while any Layout of the Deck has a Usage Module.
   readonly property var deckUsageModules: {
     var out = []
