@@ -34,7 +34,8 @@ Item {
   signal recapRequested()
 
   readonly property var t: density || ({ namePx: 12, detailPx: 10, glyphPx: 14, iconPx: 14, iconSourcePx: 28,
-    statusWidth: 16, pad: 6, gap: 4, padY: 2, lineHeight: 17, secondLineHeight: 12 })
+    statusWidth: 16, pad: 8, gap: 6, padY: 5, lineGap: 3, lineHeight: 17, secondLineHeight: 13,
+    rowGap: 1, dividerAlpha: 0.08 })
   readonly property bool recapExpandable: recapMode === "expand" && recapText !== ""
   // The Recap line opens the full Recap in place, as the disclosure does for expand.
   readonly property bool recapInline: secondLine === "recap"
@@ -55,6 +56,16 @@ Item {
       : hover.hovered ? Util.alpha(Color.foreground, 0.06)
       : root.inFocusedWorkspace ? Util.alpha(Color.accent, 0.07)
       : "transparent"
+  }
+
+  // A hairline in the gap under the row separates it from the next.
+  Rectangle {
+    visible: (root.t.dividerAlpha || 0) > 0 && (root.t.rowGap || 0) > 0
+    x: root.t.pad
+    y: root.height
+    width: Math.max(0, root.width - root.t.pad * 2)
+    height: root.t.rowGap || 0
+    color: Util.alpha(Color.foreground, root.t.dividerAlpha || 0)
   }
 
   HoverHandler {
@@ -202,7 +213,7 @@ Item {
     visible: root.secondLine !== ""
     x: nameText.x
     width: Math.max(0, root.width - x - root.t.pad)
-    y: line.y + line.height
+    y: line.y + line.height + root.t.lineGap
     height: root.t.secondLineHeight
     verticalAlignment: Text.AlignVCenter
     text: root.secondLine === "recap" ? root.recapText

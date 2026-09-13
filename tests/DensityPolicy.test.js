@@ -78,13 +78,29 @@ test("icons are rasterised for the device pixel ratio", () => {
   assert.ok(tokens(360, 714, "pointer", 50).iconSourcePx <= tokens(360, 714, "pointer", 1).iconPx * 4)
 })
 
-test("a compact pointer list fits at least 20 two-line rows in a 1080-tall Dock's Agent part", () => {
+test("a compact pointer list fits 14 to 16 two-line rows in a 1080-tall Dock's Agent part", () => {
   // dock.toml: Agent List weight 2 over Usage weight 1, gap 8, 1080 tall.
   const height = Math.floor((1080 - 8) * 2 / 3)
   const t = tokens(360, height, "pointer", 2)
   const pitch = Density.rowHeight(t, true) + t.rowGap
-  assert.ok(Math.floor((height - t.headerHeight - t.gap) / pitch) >= 20, "pitch " + pitch)
+  const rows = Math.floor((height - t.headerHeight - t.gap) / pitch)
+  assert.ok(rows >= 14 && rows <= 16, "pitch " + pitch + ", rows " + rows)
   assert.ok(Density.rowHeight(t, false) < Density.rowHeight(t, true))
+})
+
+test("compact rows breathe: padding, a gap between the lines and a hairline between rows", () => {
+  const t = tokens(360, 714, "pointer", 2)
+  assert.ok(t.padY >= 4, "padY " + t.padY)
+  assert.ok(t.lineGap > 0 && t.lineGap < t.padY)
+  assert.equal(Density.rowHeight(t, true), t.padY * 2 + t.lineHeight + t.lineGap + t.secondLineHeight)
+  assert.equal(Density.rowHeight(t, false), t.padY * 2 + t.lineHeight)
+  assert.ok(t.rowGap >= 1 && t.dividerAlpha > 0 && t.dividerAlpha <= 0.15)
+  assert.ok(t.pad >= 8 && t.gap >= 6)
+  // Compact Usage lines are spaced like the list, a little looser than a name line.
+  assert.ok(t.limitLineHeight > t.lineHeight + 3)
+  const comfy = tokens(1024, 544, "touch", 1)
+  assert.equal(comfy.lineGap, 0)
+  assert.equal(comfy.dividerAlpha, 0)
 })
 
 test("touch rows stay touch targets even when compact", () => {

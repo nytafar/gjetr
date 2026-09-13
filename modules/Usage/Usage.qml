@@ -54,7 +54,7 @@ Item {
   readonly property int bodyPx: density.bodyPx
   readonly property int titlePx: density.titlePx
   // A compact line: code, meter, percent, and the reset time when there is room.
-  readonly property int lineHeight: density.lineHeight + 3
+  readonly property int lineHeight: density.limitLineHeight
   readonly property bool resetShown: width >= 240
 
   // Meter colours: theme tokens only, loudest at the highest share used.

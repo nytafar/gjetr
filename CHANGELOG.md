@@ -14,8 +14,10 @@ All notable changes to gjetr. The format follows
   compact rows without boxes: status glyph, small kind mark, name and Cache
   timer on one line, a dim second line with the Recap clamped to one line or
   workspace › tab when there is room, the theme's own type sizes, hover
-  highlight. A 1080-high Dock shows about 20 Agents instead of 6. Density is
-  separate from `preset`.
+  highlight. Rows keep some padding, a small gap between the name and the
+  second line, a faint hairline between rows and an inset from both edges, so a
+  1080-high Dock shows about 16 Agents instead of 6 and stays calm to read;
+  compact Usage lines are spaced to match. Density is separate from `preset`.
 - Compact Usage limits: one line per limit, with the provider's mark, a short
   window code (`5h`, `7d`, `F7d`), a thin meter in its level colour with a tick
   for the time gone in the window (accent when usage runs ahead of it), the
