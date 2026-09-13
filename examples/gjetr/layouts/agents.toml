@@ -8,8 +8,10 @@ orientation = "portrait"
 [[module]]
 type = "agent-list"
 
-# Default Sort mode: "spaces" (grouped by workspace), "priority" (blocked,
-# done, idle, working) or "cache" (most urgent Cache timer first). Tapping the
+# Default Sort mode, matching herdr's own agent panel: "spaces" (herdr's
+# workspace, tab and pane order), "priority" (herdr's attention queue: blocked,
+# done, working, idle, most recent change first) or "cache" (the cache-ttl
+# plugin's order: warmest Cache timer first, cold ones after). Tapping the
 # list header cycles it as an Override, which is kept until reset.
 sort = "spaces"
 

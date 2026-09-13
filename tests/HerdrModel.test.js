@@ -61,6 +61,8 @@ test("Agents carry the fields later policies need", () => {
     title: "Fix bug",
     paneLabel: "",
     cwd: "/home/x/a",
+    stateChangeSeq: null,
+    sessionId: "",
     focused: true,
     tabLabel: "1",
     tabNumber: 1,
@@ -75,6 +77,36 @@ test("Agents are ordered by workspace number, then tab number, then herdr's pane
   const snap = snapshot()
   snap.panes.push({ pane_id: "w1:p3", tab_id: "w1:t1", workspace_id: "w1", terminal_id: "t4", agent: "claude", agent_status: "done", focused: false, revision: 1 })
   assert.deepEqual(H.agents(H.fromSnapshot(snap)).map(a => a.paneId), ["w1:p1", "w1:p3", "w2:p1"])
+})
+
+test("snapshot agents add state_change_seq, the Claude session id and herdr's Agent order", () => {
+  const snap = snapshot()
+  snap.agents = [
+    { pane_id: "w2:p1", agent: "codex", state_change_seq: 650, agent_session: { agent: "codex", kind: "path", value: "/x" } },
+    { pane_id: "w1:p1", agent: "claude", state_change_seq: 12, agent_session: { agent: "claude", kind: "id", value: "cf43ca7f-58ec-4ecd-a3ae-8efb244388cc" } },
+    { pane_id: "w9:gone", state_change_seq: 1 }
+  ]
+  const agents = H.agents(H.fromSnapshot(snap))
+  assert.deepEqual(agents.map(a => a.paneId), ["w2:p1", "w1:p1"], "herdr's order wins over workspace number")
+  assert.equal(agents[0].stateChangeSeq, 650)
+  assert.equal(agents[0].sessionId, "", "only kind id is a session id")
+  assert.equal(agents[1].sessionId, "cf43ca7f-58ec-4ecd-a3ae-8efb244388cc")
+})
+
+test("unsafe session ids and bad sequence numbers are dropped", () => {
+  const snap = snapshot()
+  snap.agents = [{ pane_id: "w1:p1", state_change_seq: "x", agent_session: { kind: "id", value: "../../etc/passwd" } }]
+  const agent = H.agents(H.fromSnapshot(snap)).find(a => a.paneId === "w1:p1")
+  assert.equal(agent.stateChangeSeq, null)
+  assert.equal(agent.sessionId, "")
+})
+
+test("pane events keep the Agent facts only the snapshot carries", () => {
+  const snap = snapshot()
+  snap.agents = [{ pane_id: "w1:p1", state_change_seq: 12, agent_session: { kind: "id", value: "cf43ca7f-58ec-4ecd-a3ae-8efb244388cc" } }]
+  const state = H.fromSnapshot(snap)
+  const out = H.applyEvent(state, ev("pane_updated", { pane: Object.assign(paneOf(state, "w1:p1"), { revision: 99 }) }))
+  assert.equal(out.changed, false)
 })
 
 test("unknown or missing statuses normalise to unknown", () => {

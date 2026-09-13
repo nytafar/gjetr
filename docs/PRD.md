@@ -31,7 +31,7 @@ touchscreen.
 |---|---|
 | M1 | A full-output surface on the Display named in Config, layer Bottom, never takes keyboard focus, survives hotplug |
 | M2 | One Card per Agent; panes without an agent are excluded |
-| M3 | Sort modes `spaces`, `priority` (blocked > done > idle > working > unknown), `cache` (most urgent first, priority as tiebreak) |
+| M3 | Sort modes mirror herdr's agent panel exactly: `spaces` (herdr's order), `priority` (herdr's attention queue: blocked > done > working > idle > unknown, most recent state change first), `cache` (the cache-ttl plugin's view: warmest first, cold after live, no timer last; then attention, then recency) |
 | M4 | Default Sort mode from Config; tapping the list header cycles it as an Override |
 | M5 | Agent name: terminal title, then renamed tab label, then workspace label, then cwd basename |
 | M6 | Card Fields chosen by named preset: status, kind icon, name, workspace › tab, Cache timer |

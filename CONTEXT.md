@@ -40,7 +40,7 @@ The time left before an Agent's prompt cache expires, with an ok, warn or critic
 _Avoid_: TTL (when talking about the displayed value)
 
 **Sort mode**:
-The ordering of the Agent List: `spaces` (grouped by workspace), `priority` (attention first) or `cache` (most urgent Cache timer first).
+The ordering of the Agent List, always the same as herdr's own agent panel: `spaces` (herdr's workspace, tab and pane order), `priority` (herdr's attention queue: blocked, done, working, idle, most recent change first) or `cache` (the cache-ttl plugin's order: warmest Cache timer first).
 
 **Attention**:
 The state of an Agent that has become `blocked` or `done` and has not been focused since. Shown prominently (pulsing) on its Card, and as a badge on the tab of any Layout that contains it. gjetr never sends notifications; herdr owns those.
