@@ -39,6 +39,8 @@ All notable changes to gjetr. The format follows
   changed. It writes only `gjetr.toml`, `layouts/<name>.toml` and their
   backups, and is the only way gjetr writes Config. `presets` lists the
   presets, marking the detected one.
+- `docs/AGENT-SETUP.md`: steps for a coding agent setting up gjetr, from
+  looking at the machine to binding the Dock toggle, linked from the README.
 
 ### Changed
 

@@ -213,6 +213,12 @@ rotatable = true
 # layouts/tall.toml: orientation = "portrait"
 ```
 
+### Set up with an agent
+
+Ask your coding agent to follow [docs/AGENT-SETUP.md](docs/AGENT-SETUP.md): it
+looks at your monitors, touchscreen and herdr, installs a preset, adjusts the
+Layouts, checks for Config errors and binds the Dock toggle.
+
 ### On the display
 
 | Touch | Does |
