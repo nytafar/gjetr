@@ -20,6 +20,12 @@ import "../lib/MotionPolicy.js" as MotionPolicy
 // both. A tinted mark is the same mask over a still `plainColor` fill. A plain
 // brand-colour or letter mark has no layer or effect at all.
 //
+// Breathe and the blocked flash glow, which takes MultiEffect's blur over a
+// still fill. Every other mask is shaders/kind-fill.frag, whose sweep, shimmer
+// and hue are uniforms: an effect whose source moves re-renders that source and
+// asks for a second frame after every tick, doubling what a moving mark costs.
+// Which of the two draws a mark is part of the Repeater's key.
+//
 // One phase drives every motion, read from the service's MotionClock (`clock`,
 // 20 frames a second). It moves only while the mark is stateful, has a motion,
 // is visible and `animate` (on screen, its window shown), and is 0 otherwise;
@@ -67,6 +73,8 @@ Item {
   // own padding scales the mask apart from the fill, so it stays off and both
   // carry this margin instead.
   readonly property int glowPad: Math.max(3, Math.round(Math.min(width, height) * 0.4))
+  // Drawn with MultiEffect for its glow; otherwise with the kind-fill shader.
+  readonly property bool glow: motion === "breathe" || motion === "flash"
 
   Motion {
     id: phaseMotion
@@ -123,9 +131,9 @@ Item {
   }
 
   // The mark as a mask over its status fill (plainColor when not stateful),
-  // rebuilt when maskKey changes.
+  // rebuilt when maskKey changes or the mark starts or stops glowing.
   Repeater {
-    model: root.masked ? [root.maskKey] : []
+    model: root.masked ? [root.maskKey + "|" + root.glow] : []
 
     delegate: Item {
       anchors.fill: parent
@@ -169,68 +177,54 @@ Item {
         }
       }
 
-      // What fills the mask: the status colour, and the sweep gradient or the
-      // shimmer band over it.
-      Item {
-        id: fill
+      // Breathe and flash: the status colour, brightened and glowing.
+      Loader {
         anchors.fill: parent
-        visible: false
-        clip: true
+        active: root.glow
 
-        Rectangle {
-          anchors.fill: parent
-          color: root.stateful ? root.fillColor : root.plainColor
-        }
-
-        // The sweep and the band cross the mark itself, inside the glow margin.
-        Rectangle {
-          visible: root.motion === "sweep"
-          width: root.width * 2
-          height: parent.height
-          x: root.glowPad - root.width * (1 - root.f.sweep)
-          gradient: Gradient {
-            orientation: Gradient.Horizontal
-            GradientStop { position: 0; color: root.toneColor }
-            GradientStop { position: 0.25; color: root.highlight }
-            GradientStop { position: 0.5; color: root.toneColor }
-            GradientStop { position: 0.75; color: root.highlight }
-            GradientStop { position: 1; color: root.toneColor }
+        sourceComponent: Item {
+          Rectangle {
+            id: fill
+            anchors.fill: parent
+            visible: false
+            color: root.fillColor
           }
-        }
 
-        // Visible for the whole motion and parked outside while it rests: an
-        // effect source whose children turn visible or hidden keeps its old
-        // texture.
-        Rectangle {
-          visible: root.motion === "shimmer"
-          width: Math.max(2, root.width * 0.4)
-          height: parent.height * 1.6
-          y: -parent.height * 0.3
-          x: root.f.band < 0 ? -width * 3 : root.glowPad - width + (root.width + width) * root.f.band
-          rotation: 20
-          gradient: Gradient {
-            orientation: Gradient.Horizontal
-            GradientStop { position: 0; color: "transparent" }
-            GradientStop { position: 0.5; color: Qt.rgba(1, 1, 1, 0.9) }
-            GradientStop { position: 1; color: "transparent" }
+          MultiEffect {
+            anchors.fill: parent
+            source: fill
+            maskEnabled: true
+            maskSource: shape
+            autoPaddingEnabled: false
+            brightness: root.f.brightness
+            shadowEnabled: true
+            shadowColor: root.toneColor
+            shadowBlur: 0.6
+            shadowOpacity: Math.min(1, root.f.glow)
+            shadowHorizontalOffset: 0
+            shadowVerticalOffset: 0
+            blurMax: Math.max(4, Math.round(root.glowPad * 1.2))
+            opacity: (root.mark ? root.mark.opacity : 1) * root.f.opacity
           }
         }
       }
 
-      MultiEffect {
+      // Everything else: the colour, the sweep gradient or the shimmer band,
+      // as uniforms of shaders/kind-fill.frag over the mark.
+      ShaderEffect {
+        id: kindFill
         anchors.fill: parent
-        source: fill
-        maskEnabled: true
-        maskSource: shape
-        autoPaddingEnabled: false
-        brightness: root.f.brightness
-        shadowEnabled: root.motion === "breathe" || root.motion === "flash"
-        shadowColor: root.toneColor
-        shadowBlur: 0.6
-        shadowOpacity: Math.min(1, root.f.glow)
-        shadowHorizontalOffset: 0
-        shadowVerticalOffset: 0
-        blurMax: Math.max(4, Math.round(root.glowPad * 1.2))
+        visible: !root.glow
+        property var mask: shape
+        property color tone: root.stateful ? root.fillColor : root.plainColor
+        property color highlight: root.highlight
+        property real sweep: root.motion === "sweep" ? root.f.sweep : -1
+        property real band: root.motion === "shimmer" ? root.f.band : -1
+        property real pad: root.glowPad
+        property real markWidth: root.width
+        property real boxWidth: kindFill.width
+        property real boxHeight: kindFill.height
+        fragmentShader: Qt.resolvedUrl("../shaders/kind-fill.frag.qsb")
         opacity: root.stateful ? (root.mark ? root.mark.opacity : 1) * root.f.opacity : root.plainOpacity
       }
     }
