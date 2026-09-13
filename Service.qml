@@ -1034,6 +1034,11 @@ Item {
       return root.toggleRecap(paneId, "")
     }
 
+    // The same in one Agent List by Module key, e.g. a Dock's "dock#0".
+    function toggleRecapIn(paneId: string, moduleKey: string): string {
+      return root.moduleStates[moduleKey] ? root.toggleRecap(paneId, moduleKey) : "no agent list"
+    }
+
     // Expands or collapses a workspace ("w:<id>") or tab ("t:<id>") in the
     // first Workspace List of the active Layout.
     function toggleExpand(nodeKey: string): string {

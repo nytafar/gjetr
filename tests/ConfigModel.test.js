@@ -159,7 +159,7 @@ focus = "window"
   assert.deepEqual(plain(read.layout), {
     name: "agents",
     orientation: "landscape",
-    modules: [{ type: "agent-list", sort: "cache", preset: "compact", focus: "window", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true }]
+    modules: [{ type: "agent-list", sort: "cache", preset: "compact", focus: "window", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true, density: "auto" }]
   })
 })
 
@@ -168,7 +168,7 @@ test("a missing layout file is the default Agent List, with an error", () => {
   assert.deepEqual(plain(read.layout), {
     name: "agents",
     orientation: "portrait",
-    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true }]
+    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true, density: "auto" }]
   })
   assert.match(read.errors.join("\n"), /layouts\/agents\.toml: not found/)
 })
@@ -186,7 +186,7 @@ extra = true
   assert.deepEqual(plain(read.layout), {
     name: "side",
     orientation: "portrait",
-    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true }]
+    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true, density: "auto" }]
   })
   const text = read.errors.join("\n")
   for (const key of ["orientation", "module[0].sort", "module[0].preset", "module[0].focus", "module[0].extra"]) {
@@ -196,7 +196,7 @@ extra = true
 
 test("unknown module types are skipped; no modules left means the default", () => {
   const read = Config.readLayout("x", '[[module]]\ntype = "clock"\n')
-  assert.deepEqual(plain(read.layout.modules), [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true }])
+  assert.deepEqual(plain(read.layout.modules), [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true, density: "auto" }])
   assert.match(read.errors.join("\n"), /module\[0\]\.type: /)
   assert.match(read.errors.join("\n"), /no valid module/)
 })
@@ -303,14 +303,14 @@ test("layoutModules keys Modules by their position among valid Modules", () => {
 test("a workspace-list Module reads tap, focus and weight", () => {
   const read = Config.readLayout("ws", '[[module]]\ntype = "workspace-list"\ntap = "focus"\nfocus = "window"\nweight = 2\n')
   assert.deepEqual(Array.from(read.errors), [])
-  assert.deepEqual(plain(read.layout.modules), [{ type: "workspace-list", tap: "focus", focus: "window", weight: 2 }])
+  assert.deepEqual(plain(read.layout.modules), [{ type: "workspace-list", tap: "focus", focus: "window", weight: 2, density: "auto" }])
   const plainList = Config.readLayout("ws", '[[module]]\ntype = "workspace-list"\n')
-  assert.deepEqual(plain(plainList.layout.modules), [{ type: "workspace-list", tap: "expand", focus: "herdr", weight: 1 }])
+  assert.deepEqual(plain(plainList.layout.modules), [{ type: "workspace-list", tap: "expand", focus: "herdr", weight: 1, density: "auto" }])
 })
 
 test("workspace-list values fall back per field", () => {
   const read = Config.readLayout("ws", '[[module]]\ntype = "workspace-list"\ntap = "hover"\nfocus = "teleport"\nsort = "spaces"\n')
-  assert.deepEqual(plain(read.layout.modules), [{ type: "workspace-list", tap: "expand", focus: "herdr", weight: 1 }])
+  assert.deepEqual(plain(read.layout.modules), [{ type: "workspace-list", tap: "expand", focus: "herdr", weight: 1, density: "auto" }])
   const text = read.errors.join("\n")
   assert.match(text, /layouts\/ws\.toml: module\[0\]\.tap: expected one of expand, focus/)
   assert.match(text, /layouts\/ws\.toml: module\[0\]\.focus: expected one of herdr, window/)
@@ -338,9 +338,9 @@ weight = 2
 `)
   assert.deepEqual(Array.from(read.errors), [])
   assert.deepEqual(plain(read.layout.modules), [{ type: "usage", show: ["limits", "today", "recent_days", "models"],
-    providers: ["claude", "codex"], refreshSeconds: 300, weight: 2 }])
+    providers: ["claude", "codex"], refreshSeconds: 300, weight: 2, density: "auto" }])
   assert.deepEqual(plain(Config.readLayout("u", '[[module]]\ntype = "usage"\n').layout.modules),
-    [{ type: "usage", show: ["limits"], providers: [], refreshSeconds: null, weight: 1 }])
+    [{ type: "usage", show: ["limits"], providers: [], refreshSeconds: null, weight: 1, density: "auto" }])
 })
 
 test("an old cost_30d show item is reported and ignored", () => {
@@ -485,4 +485,20 @@ test("displayNamed finds a Display by output", () => {
   assert.equal(Config.displayNamed(read.config, "DP-1").kind, "dock")
   assert.equal(Config.displayNamed(read.config, "DP-9"), null)
   assert.equal(Config.displayNamed(null, "DP-1"), null)
+})
+
+test("density is auto, compact or full on every Module type, default auto", () => {
+  for (const type of ["agent-list", "workspace-list", "usage"]) {
+    assert.equal(Config.readLayout("d", `[[module]]\ntype = "${type}"\n`).layout.modules[0].density, "auto", type)
+    for (const value of ["auto", "compact", "full"]) {
+      const read = Config.readLayout("d", `[[module]]\ntype = "${type}"\ndensity = "${value}"\n`)
+      assert.equal(read.layout.modules[0].density, value, type + " " + value)
+      assert.deepEqual(Array.from(read.errors), [], type + " " + value)
+    }
+  }
+  for (const bad of ['"comfortable"', '"FULL"', "true", "2", '["full"]']) {
+    const read = Config.readLayout("d", `[[module]]\ntype = "agent-list"\ndensity = ${bad}\n`)
+    assert.equal(read.layout.modules[0].density, "auto", bad)
+    assert.match(read.errors.join("\n"), /layouts\/d\.toml: module\[0\]\.density: expected one of auto, compact, full/, bad)
+  }
 })

@@ -12,9 +12,12 @@ orientation = "portrait"
 type = "agent-list"
 weight = 2
 sort = "priority"
-# A Dock draws compact rows whatever the preset (density follows the mouse and
-# the width); compact leaves out workspace › tab and the status word.
+# compact leaves out workspace › tab and the status word.
 preset = "compact"
+# A Dock draws compact rows by default (density = "auto" follows the mouse and
+# the width). "full" draws larger Cards to read leaning back: name, status
+# word, repository and branch, a draining Cache timer bar and two Recap lines.
+# density = "full"
 focus = "window"
 # Inline Recaps grow only the Cards that have one.
 recap = "inline"

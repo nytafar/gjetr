@@ -119,10 +119,13 @@ type = "usage"
 show = ["limits"]
 ```
 
-**Density.** A Dock is used with the mouse, so its Agent List and Workspace
-List draw compact rows instead of touch Cards (see [Density](#density)): a
-360-pixel Dock on a 1080-pixel-high monitor shows about 20 Agents with their
-Recap lines.
+**Density.** A Dock is used with the mouse, so by default its Agent List and
+Workspace List draw compact rows instead of touch Cards (see
+[Density](#density)): a 360-pixel Dock on a 1080-pixel-high monitor shows about
+16 Agents with their Recap lines. Set `density = "full"` on the Agent List for
+larger Cards you can read leaning back from the desk: about 9 Agents in the
+same space, each with its status word, repository and branch, a draining Cache
+timer and two Recap lines.
 
 **Orientation.** A Dock's shape decides it: left and right Docks are portrait,
 top and bottom Docks landscape. Layouts built for the other orientation are
@@ -197,6 +200,7 @@ Keys every `[[module]]` takes, whatever its type:
 |---|---|---|---|
 | `type` | `"agent-list"`, `"workspace-list"`, `"usage"` | required | Module type. Unknown types are skipped |
 | `weight` | number above 0, at most 100 | `1` | The Module's share of the width (landscape) or height (portrait). `weight = 2` beside a `weight = 1` takes two thirds |
+| `density` | `"auto"`, `"compact"`, `"full"` | `"auto"` | How big the Module draws: chosen from its size and input, always compact, or full. See [Density](#density) |
 
 ```toml
 orientation = "landscape"
@@ -239,9 +243,17 @@ recap_open = "card"
 
 #### Density
 
-How big things are is chosen automatically, from how the Display is used and
-the room the Module has; there is no key for it. It is separate from `preset`,
-which chooses the Fields.
+How big things are is set per Module with `density`. It is separate from
+`preset`, which chooses the Fields.
+
+- `"auto"` (the default) chooses from how the Display is used and the room the
+  Module has: comfortable on a touch surface, compact on a Dock and in touch
+  columns narrower than 360 pixels.
+- `"compact"` always draws compact rows.
+- `"full"` draws full Cards in an Agent List (below). A Workspace List or Usage
+  Module has no full rendering and draws comfortable.
+
+The densities:
 
 - **Comfortable**, on a touch surface: boxed Cards sized for a finger, with a
   large kind mark and type scaled up for reading from a distance.
@@ -255,6 +267,25 @@ which chooses the Fields.
   opens the whole Recap under the row. The focused Agent has a thin accent bar,
   Attention a pulsing tinted bar. On a touch surface compact rows stay at least
   56 pixels tall.
+- **Full**, only with `density = "full"`: Cards sized to be read leaning back
+  from a 4K Dock, on a faint rounded surface. The name is large (about 18
+  pixels); under it the status glyph's word (`working`, `blocked`, ...) and
+  where the Agent works: its git repository and branch (` main`), or its
+  directory shortened to `~/…/parent/dir` outside a repository. Workspace › tab
+  follows, dimmed, when the preset shows it and it fits. The Cache timer is a
+  large number at the right over a bar that drains from full to empty as the
+  cache ages, green while ok, accent in warn, urgent when critical, and
+  `cold` over an empty track once it expires. With `recap = "inline"` or `"expand"`, the
+  first two lines of the Recap sit under the Card's lines; clicking them opens
+  the whole Recap inside the Card on an accent-tinted panel (or the overlay
+  with `recap_open = "overlay"`), and clicking again closes it. Clicking the
+  name or status line focuses the Agent. The status word and repository show
+  whatever the preset; kind, Cache timer and workspace › tab follow it. A
+  360x714 Agent part shows about 9 Agents when most have a Recap.
+
+The repository and branch come from `git -C <cwd> rev-parse --show-toplevel
+--abbrev-ref HEAD`, run once per distinct working directory and again every 30
+seconds while an Agent List is shown.
 
 A Workspace List follows the same density.
 
@@ -541,6 +572,7 @@ omarchy-shell nytafar.gjetr <function> [argument]
 | `reconnect` | Drop and reopen the herdr connection |
 | `focus <pane-id>` | Focus an Agent's pane, as a tap on a touch surface does, with the first Agent List's Focus behaviour |
 | `pointerFocus <pane-id>` | The same, as a mouse click on a Dock does: with Focus behaviour `window`, the pointer goes back where it was once the window is focused. `state` → `windowFocus.cursor` says `restored x,y` or why not |
+| `toggleRecapIn <pane-id> <module-key>` | The same in one Agent List by Module key (`<layout>#<index>`), such as a Dock's `dock#0` |
 | `toggleRecap <pane-id>` | Open or close an Agent's full Recap in the first Agent List, as a tap on `recap` (or on a compact row's Recap line) does. Prints `open`, `closed`, or why nothing happened (`unknown pane`, `no agent list`, `no recap`, `recap is off`). An inline Recap opens only on a compact row. `state` → `recap.openCards` lists the open Cards |
 | `cycleSort` | Next Sort mode of the first Agent List, as a header tap does |
 | `toggleFocus` | Flip Focus behaviour of the first Agent List |

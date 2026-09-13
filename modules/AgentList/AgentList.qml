@@ -20,14 +20,18 @@ Item {
   property var service: null
   // <layout>#<index>: this Module's Overrides and session state.
   property string moduleKey: ""
-  // "pointer" on a Dock, "touch" on a surface: with the Module's size it picks
-  // the density (DensityPolicy). Comfortable draws Cards, compact draws rows.
+  // "pointer" on a Dock, "touch" on a surface: with the Module's size and its
+  // density setting it picks the density (DensityPolicy). Comfortable draws
+  // Cards, compact draws rows, full draws full Cards.
   property string input: "touch"
 
   readonly property var density: DensityPolicy.tokens({ width: width, height: height, input: input,
+    setting: moduleState ? moduleState.density : DensityPolicy.DEFAULT_SETTING, module: "agent-list",
     fonts: { caption: Style.font.caption, body: Style.font.body, title: Style.font.title },
     spacing: { sm: Style.spacing.sm, lg: Style.spacing.lg, xxl: Style.spacing.xxl }, dpr: Screen.devicePixelRatio })
+  // Unboxed: compact rows and full Cards share the list's tight spacing.
   readonly property bool compact: !density.boxed
+  readonly property bool full: density.name === "full"
 
   // Checked by type: while a Layout file loads, this key can briefly name a
   // Module of another type.
@@ -61,7 +65,8 @@ Item {
   property var cardHeights: ({})
   // The height of a Card before it is measured. Each Card's own base height
   // adds room for an inline Recap only when its Agent has one.
-  readonly property int baseCardHeight: compact ? DensityPolicy.rowHeight(density, false) : CardPolicy.cardHeight(preset)
+  readonly property int baseCardHeight: full ? DensityPolicy.fullCardHeight(density, false)
+    : compact ? DensityPolicy.rowHeight(density, false) : CardPolicy.cardHeight(preset)
   readonly property int cellWidth: Math.floor(grid.width / columns)
   readonly property var placement: LayoutPolicy.cardPlacement(cardOrder, cardHeights, columns, baseCardHeight,
     compact ? density.rowGap : gap)
@@ -226,7 +231,9 @@ Item {
     id: grid
     anchors {
       top: banner.bottom; bottom: parent.bottom; left: parent.left; right: parent.right
-      topMargin: root.gap; leftMargin: root.compact ? 0 : root.gap; rightMargin: 0
+      topMargin: root.full ? root.density.rowGap * 2 : root.gap
+      leftMargin: root.full ? root.density.rowGap * 2 : root.compact ? 0 : root.gap
+      rightMargin: root.full ? root.density.rowGap * 2 : 0
     }
     clip: true
     contentWidth: width
@@ -280,7 +287,7 @@ Item {
         Loader {
           id: loader
           width: cell.width
-          sourceComponent: root.compact ? rowComponent : cardComponent
+          sourceComponent: root.full ? fullComponent : root.compact ? rowComponent : cardComponent
         }
 
         Component {
@@ -303,6 +310,34 @@ Item {
             recapMode: root.recapMode
             recapText: cell.recapText
             recapOpen: cell.recapOpen
+            onTapped: cell.focusIt()
+            onRecapRequested: cell.toggleRecap()
+          }
+        }
+
+        Component {
+          id: fullComponent
+
+          AgentFullCard {
+            width: cell.width
+            agent: cell.agent
+            service: root.service
+            fields: root.fields
+            density: root.density
+            baseHeight: DensityPolicy.fullCardHeight(root.density, DensityPolicy.fullRecapShown(root.recapMode, cell.recapText))
+            interactive: root.online
+            indicator: cell.indicator
+            statusColor: root.toneColor(cell.indicator.tone)
+            cacheColor: root.toneColor(cell.cacheTimer && cell.cacheTimer.level === "ok" ? "foreground"
+              : CardPolicy.cacheTone(cell.cacheTimer ? cell.cacheTimer.level : ""))
+            cacheBarColor: root.toneColor(CardPolicy.cacheBarTone(cell.cacheTimer ? cell.cacheTimer.level : ""))
+            attention: cell.attention
+            inFocusedWorkspace: cell.inFocusedWorkspace
+            recapMode: root.recapMode
+            recapText: cell.recapText
+            recapOpen: cell.recapOpen
+            repoText: root.service && cell.agent ? root.service.agentRepo(cell.agent, root.service.repos).text : ""
+            locationText: root.service && cell.agent ? root.service.agentLocation(cell.agent) : ""
             onTapped: cell.focusIt()
             onRecapRequested: cell.toggleRecap()
           }

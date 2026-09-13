@@ -23,6 +23,7 @@ Item {
   property string input: "touch"
 
   readonly property var density: DensityPolicy.tokens({ width: width, height: height, input: input,
+    setting: moduleState ? moduleState.density : DensityPolicy.DEFAULT_SETTING, module: "usage",
     fonts: { caption: Style.font.caption, body: Style.font.body, title: Style.font.title },
     spacing: { sm: Style.spacing.sm, lg: Style.spacing.lg, xxl: Style.spacing.xxl }, dpr: Screen.devicePixelRatio })
   readonly property bool compact: !density.boxed

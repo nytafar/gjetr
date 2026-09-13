@@ -75,3 +75,11 @@ test("a narrow list header drops the sort and focus captions, keeping the values
   assert.equal(Card.headerCaption("sort", "priority", true), "priority")
   assert.equal(Card.headerCaption("focus", "herdr", false), "focus  herdr")
 })
+
+test("cache bar tones read as a traffic light", () => {
+  assert.equal(Card.cacheBarTone("ok"), "success")
+  assert.equal(Card.cacheBarTone("warn"), "accent")
+  assert.equal(Card.cacheBarTone("critical"), "urgent")
+  assert.equal(Card.cacheBarTone("cold"), "muted")
+  assert.equal(Card.cacheBarTone("__proto__"), "muted")
+})

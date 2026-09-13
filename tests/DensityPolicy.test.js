@@ -136,3 +136,65 @@ test("missing fonts and spacing fall back to Omarchy's defaults", () => {
   assert.deepEqual(t, tokens(360, 714, "pointer", 1))
   assert.equal(Density.tokens(null).name, "comfortable")
 })
+
+test("the density setting: auto chooses, compact and full are the user's", () => {
+  assert.deepEqual(Array.from(Density.SETTINGS), ["auto", "compact", "full"])
+  assert.equal(Density.DEFAULT_SETTING, "auto")
+  assert.equal(Density.densityFor(1024, 544, "touch", "auto", "agent-list"), "comfortable")
+  assert.equal(Density.densityFor(360, 714, "pointer", "auto", "agent-list"), "compact")
+  assert.equal(Density.densityFor(1024, 544, "touch", "compact", "agent-list"), "compact")
+  assert.equal(Density.densityFor(360, 714, "pointer", "full", "agent-list"), "full")
+  assert.equal(Density.densityFor(1024, 544, "touch", "full", "agent-list"), "full")
+  // Modules without a full rendering draw comfortable.
+  assert.equal(Density.densityFor(360, 714, "pointer", "full", "usage"), "comfortable")
+  assert.equal(Density.densityFor(360, 714, "pointer", "full", "workspace-list"), "comfortable")
+  // A setting outside the list is auto.
+  assert.equal(Density.densityFor(360, 714, "pointer", "huge", "agent-list"), "compact")
+  assert.equal(Density.normalizeSetting("huge"), "auto")
+  assert.equal(Density.normalizeSetting("full"), "full")
+})
+
+function full(width, height, input) {
+  return Density.tokens({ width, height, input, setting: "full", module: "agent-list", fonts: FONTS, spacing: SPACING, dpr: 2 })
+}
+
+test("full tokens: a big name, readable secondary lines, two Recap lines", () => {
+  const t = full(360, 714, "pointer")
+  const compact = tokens(360, 714, "pointer", 2)
+  assert.equal(t.name, "full")
+  assert.equal(t.boxed, false)
+  assert.ok(t.namePx >= 17 && t.namePx <= 19, "namePx " + t.namePx)
+  assert.ok(t.metaPx >= compact.detailPx && t.metaPx < t.namePx)
+  assert.ok(t.recapPx >= compact.detailPx)
+  assert.equal(t.recapLines, 2)
+  assert.ok(t.cachePx >= t.namePx - 2)
+  assert.ok(t.cacheBarWidth > 0 && t.cacheBarHeight >= 2)
+  assert.ok(t.headerHeight < Card.MIN_TOUCH_PX)
+  assert.equal(t.iconSourcePx, t.iconPx * 2)
+  assert.equal(full(1024, 544, "touch").headerHeight, Card.MIN_TOUCH_PX)
+})
+
+test("a full Card list shows about 9 to 11 Agents in a 360x714 Dock Agent part", () => {
+  const height = 714
+  const t = full(360, height, "pointer")
+  const room = height - t.headerHeight - t.gap
+  const withRecap = Density.fullCardHeight(t, true) + t.rowGap
+  const plain = Density.fullCardHeight(t, false) + t.rowGap
+  assert.equal(Density.fullCardHeight(t, false), t.padY * 2 + t.lineHeight + t.lineGap + t.secondLineHeight)
+  assert.equal(withRecap - plain, t.recapGap + t.recapLineHeight * 2)
+  // Every Agent with a Recap: still more than 8.
+  assert.ok(room / withRecap >= 8, "all recaps " + room / withRecap)
+  // Three in four with a Recap, as on the user's Dock.
+  const mixed = room / (withRecap * 0.75 + plain * 0.25)
+  assert.ok(mixed >= 9 && mixed <= 11, "mixed " + mixed)
+  assert.ok(Density.fullCardHeight(full(1024, 544, "touch"), false) >= Card.MIN_TOUCH_PX)
+  assert.equal(Density.fullCardHeight(tokens(360, 714, "pointer", 2), true), Card.MIN_TOUCH_PX)
+})
+
+test("a full Card shows Recap lines for inline and expand when there is a Recap", () => {
+  assert.equal(Density.fullRecapShown("inline", "Did a thing"), true)
+  assert.equal(Density.fullRecapShown("expand", "Did a thing"), true)
+  assert.equal(Density.fullRecapShown("off", "Did a thing"), false)
+  assert.equal(Density.fullRecapShown("inline", ""), false)
+  assert.equal(Density.fullRecapShown("expand", null), false)
+})

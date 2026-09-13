@@ -8,6 +8,16 @@ All notable changes to gjetr. The format follows
 
 ### Added
 
+- `density` per Module: `"auto"` (the default, chosen from size and input as
+  before), `"compact"` or `"full"`. Full Agent List Cards are sized to be read
+  leaning back from a 4K Dock: an 18 px name, the status glyph with its word,
+  the repository and branch (else a short path), dimmed workspace › tab when
+  it fits, the Cache timer as a large number over a bar draining in its level's
+  colour, and the Recap's first two lines; a click opens the whole Recap in the
+  Card on an accent-tinted panel. About 9 Agents fit a 360x714 Agent part.
+  Workspace Lists and Usage draw comfortable with `"full"`. `state` lists each
+  Module's density; IPC `toggleRecapIn <pane> <module-key>` opens a Recap in a
+  given Agent List.
 - Repo: each Agent's git repository and branch, from its cwd, else a short
   path (`~/…/a/b`). gjetr runs `git -C <cwd> rev-parse --show-toplevel
   --abbrev-ref HEAD` once per distinct cwd, when it appears and again every

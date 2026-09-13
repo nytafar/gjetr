@@ -227,7 +227,7 @@ Item {
       },
       modules: activeModules.map(function(module, index) {
         var state = service && service.moduleStates[module.key] ? service.moduleStates[module.key] : {}
-        return { key: module.key, type: module.type, weight: module.weight, sort: state.sort, focus: state.focus,
+        return { key: module.key, type: module.type, weight: module.weight, density: state.density, sort: state.sort, focus: state.focus,
           rect: surface && surface.moduleRects ? (surface.moduleRects[index] || null) : null }
       })
     }

@@ -112,9 +112,9 @@ test("format: whole minutes while ok, m:ss in warn and critical, cold when expir
 test("cacheTimer combines kind, timer and clock for one Agent", () => {
   const timers = { "w1:p1": { lastTurn: 1000, ttlSeconds: 3600 } }
   const claude = { paneId: "w1:p1", kind: "claude" }
-  assert.deepEqual({ ...Cache.cacheTimer(claude, timers, 1000 + 3600 - 2520, defaults) }, { remaining: 2520, level: "ok", label: "42m" })
-  assert.deepEqual({ ...Cache.cacheTimer(claude, timers, 1000 + 3600 - 299, defaults) }, { remaining: 299, level: "critical", label: "4:59" })
-  assert.deepEqual({ ...Cache.cacheTimer(claude, timers, 9000, defaults) }, { remaining: -4400, level: "cold", label: "cold" })
+  assert.deepEqual({ ...Cache.cacheTimer(claude, timers, 1000 + 3600 - 2520, defaults) }, { remaining: 2520, level: "ok", label: "42m", ttlSeconds: 3600, fraction: 0.7 })
+  assert.deepEqual({ ...Cache.cacheTimer(claude, timers, 1000 + 3600 - 299, defaults) }, { remaining: 299, level: "critical", label: "4:59", ttlSeconds: 3600, fraction: 299 / 3600 })
+  assert.deepEqual({ ...Cache.cacheTimer(claude, timers, 9000, defaults) }, { remaining: -4400, level: "cold", label: "cold", ttlSeconds: 3600, fraction: 0 })
 })
 
 test("cacheTimer is null without a prompt cache or a timer", () => {
@@ -146,4 +146,14 @@ test("hasLiveTimer tells the display clock whether a countdown is visible", () =
 
 test("nowSeconds converts a millisecond clock", () => {
   assert.equal(Cache.nowSeconds(1789296098999), 1789296098)
+})
+
+test("fractionLeft is the share of the ttl left, clamped to 0..1", () => {
+  assert.equal(Cache.fractionLeft(1800, 3600), 0.5)
+  assert.equal(Cache.fractionLeft(3600, 3600), 1)
+  assert.equal(Cache.fractionLeft(5000, 3600), 1)
+  assert.equal(Cache.fractionLeft(-10, 3600), 0)
+  assert.equal(Cache.fractionLeft(10, 0), 0)
+  assert.equal(Cache.fractionLeft(NaN, 3600), 0)
+  assert.equal(Cache.fractionLeft(10, "3600"), 0)
 })
