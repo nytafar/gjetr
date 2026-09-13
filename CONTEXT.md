@@ -39,6 +39,10 @@ The label a Card shows for an Agent, taken from the most specific source availab
 The time left before an Agent's prompt cache expires, with an ok, warn or critical level. Only meaningful for agent kinds that have a prompt cache.
 _Avoid_: TTL (when talking about the displayed value)
 
+**Recap**:
+The latest session recap Claude Code wrote for an Agent's session, shown as a Field on its Card, either inline or on request. Read from Claude's transcript, never from herdr; untrusted text.
+_Avoid_: summary, away summary (Claude's internal name)
+
 **Sort mode**:
 The ordering of the Agent List, always the same as herdr's own agent panel: `spaces` (herdr's workspace, tab and pane order), `priority` (herdr's attention queue: blocked, done, working, idle, most recent change first) or `cache` (the cache-ttl plugin's order: warmest Cache timer first).
 

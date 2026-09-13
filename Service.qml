@@ -15,6 +15,7 @@ import "lib/WindowPolicy.js" as WindowPolicy
 import "lib/CommandPolicy.js" as CommandPolicy
 import "lib/AttentionModel.js" as AttentionModel
 import "lib/DeckPolicy.js" as DeckPolicy
+import "lib/RecapModel.js" as RecapModel
 
 // Owns Display selection, the herdr connection and everything that must
 // outlive a surface. The surface itself is created per matching screen and
@@ -69,6 +70,17 @@ Item {
   property var touch: ({ transform: -1, devices: [], error: "" })
   property int touchLogged: -1
 
+  // Recap: the latest away_summary of each Claude Agent's session, found by
+  // session id under ~/.claude/projects and re-read when the transcript's
+  // modification time or size changes. Polled only while an Agent List shows
+  // Recaps.
+  readonly property string recapMode: agentListConfig.settings.recap
+  readonly property string claudeProjectsDir: RecapModel.projectsDir(home)
+  property var recapPaths: ({})
+  property var recapLocated: ({})
+  property var recapStamps: ({})
+  property var recaps: ({})
+  property bool recapPolling: false
   readonly property var agentListConfig: ConfigModel.agentList(activeLayout)
   readonly property var configErrors: collectConfigErrors(mainRead, layoutTexts, deckNames)
   readonly property string configSummary: "display " + display.name + (display.rotatable ? " rotatable" : "")
@@ -252,6 +264,77 @@ Item {
     touchLogged = transform
   }
 
+  function recapFor(agent, map) {
+    if (!agent || recapMode === "off") return ""
+    var entry = map[agent.sessionId]
+    return entry ? entry.text : ""
+  }
+
+  function recapSessions() {
+    var out = []
+    for (var i = 0; i < agents.length; i++) {
+      var id = agents[i].sessionId
+      if (agents[i].kind === "claude" && RecapModel.isSessionId(id) && out.indexOf(id) < 0) out.push(id)
+    }
+    return out
+  }
+
+  function setEntry(name, key, value) {
+    var next = {}
+    var current = root[name]
+    for (var k in current) next[k] = current[k]
+    next[key] = value
+    root[name] = next
+  }
+
+  function readRecap(sessionId, path) {
+    commands.run(CommandPolicy.grepRecaps(path), function(text, code) {
+      // grep exits 1 when the transcript has no recap yet.
+      if (code !== 0 && code !== 1) return
+      var recap = RecapModel.latestRecap(text, sessionId)
+      var current = recaps[sessionId]
+      if (recap && (!current || current.text !== recap.text)) setEntry("recaps", sessionId, recap)
+    })
+  }
+
+  function pollRecaps() {
+    if (recapMode === "off" || recapPolling) return
+    var sessions = recapSessions()
+    var now = Date.now()
+    var paths = []
+    var bySession = {}
+    for (var i = 0; i < sessions.length; i++) {
+      var id = sessions[i]
+      var path = recapPaths[id]
+      if (path) {
+        paths.push(path)
+        bySession[path] = id
+      } else if (!recapLocated[id] || now - recapLocated[id] > 60000) {
+        setEntry("recapLocated", id, now)
+        locateRecap(id)
+      }
+    }
+    if (paths.length === 0) return
+    recapPolling = true
+    commands.run(CommandPolicy.statTranscripts(paths.slice(0, 64)), function(text, code) {
+      recapPolling = false
+      var stamps = RecapModel.parseStat(text, paths)
+      for (var p in stamps) {
+        if (recapStamps[p] === stamps[p]) continue
+        setEntry("recapStamps", p, stamps[p])
+        readRecap(bySession[p], p)
+      }
+    })
+  }
+
+  function locateRecap(sessionId) {
+    commands.run(CommandPolicy.locateTranscript(claudeProjectsDir, sessionId), function(text, code) {
+      var path = RecapModel.parseLocate(text, claudeProjectsDir, sessionId)
+      if (path === "") return
+      setEntry("recapPaths", sessionId, path)
+      pollTimer.restart()
+    })
+  }
 
   function setLayoutText(name, text) {
     if (layoutTexts[name] === text) return
@@ -469,6 +552,12 @@ Item {
         rotation: rotationStatus,
         touch: touch
       },
+      recap: {
+        mode: recapMode,
+        sessions: recapSessions().length,
+        located: Object.keys(recapPaths).length,
+        recaps: Object.keys(recaps).length
+      },
       overrides: { key: agentListKey, sortOverridden: sortOverridden, loaded: overridesLoaded,
         error: overridesError, modules: overrides.modules },
       focus: { requests: herdr.focuses, lastError: herdr.lastFocusError },
@@ -485,6 +574,7 @@ Item {
           paneId: agent.paneId,
           status: agent.status,
           attention: attentionFor(agent, attention),
+          recap: recapFor(agent, recaps) !== "",
           name: agentName(agent),
           location: agentLocation(agent),
           cache: timer ? timer.label + " " + timer.level : ""
@@ -565,6 +655,15 @@ Item {
     function onRawEvent(event) {
       if (event && event.name === "configreloaded") reloadTimer.restart()
     }
+  }
+
+  Timer {
+    id: pollTimer
+    interval: 5000
+    repeat: true
+    triggeredOnStart: true
+    running: root.recapMode !== "off" && root.agents.length > 0
+    onTriggered: root.pollRecaps()
   }
 
   Timer {

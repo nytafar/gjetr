@@ -159,7 +159,7 @@ focus = "window"
   assert.deepEqual(plain(read.layout), {
     name: "agents",
     orientation: "landscape",
-    modules: [{ type: "agent-list", sort: "cache", preset: "compact", focus: "window" }]
+    modules: [{ type: "agent-list", sort: "cache", preset: "compact", focus: "window", recap: "off" }]
   })
 })
 
@@ -168,7 +168,7 @@ test("a missing layout file is the default Agent List, with an error", () => {
   assert.deepEqual(plain(read.layout), {
     name: "agents",
     orientation: "portrait",
-    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr" }]
+    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off" }]
   })
   assert.match(read.errors.join("\n"), /layouts\/agents\.toml: not found/)
 })
@@ -186,7 +186,7 @@ extra = true
   assert.deepEqual(plain(read.layout), {
     name: "side",
     orientation: "portrait",
-    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr" }]
+    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off" }]
   })
   const text = read.errors.join("\n")
   for (const key of ["orientation", "module[0].sort", "module[0].preset", "module[0].focus", "module[0].extra"]) {
@@ -196,7 +196,7 @@ extra = true
 
 test("unknown module types are skipped; no modules left means the default", () => {
   const read = Config.readLayout("x", '[[module]]\ntype = "usage"\n')
-  assert.deepEqual(plain(read.layout.modules), [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr" }])
+  assert.deepEqual(plain(read.layout.modules), [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off" }])
   assert.match(read.errors.join("\n"), /module\[0\]\.type: /)
   assert.match(read.errors.join("\n"), /no valid module/)
 })
@@ -241,4 +241,12 @@ test("touch_devices lists the touchscreens that rotate with a Display", () => {
   assert.deepEqual(Array.from(bad.config.displays[0].touchDevices), ["ok-dev"])
   assert.equal(bad.errors.length, 2)
   assert.match(Config.readMain('[[display]]\nname = "HDMI-A-2"\ntouch_devices = "all"\n', HOME).errors[0], /touch_devices: expected a list/)
+})
+
+test("recap is off, inline or expand per Agent List", () => {
+  assert.equal(Config.readLayout("agents", '[[module]]\ntype = "agent-list"\n').layout.modules[0].recap, "off")
+  assert.equal(Config.readLayout("agents", '[[module]]\ntype = "agent-list"\nrecap = "expand"\n').layout.modules[0].recap, "expand")
+  const bad = Config.readLayout("agents", '[[module]]\ntype = "agent-list"\nrecap = "loud"\n')
+  assert.equal(bad.layout.modules[0].recap, "off")
+  assert.match(bad.errors.join("\n"), /module\[0\]\.recap: expected one of off, inline, expand/)
 })

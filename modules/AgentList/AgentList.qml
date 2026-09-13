@@ -18,6 +18,11 @@ Item {
   signal headerTapped()
   signal focusToggled()
 
+  readonly property string recapMode: service ? service.recapMode : "off"
+  // The pane whose Recap is open in the overlay, or "".
+  property string recapPane: ""
+  readonly property var recapAgent: recapPane !== "" ? (agentByPane[recapPane] || null) : null
+
   readonly property var fields: CardPolicy.fieldsFor(preset)
   readonly property var agents: service ? service.sortedAgents : []
   // Cards are keyed by pane id in a ListModel that is updated in place, so a
@@ -159,7 +164,7 @@ Item {
     clip: true
     model: cardModel
     cellWidth: Math.floor(width / root.columns)
-    cellHeight: CardPolicy.cardHeight(root.preset) + root.gap
+    cellHeight: CardPolicy.cardHeightFor(root.preset, root.recapMode === "inline") + root.gap
     boundsBehavior: Flickable.StopAtBounds
     // Last known Cards stay visible while Offline, greyed out.
     opacity: root.online ? 1 : 0.4
@@ -177,7 +182,64 @@ Item {
       statusColor: root.toneColor(CardPolicy.statusTone(agent ? agent.status : ""))
       cacheColor: root.toneColor(CardPolicy.cacheTone(cacheTimer ? cacheTimer.level : ""))
       attention: root.service ? root.service.attentionFor(agent, root.service.attention) : ""
+      recapMode: root.recapMode
+      recapText: root.service ? root.service.recapFor(agent, root.service.recaps) : ""
       onTapped: if (agent) root.service.focusAgent(agent)
+      onRecapRequested: root.recapPane = paneId
+    }
+  }
+
+  // Recap overlay: the whole Recap of one Agent, over the list. A tap
+  // anywhere closes it.
+  Rectangle {
+    anchors.fill: parent
+    z: 20
+    visible: root.recapAgent !== null
+    color: Util.alpha(Color.background, 0.92)
+
+    TapHandler {
+      onTapped: root.recapPane = ""
+    }
+
+    Column {
+      anchors { left: parent.left; right: parent.right; top: parent.top; margins: root.gap * 2 }
+      spacing: root.gap
+
+      Text {
+        width: parent.width
+        text: root.recapAgent && root.service ? root.service.agentName(root.recapAgent) : ""
+        color: Color.foreground
+        font.family: Style.font.family
+        font.pixelSize: Math.round(Style.font.title * root.textScale)
+        font.bold: true
+        elide: Text.ElideRight
+      }
+
+      Text {
+        width: parent.width
+        text: root.recapAgent && root.service ? root.service.agentLocation(root.recapAgent) : ""
+        color: Color.muted
+        font.family: Style.font.family
+        font.pixelSize: Math.round(Style.font.body * root.textScale)
+      }
+
+      Text {
+        width: parent.width
+        text: root.recapAgent && root.service ? root.service.recapFor(root.recapAgent, root.service.recaps) : ""
+        textFormat: Text.PlainText
+        wrapMode: Text.WordWrap
+        color: Color.foreground
+        font.family: Style.font.family
+        font.pixelSize: Math.round(Style.font.body * root.textScale)
+        lineHeight: 1.2
+      }
+
+      Text {
+        text: "tap to close"
+        color: Color.muted
+        font.family: Style.font.family
+        font.pixelSize: Math.round(Style.font.caption * root.textScale)
+      }
     }
   }
 

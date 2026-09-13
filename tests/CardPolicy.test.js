@@ -59,3 +59,8 @@ test("kindGlyph is the fallback letter", () => {
   assert.equal(Card.kindGlyph("opencode", "OpenCode"), "O")
   assert.equal(Card.kindGlyph("", ""), "?")
 })
+
+test("an inline Recap makes room for two lines", () => {
+  assert.equal(Card.cardHeightFor("detailed", false), Card.cardHeight("detailed"))
+  assert.equal(Card.cardHeightFor("compact", true), Card.cardHeight("compact") + Card.RECAP_INLINE_PX)
+})

@@ -62,6 +62,45 @@ test("rotateOutput refuses values outside the allowlist", () => {
   assert.equal(Command.allowed(["hyprctl", "eval", 'hl.monitor({ output = "HDMI-A-2", disabled = true })']), false)
 })
 
+const SESSION = "cf43ca7f-58ec-4ecd-a3ae-8efb244388cc"
+const PROJECTS = "/home/test/.claude/projects"
+const TRANSCRIPT = PROJECTS + "/-home-test-code/" + SESSION + ".jsonl"
+
+test("Recap commands locate, stat and grep transcripts only", () => {
+  const find = Command.locateTranscript(PROJECTS, SESSION)
+  assert.deepEqual(Array.from(find), ["find", PROJECTS, "-mindepth", "2", "-maxdepth", "2", "-type", "f", "-name", SESSION + ".jsonl"])
+  assert.equal(Command.allowed(find), true)
+  const stat = Command.statTranscripts([TRANSCRIPT, TRANSCRIPT.replace("-code", "-docs")])
+  assert.deepEqual(Array.from(stat).slice(0, 4), ["stat", "-c", "%Y %s %n", "--"])
+  assert.equal(Command.allowed(stat), true)
+  const grep = Command.grepRecaps(TRANSCRIPT)
+  assert.deepEqual(Array.from(grep), ["grep", "-F", "--", '"subtype":"away_summary"', TRANSCRIPT])
+  assert.equal(Command.allowed(grep), true)
+})
+
+test("Recap commands refuse other paths, ids and shapes", () => {
+  const newline = String.fromCharCode(10)
+  assert.deepEqual(Array.from(Command.locateTranscript("/etc", SESSION)), [])
+  assert.deepEqual(Array.from(Command.locateTranscript(PROJECTS, "*")), [])
+  assert.deepEqual(Array.from(Command.locateTranscript("relative/.claude/projects", SESSION)), [])
+  assert.deepEqual(Array.from(Command.grepRecaps("/etc/passwd")), [])
+  assert.deepEqual(Array.from(Command.grepRecaps(PROJECTS + "/../" + SESSION + ".jsonl")), [])
+  assert.deepEqual(Array.from(Command.grepRecaps(PROJECTS + "/a" + newline + "b/" + SESSION + ".jsonl")), [])
+  assert.deepEqual(Array.from(Command.statTranscripts([])), [])
+  assert.deepEqual(Array.from(Command.statTranscripts([TRANSCRIPT, "/etc/shadow"])), [])
+  for (const argv of [
+    ["find", PROJECTS, "-name", "*", "-delete"],
+    ["find", PROJECTS, "-mindepth", "2", "-maxdepth", "2", "-type", "f", "-name", SESSION + ".jsonl", "-delete"],
+    ["grep", "-r", "--", '"subtype":"away_summary"', TRANSCRIPT],
+    ["grep", "-F", "--", "password", TRANSCRIPT],
+    ["stat", "-c", "%Y %s %n", "/etc/passwd"],
+    ["stat", "-c", "%Y %s %n", "--", "/etc/passwd"],
+    ["tail", "-c", "10", TRANSCRIPT]
+  ]) {
+    assert.equal(Command.allowed(argv), false, JSON.stringify(argv))
+  }
+})
+
 test("touch transforms follow a rotation, globally or per device", () => {
   assert.deepEqual(Array.from(Command.touchTransform(1)),
     ["hyprctl", "eval", "hl.config({ input = { touchdevice = { transform = 1 } } })"])

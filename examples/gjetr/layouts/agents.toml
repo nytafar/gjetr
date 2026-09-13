@@ -24,3 +24,9 @@ preset = "detailed"
 # server, and focuses it. Tapping "focus" in the list header flips it as an
 # Override.
 focus = "herdr"
+
+# Recap: the latest session recap Claude Code wrote for a Claude Agent
+# (away_summary in ~/.claude/projects/<project>/<session>.jsonl, found by the
+# session id herdr reports). "off", "inline" (two lines on the Card) or
+# "expand" (a "recap" area on the Card, or a long press, shows it in full).
+recap = "off"

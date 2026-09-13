@@ -16,8 +16,15 @@ Item {
   property color cacheColor: Color.muted
   // "blocked" or "done" while the Agent is in Attention, else "".
   property string attention: ""
+  // Recap: "off", "inline" (clamped under the Fields) or "expand" (a
+  // disclosure area and long press ask the list to show it in full).
+  property string recapMode: "off"
+  property string recapText: ""
 
   signal tapped()
+  signal recapRequested()
+
+  readonly property bool recapExpandable: recapMode === "expand" && recapText !== ""
 
   readonly property bool focused: !!agent && agent.focused
   readonly property var cacheTimer: fields.cache && service && agent
@@ -99,7 +106,8 @@ Item {
     anchors {
       left: kindIcon.right; leftMargin: root.pad
       right: trailing.left; rightMargin: root.pad
-      verticalCenter: parent.verticalCenter
+      top: parent.top; topMargin: root.recapMode === "inline" ? root.pad / 2 : 0
+      verticalCenter: root.recapMode === "inline" ? undefined : parent.verticalCenter
     }
     spacing: Style.spacing.xs
 
@@ -125,11 +133,29 @@ Item {
       elide: Text.ElideMiddle
       maximumLineCount: 1
     }
+
+    // Recap text is untrusted: always plain text, never rich text or links.
+    Text {
+      width: parent.width
+      visible: root.recapMode === "inline" && root.recapText !== ""
+      text: root.recapText
+      textFormat: Text.PlainText
+      color: Color.muted
+      font.family: Style.font.family
+      font.pixelSize: Math.round(Style.font.caption * root.textScale)
+      wrapMode: Text.WordWrap
+      maximumLineCount: 2
+      elide: Text.ElideRight
+    }
   }
 
   Column {
     id: trailing
-    anchors { right: parent.right; rightMargin: root.pad; verticalCenter: parent.verticalCenter }
+    anchors {
+      right: disclosure.visible ? disclosure.left : parent.right
+      rightMargin: disclosure.visible ? 0 : root.pad
+      verticalCenter: parent.verticalCenter
+    }
     spacing: Style.spacing.xs
 
     Text {
@@ -154,9 +180,51 @@ Item {
     }
   }
 
-  TapHandler {
-    id: tap
-    enabled: root.interactive
-    onTapped: root.tapped()
+  // The Card body focuses the Agent; a long press opens its Recap.
+  Item {
+    anchors { left: parent.left; top: parent.top; bottom: parent.bottom; right: disclosure.visible ? disclosure.left : parent.right }
+
+    TapHandler {
+      id: tap
+      enabled: root.interactive
+      onTapped: root.tapped()
+      onLongPressed: if (root.recapExpandable) root.recapRequested()
+    }
+  }
+
+  // Disclosure area for the Recap, a full-height touch target at the edge.
+  Item {
+    id: disclosure
+    visible: root.recapExpandable
+    anchors { right: parent.right; top: parent.top; bottom: parent.bottom }
+    width: visible ? 56 : 0
+
+    Rectangle {
+      anchors.fill: parent
+      anchors.margins: 1
+      radius: Style.cornerRadius
+      color: disclosureTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent) : "transparent"
+    }
+
+    Rectangle {
+      anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+      width: 1
+      height: parent.height / 2
+      color: Util.alpha(Color.foreground, 0.12)
+    }
+
+    Text {
+      anchors.centerIn: parent
+      text: "recap"
+      rotation: -90
+      color: Color.accent
+      font.family: Style.font.family
+      font.pixelSize: Math.round(Style.font.caption * root.textScale)
+    }
+
+    TapHandler {
+      id: disclosureTap
+      onTapped: root.recapRequested()
+    }
   }
 }
