@@ -264,7 +264,7 @@ Item {
           border.color: rowItem.attentionColor
 
           SequentialAnimation on opacity {
-            running: pulse.visible
+            running: pulse.visible && rowItem.onScreen
             loops: Animation.Infinite
             onRunningChanged: if (!running) pulse.opacity = 1
             NumberAnimation { from: 1; to: 0.2; duration: 650; easing.type: Easing.InOutSine }
@@ -291,7 +291,7 @@ Item {
             font.bold: rowItem.indicator.status === "blocked" || rowItem.indicator.status === "done"
 
             RotationAnimation on rotation {
-              running: rowItem.indicator.motion === "spin" && rowItem.visible && statusGlyph.visible
+              running: rowItem.indicator.motion === "spin" && rowItem.visible && statusGlyph.visible && rowItem.onScreen
               from: 0
               to: 360
               duration: 1800

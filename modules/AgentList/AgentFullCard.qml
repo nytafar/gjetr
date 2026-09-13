@@ -115,7 +115,7 @@ Item {
     }
 
     SequentialAnimation on opacity {
-      running: pulse.visible
+      running: pulse.visible && root.animate
       loops: Animation.Infinite
       onRunningChanged: if (!running) pulse.opacity = 1
       NumberAnimation { from: 1; to: 0.25; duration: 650; easing.type: Easing.InOutSine }
@@ -160,7 +160,7 @@ Item {
       font.bold: root.indicator.status === "blocked" || root.indicator.status === "done"
 
       RotationAnimation on rotation {
-        running: root.indicator.motion === "spin" && root.visible && root.showGlyph
+        running: root.indicator.motion === "spin" && root.visible && root.showGlyph && root.animate
         from: 0
         to: 360
         duration: 1800
