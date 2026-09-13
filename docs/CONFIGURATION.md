@@ -416,8 +416,8 @@ also pulse while their Agent is in Attention.
 #### Status indicator
 
 With `indicator = "icon"` the kind mark carries the status instead of the
-glyph. Claude's and Codex's marks and every letter mark are drawn in one
-colour, the status's, and move:
+glyph. Every kind mark, Claude's and Codex's brand-colour marks included, is
+drawn in one colour, the status's, and moves:
 
 | Status | Kind mark |
 |---|---|
@@ -511,10 +511,14 @@ Rows, from the top of the tree down:
   (`shell` without an agent). Names follow the Agent name rules.
 
 Kinds are shown by their written name (Claude, Oh My Pi, GitHub Copilot, ...).
-Claude and Codex draw Omarchy's marks; every other kind herdr 0.8.2 and 0.9.0
-can report draws its own letter in a thin frame in the theme's muted colour
-(π for Pi, T for Antigravity, M for Muse, ...), and a kind herdr adds later
-draws its first letter.
+Claude and Codex draw Omarchy's marks in their own colours. Pi, Gemini, Cursor,
+Cline, OpenCode, GitHub Copilot, Kimi, Qwen Code, Devin, Antigravity, Mastra
+Code, Kiro, Amp, Grok, Hermes, Kilo Code, Qoder and Oh My Pi draw their logo,
+shipped with gjetr in `assets/kinds/`, in the theme's muted colour. Droid, Maki
+and Muse, which have no clearly licensed logo, draw a letter in a thin frame in
+the same colour (D, I, M), and a kind herdr adds later draws its first letter.
+Where each logo comes from, and its licence, is in
+[`assets/kinds/LICENSES.md`](../assets/kinds/LICENSES.md).
 
 A workspace's or tab's status is the one herdr reports for it, else the most
 urgent status below it (blocked, done, working, idle). Glyphs, colours and the
@@ -682,7 +686,7 @@ omarchy-shell nytafar.gjetr resetOverrides
 | `~/.local/state/herdr/plugins/cache-ttl/timers.json` | cache-ttl herdr plugin | Cache timers |
 | `~/.config/herdr/plugins/config/cache-ttl/config.json` | cache-ttl herdr plugin | Warn and critical thresholds |
 | `~/.claude/projects/*/<session-id>.jsonl` | Claude Code | Recap (only when `recap` is not `off`) |
-| `$OMARCHY_PATH/shell/plugins/agents/assets/*.svg` | Omarchy | Agent kind marks for Claude and Codex; other kinds draw a letter |
+| `$OMARCHY_PATH/shell/plugins/agents/assets/*.svg` | Omarchy | Agent kind marks for Claude and Codex; other kinds draw gjetr's own logos or a letter |
 | `~/.local/state/omarchy/current/theme/colors.toml` | Omarchy theme | `green`, the colour of `done` |
 | `~/.local/state/omarchy/agents/usage/*.json` | `omarchy-agent-usage-update` | Usage Module (only while a Usage Module is in the Deck) |
 

@@ -181,6 +181,7 @@ Item {
     width: size
     height: size
     iconUrl: root.iconUrl
+    tinted: root.service && root.agent ? root.service.kindIconTinted(root.agent.kind) : false
     letter: root.agent ? CardPolicy.kindGlyph(root.agent.kind, root.agent.displayKind) : ""
     sourcePx: Math.ceil(root.t.iconSourcePx * size / Math.max(1, root.t.iconPx))
     letterPx: Math.round(root.t.metaPx * size / Math.max(1, root.t.iconPx))

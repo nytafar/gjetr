@@ -3,18 +3,21 @@ import QtQuick.Effects
 import qs.Commons
 import "../lib/IndicatorPolicy.js" as IndicatorPolicy
 
-// An agent kind's mark: Omarchy's SVG where it ships one, else the kind's
-// letter in a thin frame. Plain, it draws as itself, the letter in
-// `plainColor`. Stateful (a Module's indicator = "icon" or "both"), the mark is
-// a mask filled with its Agent's status from IndicatorPolicy: the tone's colour,
-// a moving gradient, hue, glow or highlight band while working, a flash while
-// blocked, a pulse while done in Attention, faded when idle or unknown.
+// An agent kind's mark: its SVG where it has one, else the kind's letter in a
+// thin frame. Plain, a brand-colour SVG (Omarchy's) draws as itself; a
+// one-colour SVG (`tinted`, gjetr's assets/kinds, black as Qt draws
+// currentColor) and the letter draw in `plainColor`. Stateful (a Module's
+// indicator = "icon" or "both"), every mark is a mask filled with its Agent's
+// status from IndicatorPolicy: the tone's colour, a moving gradient, hue, glow
+// or highlight band while working, a flash while blocked, a pulse while done in
+// Attention, faded when idle or unknown.
 //
 // A mask that already exists goes blank when what it draws changes (its layer
-// turned on, or its image appearing or going; Qt 6.11). So the stateful drawing
+// turned on, or its image appearing or going; Qt 6.11). So the masked drawing
 // is rebuilt whenever its image, letter or sizes change: it is the one delegate
 // of a Repeater keyed by them, and draws either the image or the letter, never
-// both. A plain mark has no layer or effect at all.
+// both. A tinted mark is the same mask over a still `plainColor` fill. A plain
+// brand-colour or letter mark has no layer or effect at all.
 //
 // One phase animation drives every motion. It runs only while the mark is
 // stateful, has a motion, is visible and `animate` (on screen, its window
@@ -30,6 +33,8 @@ Item {
   property real frameRadius: 4
   property color plainColor: Color.muted
   property real plainOpacity: 1
+  // The SVG is one colour, drawn in plainColor (or the status) rather than as itself.
+  property bool tinted: false
 
   property bool stateful: false
   property var mark: IndicatorPolicy.markFor("unknown", "", "")
@@ -48,9 +53,11 @@ Item {
     var step = IndicatorPolicy.hueStep(palette.length, phase)
     return Qt.tint(palette[step.from], Util.alpha(palette[step.to], step.t))
   }
+  // Drawn as a mask: stateful, or a one-colour SVG.
+  readonly property bool masked: stateful || (tinted && iconUrl !== "")
   // Whether the kind's image has loaded, from an image outside any mask.
   readonly property bool imageReady: probe.status === Image.Ready
-  // What a stateful mask draws; a change rebuilds it.
+  // What a mask draws; a change rebuilds it.
   readonly property string maskKey: [iconUrl, imageReady, letter, sourcePx, letterPx].join("|")
   // Room around the mark inside the mask and the fill for the glow. The effect's
   // own padding scales the mask apart from the fill, so it stays off and both
@@ -72,7 +79,7 @@ Item {
   Image {
     id: probe
     visible: false
-    source: root.stateful ? root.iconUrl : ""
+    source: root.masked ? root.iconUrl : ""
     sourceSize.width: root.sourcePx
     sourceSize.height: root.sourcePx
   }
@@ -80,7 +87,7 @@ Item {
   // The mark as itself.
   Loader {
     anchors.fill: parent
-    active: !root.stateful
+    active: !root.masked
 
     sourceComponent: Item {
       opacity: root.plainOpacity
@@ -117,9 +124,10 @@ Item {
     }
   }
 
-  // The mark as a mask over its status fill, rebuilt when maskKey changes.
+  // The mark as a mask over its status fill (plainColor when not stateful),
+  // rebuilt when maskKey changes.
   Repeater {
-    model: root.stateful ? [root.maskKey] : []
+    model: root.masked ? [root.maskKey] : []
 
     delegate: Item {
       anchors.fill: parent
@@ -173,7 +181,7 @@ Item {
 
         Rectangle {
           anchors.fill: parent
-          color: root.fillColor
+          color: root.stateful ? root.fillColor : root.plainColor
         }
 
         // The sweep and the band cross the mark itself, inside the glow margin.
@@ -225,7 +233,7 @@ Item {
         shadowHorizontalOffset: 0
         shadowVerticalOffset: 0
         blurMax: Math.max(4, Math.round(root.glowPad * 1.2))
-        opacity: (root.mark ? root.mark.opacity : 1) * root.f.opacity
+        opacity: root.stateful ? (root.mark ? root.mark.opacity : 1) * root.f.opacity : root.plainOpacity
       }
     }
   }

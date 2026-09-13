@@ -164,6 +164,7 @@ Item {
     width: visible ? root.t.iconPx : 0
     height: root.t.iconPx
     iconUrl: root.iconUrl
+    tinted: root.service && root.agent ? root.service.kindIconTinted(root.agent.kind) : false
     letter: root.agent ? CardPolicy.kindGlyph(root.agent.kind, root.agent.displayKind) : ""
     sourcePx: root.t.iconSourcePx
     letterPx: root.t.detailPx

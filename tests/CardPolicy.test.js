@@ -35,12 +35,17 @@ test("cache levels map to theme tokens", () => {
   assert.equal(Card.cacheTone(undefined), "muted")
 })
 
-test("kind icons exist only for kinds Omarchy ships a mark for", () => {
+test("kind icons are the kind table's: Omarchy's marks, gjetr's one-colour marks, else none", () => {
   assert.equal(Card.kindIconFile("claude", false), "claude.svg")
   assert.equal(Card.kindIconFile("claude", true), "claude.svg")
   assert.equal(Card.kindIconFile("codex", false), "codex.svg")
   assert.equal(Card.kindIconFile("codex", true), "codex-light.svg")
-  assert.equal(Card.kindIconFile("pi", false), "")
+  assert.equal(Card.kindIconFile("pi", false), "pi.svg")
+  assert.equal(Card.kindIconTinted("pi"), true)
+  assert.equal(Card.kindIconTinted("claude"), false)
+  assert.equal(Card.kindIconUrl("pi", false, "/o", "file:///g/assets/kinds"), "file:///g/assets/kinds/pi.svg")
+  assert.equal(Card.kindIconUrl("codex", true, "/o", "file:///g/assets/kinds"), "file:///o/shell/plugins/agents/assets/codex-light.svg")
+  assert.equal(Card.kindIconFile("droid", false), "")
   assert.equal(Card.kindIconFile("__proto__", false), "")
   assert.equal(Card.kindIconFile("../x", false), "")
 })

@@ -164,7 +164,9 @@ Item {
             required property int index
 
             readonly property var entry: modelData
-            readonly property string iconUrl: root.service ? root.service.kindIconUrl(entry.providerId) : ""
+            // Only a brand-colour mark: a one-colour kind SVG would draw black here.
+            readonly property string iconUrl: root.service && !root.service.kindIconTinted(entry.providerId)
+              ? root.service.kindIconUrl(entry.providerId) : ""
             // Space above a provider's first line, after the one before it.
             readonly property int lead: entry.first && index > 0 ? root.gap * 2 : 0
 

@@ -701,9 +701,14 @@ Item {
     return CacheTimerModel.cacheTimer(agent, cacheTimers, now, cacheSettings)
   }
 
+  // A kind's SVG: Omarchy's read in place, else gjetr's own in assets/kinds.
   function kindIconUrl(kind) {
-    var file = CardPolicy.kindIconFile(kind, lightBackground)
-    return file === "" ? "" : "file://" + omarchyPath + "/shell/plugins/agents/assets/" + file
+    return CardPolicy.kindIconUrl(kind, lightBackground, omarchyPath, String(Qt.resolvedUrl("assets/kinds")))
+  }
+
+  // Whether a kind's SVG is one colour, drawn in the theme's (KindMark `tinted`).
+  function kindIconTinted(kind) {
+    return CardPolicy.kindIconTinted(kind)
   }
 
   // Focus is only ever asked for a pane that is a known Agent. The Module that

@@ -308,6 +308,7 @@ Item {
           width: visible ? root.iconSize : 0
           height: root.iconSize
           iconUrl: rowItem.iconUrl
+          tinted: rowItem.row && root.service ? root.service.kindIconTinted(rowItem.row.kind) : false
           letter: rowItem.row ? CardPolicy.kindGlyph(rowItem.row.kind, rowItem.row.displayKind) : ""
           sourcePx: root.compact ? root.density.iconSourcePx : 48
           letterPx: root.compact ? root.density.detailPx : Math.round(Style.font.body * root.textScale)

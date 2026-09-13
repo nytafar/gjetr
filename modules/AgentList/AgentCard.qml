@@ -141,6 +141,7 @@ Item {
     width: visible ? 28 : 0
     height: 28
     iconUrl: root.iconUrl
+    tinted: root.service && root.agent ? root.service.kindIconTinted(root.agent.kind) : false
     letter: root.agent ? CardPolicy.kindGlyph(root.agent.kind, root.agent.displayKind) : ""
     sourcePx: 56
     letterPx: Math.round(Style.font.title * root.textScale)
