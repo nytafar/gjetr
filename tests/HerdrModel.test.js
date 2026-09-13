@@ -463,3 +463,101 @@ test("focusLine refuses an empty pane id", () => {
   assert.equal(H.focusLine("x", ""), "")
   assert.equal(H.focusLine("x", undefined), "")
 })
+
+// ---------------------------------------------------------------- tree
+
+function treeShape(tree) {
+  return tree.workspaces.map(w => [w.workspaceId, w.label, w.status,
+    w.tabs.map(t => [t.tabId, t.label, t.status, t.panes.map(p => [p.paneId, p.kind, p.status])])])
+}
+
+test("the tree holds every workspace, tab and pane, including panes without an agent", () => {
+  const tree = H.tree(H.fromSnapshot(snapshot()))
+  assert.deepEqual(treeShape(JSON.parse(JSON.stringify(tree))), [
+    ["w1", "~", "idle", [["w1:t1", "1", "idle", [["w1:p1", "claude", "idle"]]], ["w1:t2", "api", "unknown", [["w1:p2", "", "unknown"]]]]],
+    ["w2", "hvelv", "working", [["w2:t1", "1", "working", [["w2:p1", "codex", "working"]]]]]
+  ])
+  assert.deepEqual([tree.focusedWorkspaceId, tree.focusedTabId, tree.focusedPaneId], ["w1", "w1:t1", "w1:p1"])
+  const shell = tree.workspaces[0].tabs[1].panes[0]
+  assert.deepEqual([shell.tabLabel, shell.workspaceLabel, shell.cwd, shell.focused], ["api", "~", "/home/x", false])
+})
+
+test("workspaces follow their number; tabs and panes follow herdr's snapshot order", () => {
+  const snap = snapshot()
+  snap.tabs.reverse()
+  const tree = H.tree(H.fromSnapshot(snap))
+  assert.deepEqual(tree.workspaces.map(w => w.workspaceId), ["w1", "w2"])
+  assert.deepEqual(tree.workspaces[0].tabs.map(t => t.tabId), ["w1:t2", "w1:t1"])
+})
+
+test("focus ids fall back to focused flags, and a missing rolled-up status stays empty", () => {
+  const snap = snapshot()
+  delete snap.focused_workspace_id
+  delete snap.focused_tab_id
+  delete snap.tabs[1].agent_status
+  const tree = H.tree(H.fromSnapshot(snap))
+  assert.equal(tree.focusedWorkspaceId, "w1")
+  assert.equal(tree.focusedTabId, "w1:t1")
+  assert.equal(tree.workspaces[0].tabs[1].status, "")
+  assert.deepEqual(JSON.parse(JSON.stringify(H.tree(H.fromSnapshot(null)))),
+    { focusedWorkspaceId: "", focusedTabId: "", focusedPaneId: "", workspaces: [] })
+})
+
+test("a shell's title change leaves the Agents alone but changes the tree", () => {
+  const state = H.fromSnapshot(snapshot())
+  const pane = paneOf(state, "w1:p2")
+  pane.terminal_title_stripped = "lasse@oma:~/code"
+  const out = H.applyEvent(state, ev("pane_updated", { pane }))
+  assert.equal(out.changed, false)
+  assert.equal(out.treeChanged, true)
+  assert.equal(out.focusChanged, false)
+  assert.equal(H.tree(out.state).workspaces[0].tabs[1].panes[0].title, "lasse@oma:~/code")
+})
+
+test("workspace and tab focus change the Focused workspace without touching the Agents", () => {
+  const state = H.fromSnapshot(snapshot())
+  const ws = H.applyEvent(state, ev("workspace_focused", { workspace_id: "w2" }))
+  assert.deepEqual([ws.changed, ws.treeChanged, ws.focusChanged], [false, true, true])
+  assert.equal(H.tree(ws.state).focusedWorkspaceId, "w2")
+  const tab = H.applyEvent(state, ev("tab_focused", { tab_id: "w2:t1", workspace_id: "w2" }))
+  assert.deepEqual([tab.changed, tab.focusChanged], [false, true])
+  assert.deepEqual([H.tree(tab.state).focusedTabId, H.tree(tab.state).focusedWorkspaceId], ["w2:t1", "w2"])
+  const again = H.applyEvent(state, ev("workspace_focused", { workspace_id: "w1" }))
+  assert.deepEqual([again.changed, again.treeChanged, again.focusChanged], [false, false, false])
+})
+
+test("pane_focused on a plain pane moves the Focused workspace and tab with it", () => {
+  const state = H.applyEvent(H.fromSnapshot(snapshot()), ev("workspace_focused", { workspace_id: "w2" })).state
+  const out = H.applyEvent(state, ev("pane_focused", { pane_id: "w1:p2", workspace_id: "w1" }))
+  assert.equal(out.focusChanged, true)
+  assert.deepEqual([H.tree(out.state).focusedWorkspaceId, H.tree(out.state).focusedTabId], ["w1", "w1:t2"])
+})
+
+test("eventInvalidates can include tree changes; sameTree compares the rendered tree", () => {
+  const state = H.fromSnapshot(snapshot())
+  const pane = paneOf(state, "w1:p2")
+  pane.terminal_title_stripped = "vim"
+  const envelope = ev("pane_updated", { pane })
+  assert.equal(H.eventInvalidates(state, envelope), false)
+  assert.equal(H.eventInvalidates(state, envelope, true), true)
+  assert.equal(H.eventInvalidates(state, ev("workspace_focused", { workspace_id: "w2" })), true)
+  assert.equal(H.sameTree(state, H.fromSnapshot(snapshot())), true)
+  const renamed = snapshot()
+  renamed.tabs[1].label = "server"
+  assert.equal(H.sameTree(state, H.fromSnapshot(renamed)), false)
+  assert.equal(H.sameTree(null, state), false)
+})
+
+test("focusTargetLine focuses a workspace, tab or pane by id", () => {
+  assert.deepEqual(JSON.parse(H.focusTargetLine("a", "workspace", "w2")), { id: "a", method: "workspace.focus", params: { workspace_id: "w2" } })
+  assert.deepEqual(JSON.parse(H.focusTargetLine("b", "tab", "w2:t1")), { id: "b", method: "tab.focus", params: { tab_id: "w2:t1" } })
+  assert.deepEqual(JSON.parse(H.focusTargetLine("c", "pane", "w1:p2")), { id: "c", method: "pane.focus", params: { pane_id: "w1:p2" } })
+  assert.equal(H.focusTargetLine("d", "agent", "w1:p1"), "")
+  assert.equal(H.focusTargetLine("e", "tab", ""), "")
+})
+
+test("subscribeLine follows workspace and tab focus for the Focused workspace", () => {
+  const types = JSON.parse(H.subscribeLine("gjetr:3")).params.subscriptions.map(s => s.type)
+  assert.ok(types.includes("workspace.focused"))
+  assert.ok(types.includes("tab.focused"))
+})

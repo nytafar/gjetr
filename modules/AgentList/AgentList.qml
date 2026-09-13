@@ -18,10 +18,17 @@ Item {
   // <layout>#<index>: this Module's Overrides and session state.
   property string moduleKey: ""
 
-  readonly property var moduleState: service && service.moduleStates[moduleKey] ? service.moduleStates[moduleKey] : null
+  // Checked by type: while a Layout file loads, this key can briefly name a
+  // Module of another type.
+  readonly property var moduleState: service && service.moduleStates[moduleKey]
+    && service.moduleStates[moduleKey].type === "agent-list" ? service.moduleStates[moduleKey] : null
   readonly property string preset: moduleState ? moduleState.preset : CardPolicy.DEFAULT_PRESET
   readonly property string sortMode: moduleState ? moduleState.sort : "spaces"
   readonly property string focusMode: moduleState ? moduleState.focus : "herdr"
+  // highlight_workspace: Cards of Agents in herdr's Focused workspace get a
+  // subtle tint. It never filters the list.
+  readonly property string highlightedWorkspace: service && moduleState && moduleState.highlightWorkspace
+    ? service.focusedWorkspaceId : ""
 
   readonly property string recapMode: moduleState ? moduleState.recap : "off"
   // The Agent whose Recap is open in this Module's overlay (recap_open =
@@ -232,6 +239,7 @@ Item {
         statusColor: root.toneColor(CardPolicy.statusTone(agent ? agent.status : ""))
         cacheColor: root.toneColor(CardPolicy.cacheTone(cacheTimer ? cacheTimer.level : ""))
         attention: root.service ? root.service.attentionFor(agent, root.service.attention) : ""
+        inFocusedWorkspace: root.highlightedWorkspace !== "" && !!agent && agent.workspaceId === root.highlightedWorkspace
         recapMode: root.recapMode
         recapText: root.service ? root.service.recapFor(agent, root.service.recaps) : ""
         recapOpen: root.service ? root.service.recapOpenFor(agent, root.service.recapOpen, root.moduleKey) : false

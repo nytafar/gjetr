@@ -1,0 +1,32 @@
+# Workspaces, landscape: herdr's workspace > tab > pane tree beside the Agent
+# List. Add "workspaces" to a Display's deck in gjetr.toml to use it.
+
+orientation = "landscape"
+
+# The Workspace List: every workspace, tab and pane, including panes without
+# an agent, as a tree that expands in place. Workspace rows show their rolled-up
+# status and tab count; tabs their pane count, or the agent kind ("shell"
+# without one) when they hold a single pane; panes their kind and name.
+[[module]]
+type = "workspace-list"
+
+# What a tap on a row does:
+# "expand" (default): a workspace or tab opens or closes; a pane (or a tab with
+#   one pane) is focused in herdr.
+# "focus": the row's workspace, tab or pane is focused in herdr; the chevron at
+#   the right edge opens or closes it.
+tap = "expand"
+
+# Focus behaviour for this Module's taps: "herdr", or "window" to also bring
+# the terminal window running herdr forward. Tapping "focus" in the header
+# flips it as an Override.
+focus = "herdr"
+
+[[module]]
+type = "agent-list"
+sort = "spaces"
+preset = "compact"
+
+# Cards of Agents in herdr's focused workspace get a subtle tint. The list is
+# never filtered. true (default) or false.
+highlight_workspace = true

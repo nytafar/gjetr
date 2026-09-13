@@ -28,10 +28,15 @@ QtObject {
   id: root
 
   property string socketPath: ""
+  // Set by the service while a Module on screen draws the workspace tree, so a
+  // change to a pane without an agent (a shell's title) takes a new snapshot.
+  property bool treeWanted: false
 
   // Published.
   property bool online: false
   property var agents: []
+  // herdr's workspace > tab > pane tree with the focused ids (HerdrModel.tree).
+  property var tree: HerdrModel.tree(null)
   property int attempt: 0
   property int retryInMs: 0
   property string lastError: ""
@@ -54,10 +59,11 @@ QtObject {
   property var focusSocket: null
   property bool focusConnected: false
   property string focusRequestLine: ""
-  property string focusPaneId: ""
+  property string focusKind: ""
+  property string focusTargetId: ""
 
-  // herdr accepted a pane.focus request.
-  signal paneFocused(string paneId)
+  // herdr accepted a focus request for a workspace, tab or pane.
+  signal targetFocused(string kind, string id)
 
   function log(message) {
     console.info("[gjetr] herdr " + message)
@@ -157,6 +163,7 @@ QtObject {
     var next = HerdrModel.fromSnapshot(snapshot)
     var wasOnline = online
     var differs = !HerdrModel.sameAgents(model, next)
+    var treeDiffers = !HerdrModel.sameTree(model, next)
     model = next
     phase = "live"
     online = true
@@ -164,6 +171,7 @@ QtObject {
     retryInMs = 0
     lastError = ""
     if (differs || !wasOnline) publish()
+    if (treeDiffers || !wasOnline) tree = HerdrModel.tree(model)
     if (!wasOnline) log("online, " + agents.length + " agents")
     if (refreshQueued) {
       refreshQueued = false
@@ -176,7 +184,7 @@ QtObject {
     var item = HerdrModel.classifyStreamLine(line)
     if (item.kind === "event") {
       eventsSeen++
-      if ((phase === "snapshot" || phase === "live") && HerdrModel.eventInvalidates(model, item.envelope))
+      if ((phase === "snapshot" || phase === "live") && HerdrModel.eventInvalidates(model, item.envelope, treeWanted))
         markStale()
     } else if (item.kind === "started") {
       if (phase === "subscribing") requestSnapshot()
@@ -185,15 +193,21 @@ QtObject {
     }
   }
 
-  // Focus one pane over its own one-shot socket. A newer tap replaces a request
-  // still in flight. Focus never touches connection state: a failure is
-  // logged, and the snapshot after herdr's pane_focused event shows the result.
+  // Focus one workspace, tab or pane over its own one-shot socket. A newer tap
+  // replaces a request still in flight. Focus never touches connection state: a
+  // failure is logged, and the snapshot after herdr's focus event shows the
+  // result.
   function focusPane(paneId) {
-    var line = HerdrModel.focusLine(nextId("focus"), paneId)
+    return focusTarget("pane", paneId)
+  }
+
+  function focusTarget(kind, id) {
+    var line = HerdrModel.focusTargetLine(nextId("focus"), kind, id)
     if (line === "" || socketPath === "") return false
     dropFocus()
     focusRequestLine = line
-    focusPaneId = String(paneId)
+    focusKind = String(kind)
+    focusTargetId = String(id)
     focusConnected = false
     focusSocket = commandComponent.createObject(root, { path: socketPath })
     focusTimeout.restart()
@@ -210,7 +224,7 @@ QtObject {
   function failFocus(reason) {
     dropFocus()
     lastFocusError = reason
-    log("focus " + focusPaneId + " failed: " + reason)
+    log("focus " + focusKind + " " + focusTargetId + " failed: " + reason)
   }
 
   function handleFocusLine(socket, line) {
@@ -223,7 +237,7 @@ QtObject {
     dropFocus()
     lastFocusError = ""
     focuses++
-    paneFocused(focusPaneId)
+    targetFocused(focusKind, focusTargetId)
   }
 
   function publish() {

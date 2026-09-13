@@ -16,6 +16,7 @@ import "lib/CommandPolicy.js" as CommandPolicy
 import "lib/AttentionModel.js" as AttentionModel
 import "lib/DeckPolicy.js" as DeckPolicy
 import "lib/RecapModel.js" as RecapModel
+import "lib/WorkspaceTreeModel.js" as WorkspaceTreeModel
 
 // Owns Display selection, the herdr connection and everything that must
 // outlive a surface. The surface itself is created per matching screen and
@@ -100,7 +101,23 @@ Item {
   // The first Agent List: what `state` reports, and what the IPC functions that
   // name no Module act on. Empty key when the Layout has none.
   readonly property var agentListConfig: ConfigModel.agentList(activeLayout)
-  readonly property var primaryModule: moduleStates[agentListKey] || null
+  // Checked by type: while a Layout file loads, a key can briefly name a
+  // Module of another type.
+  readonly property var primaryModule: moduleStates[agentListKey] && moduleStates[agentListKey].type === "agent-list"
+    ? moduleStates[agentListKey] : null
+  // The first Workspace List: what the tree IPC functions act on.
+  readonly property string workspaceListKey: {
+    for (var i = 0; i < activeModules.length; i++) if (activeModules[i].type === "workspace-list") return activeModules[i].key
+    return ""
+  }
+
+  // herdr's workspace > tab > pane tree and the Focused workspace. Agent Lists
+  // highlight the Agents in it; nothing filters by it.
+  readonly property var workspaceTree: herdr.tree
+  readonly property string focusedWorkspaceId: workspaceTree ? workspaceTree.focusedWorkspaceId : ""
+  // Session state, never written: the expanded workspaces and tabs of each
+  // Workspace List (WorkspaceTreeModel expansion state), pruned as they go away.
+  property var treeExpanded: WorkspaceTreeModel.emptyExpanded()
   readonly property var configErrors: collectConfigErrors(mainRead, layoutTexts, deckNames)
   readonly property string configSummary: "display " + display.name + (display.rotatable ? " rotatable" : "")
     + ", deck [" + deckLayouts.join(", ") + "]"
@@ -467,6 +484,57 @@ Item {
     return next
   }
 
+  // ------------------------------------------------------------ Workspace List
+
+  // Pass `workspaceTree`, `treeExpanded` and `attention` from a binding so the
+  // rows re-evaluate when any of them changes.
+  function workspaceRows(moduleKey, tree, expanded, attentionModel) {
+    return WorkspaceTreeModel.rows(tree, expanded, moduleKey, attentionModel)
+  }
+
+  // Expands or collapses a workspace ("w:<id>") or tab ("t:<id>") in one
+  // Workspace List. -> "expanded", "collapsed" or why nothing happened.
+  function toggleExpanded(moduleKey, nodeKey) {
+    var key = moduleKey ? String(moduleKey) : workspaceListKey
+    var state = moduleStates[key]
+    if (!state || state.type !== "workspace-list") return "no workspace list"
+    var node = String(nodeKey || "")
+    if (!/^[wt]:/.test(node) || !WorkspaceTreeModel.nodeExists(workspaceTree, node)) return "unknown node"
+    treeExpanded = WorkspaceTreeModel.toggleExpanded(treeExpanded, key, node)
+    return WorkspaceTreeModel.isExpanded(treeExpanded, key, node) ? "expanded" : "collapsed"
+  }
+
+  // A tap on a row of one Workspace List, in its "row" or "chevron" zone.
+  // What it does is WorkspaceTreeModel.tapAction for the Module's tap mode.
+  function tapWorkspaceRow(moduleKey, row, zone) {
+    var key = moduleKey ? String(moduleKey) : workspaceListKey
+    var state = moduleStates[key]
+    if (!state || state.type !== "workspace-list") return "no workspace list"
+    var action = WorkspaceTreeModel.tapAction(row, state.tap, zone)
+    if (action.action === "toggle") return toggleExpanded(key, action.key)
+    if (action.action === "focus")
+      return focusTarget(action.kind, action.id, key) ? "focus " + action.kind + " " + action.id : "unknown " + action.kind
+    return "nothing"
+  }
+
+  // The row of the first Workspace List with this node key, as drawn now.
+  function workspaceRowByKey(nodeKey) {
+    var list = workspaceRows(workspaceListKey, workspaceTree, treeExpanded, attention)
+    for (var i = 0; i < list.length; i++) if (list[i].key === nodeKey) return list[i]
+    return null
+  }
+
+  // Focus a workspace, tab or pane of herdr's tree, with the Focus behaviour of
+  // the Module that asked. Panes need not hold an Agent.
+  function focusTarget(kind, id, moduleKey) {
+    var value = String(id || "")
+    var prefix = kind === "workspace" ? "w:" : kind === "tab" ? "t:" : kind === "pane" ? "p:" : ""
+    if (prefix === "" || value === "" || !WorkspaceTreeModel.nodeExists(workspaceTree, prefix + value)) return false
+    if (kind === "pane") attention = AttentionModel.acknowledge(attention, value)
+    pendingFocusMode = focusModeFor(moduleKey)
+    return herdr.focusTarget(kind, value)
+  }
+
   function focusModeFor(moduleKey) {
     var state = moduleStates[moduleKeyOr(moduleKey)]
     return state && state.focus ? state.focus : "herdr"
@@ -642,6 +710,17 @@ Item {
       windowFocus: windowFocus,
       commands: { started: commands.started, refused: commands.refused, lastError: commands.lastError },
       config: { dir: configDir, summary: configSummary, errors: configErrors },
+      workspaces: {
+        list: workspaceListKey,
+        focusedWorkspace: focusedWorkspaceId,
+        count: workspaceTree ? workspaceTree.workspaces.length : 0,
+        expanded: treeExpanded,
+        rows: workspaceListKey === "" ? [] : workspaceRows(workspaceListKey, workspaceTree, treeExpanded, attention)
+          .map(function(row) {
+            return { key: row.key, label: row.label, detail: row.detail, status: row.status, focused: row.focused,
+              attention: row.attention, expanded: row.expanded }
+          })
+      },
       modules: activeModules.map(function(module, index) {
         var state = moduleStates[module.key] || {}
         return { key: module.key, type: module.type, weight: module.weight, sort: state.sort, focus: state.focus,
@@ -687,6 +766,7 @@ Item {
           status: agent.status,
           attention: attentionFor(agent, attention),
           recap: recapFor(agent, recaps) !== "",
+          inFocusedWorkspace: focusedWorkspaceId !== "" && agent.workspaceId === focusedWorkspaceId,
           name: agentName(agent),
           location: agentLocation(agent),
           cache: timer ? timer.label + " " + timer.level : ""
@@ -698,7 +778,8 @@ Item {
   HerdrConnection {
     id: herdr
     socketPath: root.herdrSocketPath
-    onPaneFocused: if (root.pendingFocusMode === "window") root.focusHostWindow()
+    treeWanted: root.workspaceListKey !== ""
+    onTargetFocused: if (root.pendingFocusMode === "window") root.focusHostWindow()
   }
 
   CommandRunner {
@@ -749,6 +830,7 @@ Item {
   }
 
   onAgentsChanged: applyAgents()
+  onWorkspaceTreeChanged: treeExpanded = WorkspaceTreeModel.pruneExpanded(treeExpanded, workspaceTree)
   onActiveLayoutNameChanged: {
     closeRecapOverlay()
     orientationTimer.restart()
@@ -860,6 +942,19 @@ Item {
     // Opens or closes a Card's full Recap, as a tap on its recap area does.
     function toggleRecap(paneId: string): string {
       return root.toggleRecap(paneId, "")
+    }
+
+    // Expands or collapses a workspace ("w:<id>") or tab ("t:<id>") in the
+    // first Workspace List of the active Layout.
+    function toggleExpand(nodeKey: string): string {
+      return root.toggleExpanded("", nodeKey)
+    }
+
+    // Taps a row of the first Workspace List ("w:<id>", "t:<id>", "p:<id>"),
+    // in zone "row" or "chevron", as a finger does.
+    function tapRow(nodeKey: string, zone: string): string {
+      var row = root.workspaceRowByKey(nodeKey)
+      return row ? root.tapWorkspaceRow("", row, zone === "chevron" ? "chevron" : "row") : "unknown row"
     }
 
     function selectLayout(name: string): string {

@@ -15,6 +15,8 @@ Item {
   property bool interactive: true
   property color statusColor: Color.muted
   property color cacheColor: Color.muted
+  // The Agent is in herdr's Focused workspace (highlight_workspace).
+  property bool inFocusedWorkspace: false
   // "blocked" or "done" while the Agent is in Attention, else "".
   property string attention: ""
   // Recap: "off", "inline" (clamped under the Fields) or "expand" (a
@@ -47,9 +49,12 @@ Item {
     color: tap.pressed
       ? Style.pressedFillFor(Color.foreground, Color.accent)
       : root.focused ? Style.selectedFillFor(Color.foreground, Color.accent)
+      : root.inFocusedWorkspace ? Util.alpha(Color.accent, 0.08)
       : Style.normalFillFor(Color.foreground, Color.accent)
     border.width: 1
-    border.color: root.focused ? Color.accent : Util.alpha(Color.foreground, 0.1)
+    border.color: root.focused ? Color.accent
+      : root.inFocusedWorkspace ? Util.alpha(Color.accent, 0.35)
+      : Util.alpha(Color.foreground, 0.1)
   }
 
   // Attention: a tinted fill and a thick border in the status colour, breathing

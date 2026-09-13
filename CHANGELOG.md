@@ -15,6 +15,20 @@ All notable changes to gjetr. The format follows
   Recaps, so two Agent Lists with different Sort modes can sit side by side.
 - `state` → `modules` lists the active Layout's Modules with key, type, weight
   and rectangle.
+- The Workspace List Module, `type = "workspace-list"`: herdr's workspaces,
+  tabs and panes as a tree that expands in place, panes without an agent
+  included. Rows show rolled-up status, labels, tab and pane counts or the
+  single pane's agent kind, and pulse while a pane below them is in Attention.
+  `tap = "expand"` (default) opens rows and focuses panes; `tap = "focus"`
+  focuses the workspace, tab or pane and expands from a chevron. Per-Module
+  `focus = "herdr" | "window"` with its Override. Expansion is kept per Module
+  for the session, survives updates without moving the scroll position, and
+  is never written.
+- `highlight_workspace` per Agent List, default `true`: Cards of Agents in
+  herdr's Focused workspace get a subtle tint. The list is never filtered.
+- IPC `toggleExpand <node>` and `tapRow <node> <zone>`; `state` → `workspaces`,
+  and `inFocusedWorkspace` on each Card.
+- `examples/gjetr/layouts/workspaces.toml`.
 - `recap_open = "card" | "overlay"` per Agent List, default `card`: with
   `recap = "expand"` the full Recap opens inside its Card, under the Fields,
   and the Card grows. Several Cards can be open at once; open Cards follow
@@ -25,6 +39,9 @@ All notable changes to gjetr. The format follows
 
 ### Changed
 
+- gjetr also subscribes to herdr's `workspace.focused` and `tab.focused`, to
+  follow the Focused workspace. They collapse unless the focus really moves.
+- Deck tab badges count on Layouts with a Workspace List too.
 - IPC `cycleSort`, `toggleFocus` and `toggleRecap` act on the first Agent List
   of the active Layout, and say `no agent list` when it has none.
 - The Agent List places Cards by measured height instead of a uniform grid,

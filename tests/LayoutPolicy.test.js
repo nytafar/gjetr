@@ -155,3 +155,19 @@ test("moduleRects treats junk weights as 1 and never goes negative", () => {
   assert.deepEqual(Layout.moduleRects(500, 300, [], 8), [])
   assert.deepEqual(Layout.moduleRects(500, 300, [1], 8).map(r => ({ ...r })), [{ x: 0, y: 0, width: 500, height: 300 }])
 })
+
+test("keepRowScroll holds the row at the top of the view when rows change above or below it", () => {
+  const before = ["a", "b", "c", "d", "e"]
+  // View top at 130 with 60 px rows: row c (index 2) is at the top, 10 px scrolled into it.
+  assert.equal(Layout.keepRowScroll(before, ["a", "x", "y", "b", "c", "d", "e"], 60, 130), 250)
+  // Rows inserted below the top row (an expanded row) move nothing.
+  assert.equal(Layout.keepRowScroll(before, ["a", "b", "c", "c1", "c2", "d", "e"], 60, 130), 130)
+  // Rows removed above it pull the view up with it.
+  assert.equal(Layout.keepRowScroll(before, ["c", "d", "e"], 60, 130), 10)
+  // The top row itself gone: the nearest surviving row above it keeps its place.
+  assert.equal(Layout.keepRowScroll(before, ["x", "a", "b", "d", "e"], 60, 130), 190)
+  // Nothing survives, junk, or at the very top: unchanged.
+  assert.equal(Layout.keepRowScroll(before, ["z"], 60, 130), 130)
+  assert.equal(Layout.keepRowScroll(before, ["x", "a"], 60, 0), 0)
+  assert.equal(Layout.keepRowScroll(null, null, 0, 40), 40)
+})

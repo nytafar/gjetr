@@ -159,7 +159,7 @@ focus = "window"
   assert.deepEqual(plain(read.layout), {
     name: "agents",
     orientation: "landscape",
-    modules: [{ type: "agent-list", sort: "cache", preset: "compact", focus: "window", recap: "off", recapOpen: "card", weight: 1 }]
+    modules: [{ type: "agent-list", sort: "cache", preset: "compact", focus: "window", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true }]
   })
 })
 
@@ -168,7 +168,7 @@ test("a missing layout file is the default Agent List, with an error", () => {
   assert.deepEqual(plain(read.layout), {
     name: "agents",
     orientation: "portrait",
-    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1 }]
+    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true }]
   })
   assert.match(read.errors.join("\n"), /layouts\/agents\.toml: not found/)
 })
@@ -186,7 +186,7 @@ extra = true
   assert.deepEqual(plain(read.layout), {
     name: "side",
     orientation: "portrait",
-    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1 }]
+    modules: [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true }]
   })
   const text = read.errors.join("\n")
   for (const key of ["orientation", "module[0].sort", "module[0].preset", "module[0].focus", "module[0].extra"]) {
@@ -196,7 +196,7 @@ extra = true
 
 test("unknown module types are skipped; no modules left means the default", () => {
   const read = Config.readLayout("x", '[[module]]\ntype = "usage"\n')
-  assert.deepEqual(plain(read.layout.modules), [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1 }])
+  assert.deepEqual(plain(read.layout.modules), [{ type: "agent-list", sort: "spaces", preset: "detailed", focus: "herdr", recap: "off", recapOpen: "card", weight: 1, highlightWorkspace: true }])
   assert.match(read.errors.join("\n"), /module\[0\]\.type: /)
   assert.match(read.errors.join("\n"), /no valid module/)
 })
@@ -298,4 +298,31 @@ test("layoutModules keys Modules by their position among valid Modules", () => {
   const read = Config.readLayout("mix", '[[module]]\ntype = "nope"\n[[module]]\ntype = "agent-list"\n')
   assert.deepEqual(plain(Config.layoutModules(read.layout)).map(m => m.key), ["mix#0"])
   assert.deepEqual(plain(Config.layoutModules(null)), [])
+})
+
+test("a workspace-list Module reads tap, focus and weight", () => {
+  const read = Config.readLayout("ws", '[[module]]\ntype = "workspace-list"\ntap = "focus"\nfocus = "window"\nweight = 2\n')
+  assert.deepEqual(Array.from(read.errors), [])
+  assert.deepEqual(plain(read.layout.modules), [{ type: "workspace-list", tap: "focus", focus: "window", weight: 2 }])
+  const plainList = Config.readLayout("ws", '[[module]]\ntype = "workspace-list"\n')
+  assert.deepEqual(plain(plainList.layout.modules), [{ type: "workspace-list", tap: "expand", focus: "herdr", weight: 1 }])
+})
+
+test("workspace-list values fall back per field", () => {
+  const read = Config.readLayout("ws", '[[module]]\ntype = "workspace-list"\ntap = "hover"\nfocus = "teleport"\nsort = "spaces"\n')
+  assert.deepEqual(plain(read.layout.modules), [{ type: "workspace-list", tap: "expand", focus: "herdr", weight: 1 }])
+  const text = read.errors.join("\n")
+  assert.match(text, /layouts\/ws\.toml: module\[0\]\.tap: expected one of expand, focus/)
+  assert.match(text, /layouts\/ws\.toml: module\[0\]\.focus: expected one of herdr, window/)
+  assert.match(text, /layouts\/ws\.toml: module\[0\]\.sort: unknown key/)
+})
+
+test("highlight_workspace is on by default and may be turned off per Agent List", () => {
+  assert.equal(Config.readLayout("a", '[[module]]\ntype = "agent-list"\n').layout.modules[0].highlightWorkspace, true)
+  const off = Config.readLayout("a", '[[module]]\ntype = "agent-list"\nhighlight_workspace = false\n')
+  assert.deepEqual(Array.from(off.errors), [])
+  assert.equal(off.layout.modules[0].highlightWorkspace, false)
+  const bad = Config.readLayout("a", '[[module]]\ntype = "agent-list"\nhighlight_workspace = "no"\n')
+  assert.equal(bad.layout.modules[0].highlightWorkspace, true)
+  assert.match(bad.errors.join("\n"), /layouts\/a\.toml: module\[0\]\.highlight_workspace: expected true or false/)
 })

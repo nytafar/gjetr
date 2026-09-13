@@ -15,11 +15,12 @@ Two rules shape every file:
 ## Data flow
 
 ```
-herdr socket ──► HerdrConnection.qml ──► HerdrModel.js ─┐
+herdr socket ──► HerdrConnection.qml ──► HerdrModel.js ─┐   (Agents and workspace tree)
 cache-ttl files ─► FileView ──────────► CacheTimerModel ─┤
 ~/.config/gjetr ─► FileView ──────────► ConfigModel ─────┤
 state.json ─────► FileView ──────────► OverrideModel ────┼─► Service.qml ─► DeckSurface.qml ─► DeckTabs.qml
-~/.claude/projects ► CommandRunner ───► RecapModel ──────┤                                   └► AgentList ─► AgentCard
+~/.claude/projects ► CommandRunner ───► RecapModel ──────┤                                   ├► AgentList ─► AgentCard
+                                        WorkspaceTreeModel ┘                                   └► WorkspaceList
 hyprctl / ps ───► CommandRunner ───► WindowPolicy, DeckPolicy
 ```
 
@@ -36,7 +37,8 @@ registries. Those properties must stay writable (see `AGENTS.md`).
 Owns: Display selection, Config and Layout texts, the active Layout's Modules
 and each Module's effective settings (`moduleStates`, keyed `<layout>#<index>`),
 Overrides and the single write to `state.json`, the herdr connection, Agents in
-every Sort mode (`sortedByMode`), Attention, Recaps,
+every Sort mode (`sortedByMode`), herdr's workspace tree and which of its rows
+each Workspace List has expanded (`treeExpanded`), Attention, Recaps,
 Cache timers and the display clock, the Deck and the active Layout, runtime
 rotation and touch transforms, window focus, and IPC.
 
@@ -45,8 +47,11 @@ decision that can be a pure function. It calls into `lib/` for all of those.
 
 ### `HerdrConnection.qml`
 
-Owns: sockets, reconnect timers, the published `agents`, `online`, `attempt`
-and focus request counters. One `Socket` object per connection attempt and per
+Owns: sockets, reconnect timers, the published `agents`, `tree` (workspaces,
+tabs and panes with the focused ids), `online`, `attempt` and focus request
+counters. Focus requests name a workspace, tab or pane. It re-snapshots on a
+change to a pane without an agent only while `treeWanted`, which the service
+sets when a Workspace List is on screen. One `Socket` object per connection attempt and per
 request, because a Quickshell 0.3.1 `Socket` never retries after a failed
 connect.
 
@@ -78,6 +83,19 @@ anything (`DeckPolicy.swipeTarget`).
 
 Tabs on one edge with badges. Reports a tapped Layout name. Owns nothing.
 
+### `modules/WorkspaceList/WorkspaceList.qml`
+
+The Workspace List Module: header (workspace count, tap mode, Focus behaviour
+toggle), Offline banner, and the rows of `WorkspaceTreeModel.rows` for its
+Module key. Rows live in a `ListModel` keyed by node and updated in place, and
+`LayoutPolicy.keepRowScroll` holds the row at the top of the view when rows
+open, close or change above it. A row draws its status bar, kind mark, label,
+detail, Attention pulse and, for a parent, a chevron. Every tap goes to
+`Service.tapWorkspaceRow(key, row, zone)`.
+
+Does not own: the tree, expansion state, what a tap does
+(`WorkspaceTreeModel.tapAction`), or Focus.
+
 ### `modules/AgentList/AgentList.qml`, `AgentCard.qml`
 
 The Agent List Module: header (Agent count, Sort mode and Focus behaviour
@@ -90,7 +108,8 @@ keep scroll position and running animations. A Flickable places them with
 its Recap open grows and pushes the rows below it down; `keepScroll` holds the
 view when a Card above it changes height. A Card draws its Fields, its
 Attention pulse and its Recap, and reports taps, long presses and the Recap
-disclosure.
+disclosure. With `highlight_workspace`, Cards of Agents in the Focused workspace
+get a faint accent tint.
 
 Does not own: Agents, sorting, Attention or Recap state, colours (theme tokens
 come from `CardPolicy`), or what a tap does.
@@ -99,7 +118,8 @@ come from `CardPolicy`), or what a tap does.
 
 | File | Decides or transforms | Does not own |
 |---|---|---|
-| `HerdrModel.js` | Request lines, reply and stream parsing, snapshot to Agents (with herdr's order, `state_change_seq`, session id), whether an event would change what is drawn, reconnect and debounce timing | Sockets, timers |
+| `HerdrModel.js` | Request lines (focus of a pane, tab or workspace), reply and stream parsing, snapshot to Agents (with herdr's order, `state_change_seq`, session id) and to the workspace tree (every pane, herdr's rolled-up statuses, focused ids), whether an event would change what is drawn, reconnect and debounce timing | Sockets, timers |
+| `WorkspaceTreeModel.js` | Tree to Workspace List rows (rolled-up status and Attention, counts, kinds, names), expansion state per Module and its pruning, what a tap on a row does in `expand` and `focus` mode | Drawing, Focus |
 | `SortPolicy.js` | `spaces`, `priority`, `cache`, matching herdr and cache-ttl | Cache timer arithmetic |
 | `NamePolicy.js` | Agent name fallback and the workspace › tab Field | |
 | `CacheTimerModel.js` | `timers.json` and plugin thresholds to a Cache timer, level and label | File watching |
@@ -108,8 +128,8 @@ come from `CardPolicy`), or what a tap does.
 | `RecapModel.js` | Transcript path checks, stat parsing, the latest `away_summary`, cleaning untrusted text, which Recaps are open per Module and pane | Finding or reading files |
 | `ConfigModel.js` | TOML to validated Displays, Decks, Layouts and Module settings (including `weight`), with per-key errors; a Layout's Modules with their keys | Loading or watching files |
 | `OverrideModel.js` | `state.json` parse, set, clear and stable serialization; each Module's settings shadowed by its Overrides | Writing the file |
-| `LayoutPolicy.js` | Screen by output name, bar inset, content rectangle, Module rectangles by weight, columns, Card placement by height, scroll keeping | |
-| `DeckPolicy.js` | Available and active Layouts, orientation to transform, `hyprctl monitors` parsing, tab edge and rectangle, swipe step, badges | Running `hyprctl` |
+| `LayoutPolicy.js` | Screen by output name, bar inset, content rectangle, Module rectangles by weight, columns, Card placement by height, scroll keeping for Cards and for rows | |
+| `DeckPolicy.js` | Available and active Layouts, orientation to transform, `hyprctl monitors` parsing, tab edge and rectangle, swipe step, badges (Layouts with an Agent List or Workspace List) | Running `hyprctl` |
 | `WindowPolicy.js` | Process table and window list to the host window of a herdr client | Running `ps` or `hyprctl` |
 | `ListSyncPolicy.js` | Remove, move and insert steps between two key orders | The model |
 | `CommandPolicy.js` | The complete allowlist of process argv, and builders that return `[]` for any value outside it | Starting processes |
@@ -137,10 +157,10 @@ come from Config, herdr or Hyprland are validated against a pattern first.
 
 | State | Writer | Persisted |
 |---|---|---|
-| Agents, online, attempt | `HerdrConnection.qml` | no |
+| Agents, workspace tree, online, attempt | `HerdrConnection.qml` | no |
 | Config texts | FileViews in `Service.qml` (read only) | user's files, never written |
 | Overrides | `Service.writeOverrides` | `~/.local/state/gjetr/state.json` |
-| Attention, Recaps, open Recaps (per Module and pane, and the overlay's Module and pane), rotation and touch status, window focus status | `Service.qml` | no |
+| Attention, Recaps, open Recaps (per Module and pane, and the overlay's Module and pane), expanded Workspace List rows (per Module and node), rotation and touch status, window focus status | `Service.qml` | no |
 | Output transform and touch transform | Hyprland, requested by `Service.applyOrientation` | runtime only, reset by `hyprctl reload` |
 
 ## Tests

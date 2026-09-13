@@ -30,6 +30,9 @@ lives beside the Omarchy bar, and needs no daemon.
 - **The same order as herdr.** Sort modes `spaces`, `priority` and `cache`
   match herdr's own agent panel and the cache-ttl plugin. Tap the header to
   cycle.
+- **Workspace List.** herdr's workspaces, tabs and panes as a tree that
+  expands in place, plain shells included, so any pane is a tap away. Agent
+  Lists quietly highlight the agents in herdr's focused workspace.
 - **Recap.** For Claude agents, the latest session recap Claude Code wrote,
   inline on the Card or on request.
 - **Decks of Layouts.** Several Layouts per display, with tabs on a short edge,
@@ -124,6 +127,8 @@ rotatable = true
 | Tap the header | Next Sort mode |
 | Tap `focus` in the header | Switch Focus behaviour between `herdr` and `window` |
 | Tap a tab, or swipe sideways | Change Layout |
+| Tap a workspace or tab row | Open or close it (`tap = "expand"`), or focus it in herdr (`tap = "focus"`, where the chevron opens it) |
+| Tap a pane row | Focus that pane, agent or shell |
 | Tap `recap` on a Card, or long press | Open or close the full Recap in the Card, or over the list with `recap_open = "overlay"` (with `recap = "expand"`) |
 
 These choices are remembered until you reset them with
@@ -184,7 +189,6 @@ window focus when you tap with Focus behaviour `window`.
 ## Roadmap
 
 - A docked surface on the main monitor that reserves space across workspaces
-- A Workspace List Module for panes without an agent
 - A usage Module
 - Client mode: work in a herdr pane on the display when the desk is away
 - Long-press actions on Cards

@@ -40,3 +40,7 @@ recap = "off"
 # Fields; the Card grows, and a tap on the Recap closes it; several can be open)
 # or "overlay" (over the whole list; a tap closes it).
 recap_open = "card"
+
+# Cards of Agents in herdr's focused workspace get a subtle tint. The list is
+# never filtered. true (default) or false.
+highlight_workspace = true

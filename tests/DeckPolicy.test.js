@@ -139,3 +139,9 @@ test("tabRect places the tab bar on its edge inside the bar inset", () => {
   assert.deepEqual({ ...Deck.tabRect(600, 1024, inset, "top", 56) }, { x: 0, y: 0, width: 572, height: 56 })
   assert.deepEqual({ ...Deck.tabRect(600, 1024, inset, "bottom", 56) }, { x: 0, y: 968, width: 572, height: 56 })
 })
+
+test("badges count on Layouts with a Workspace List too, which reaches every Agent", () => {
+  const DeckForBadges = loadLib("lib/DeckPolicy.js")
+  const layouts = { a: { modules: [{ type: "agent-list" }] }, w: { modules: [{ type: "workspace-list" }] }, u: { modules: [{ type: "usage" }] } }
+  assert.deepEqual(Array.from(DeckForBadges.badges(["a", "w", "u"], layouts, "a", 2)), [0, 2, 0])
+})

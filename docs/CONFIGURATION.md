@@ -22,6 +22,7 @@ no Config at all, gjetr shows one Agent List on `HDMI-A-2`.
   gjetr.toml            socket and Displays
   layouts/
     agents.toml         one file per Layout
+    workspaces.toml
 ```
 
 ## `gjetr.toml`
@@ -85,7 +86,7 @@ Keys every `[[module]]` takes, whatever its type:
 
 | Key | Values | Default | Meaning |
 |---|---|---|---|
-| `type` | `"agent-list"` | required | Module type. Unknown types are skipped |
+| `type` | `"agent-list"`, `"workspace-list"` | required | Module type. Unknown types are skipped |
 | `weight` | number above 0, at most 100 | `1` | The Module's share of the width (landscape) or height (portrait). `weight = 2` beside a `weight = 1` takes two thirds |
 
 ```toml
@@ -113,6 +114,7 @@ Every Agent across workspaces as a Card.
 | `focus` | `"herdr"`, `"window"` | `"herdr"` | Focus behaviour on tap. Tapping `focus` in the header flips it as an Override |
 | `recap` | `"off"`, `"inline"`, `"expand"` | `"off"` | Recap Field for Claude Agents |
 | `recap_open` | `"card"`, `"overlay"` | `"card"` | With `recap = "expand"`: open the full Recap inside the Card or over the list |
+| `highlight_workspace` | `true`, `false` | `true` | Tint the Cards of Agents in herdr's Focused workspace. It never filters the list |
 
 ```toml
 orientation = "portrait"
@@ -172,6 +174,61 @@ runs. It follows each Agent through re-sorts and updates, is forgotten when the
 pane goes away, and is never written to Config or `state.json`. A Card opening
 above the part of the list you are looking at does not move what is on screen.
 
+### `[[module]]` with `type = "workspace-list"`
+
+herdr's workspaces, tabs and panes as a tree that expands in place. Unlike the
+Agent List it includes panes without an agent, so it is the way to reach a
+plain shell from the Display.
+
+| Key | Values | Default | Meaning |
+|---|---|---|---|
+| `tap` | `"expand"`, `"focus"` | `"expand"` | What a tap on a row does (below) |
+| `focus` | `"herdr"`, `"window"` | `"herdr"` | Focus behaviour for this Module's taps, as for the Agent List. Tapping `focus` in the header flips it as an Override |
+
+```toml
+orientation = "landscape"
+
+[[module]]
+type = "workspace-list"
+tap = "expand"
+focus = "window"
+
+[[module]]
+type = "agent-list"
+```
+
+Rows, from the top of the tree down:
+
+- **Workspace**: status bar, label (its number when it has none), tab count.
+- **Tab**, indented: status bar, label or number, and its pane count. A tab with
+  a single pane shows that pane's agent kind instead (`shell` without an
+  agent) and does not expand, since it would only repeat itself.
+- **Pane**, indented again: status bar, agent kind mark, name, and the kind
+  (`shell` without an agent). Names follow the Agent name rules.
+
+A workspace's or tab's status is the one herdr reports for it, else the most
+urgent status below it (blocked, done, working, idle). The Focused workspace,
+tab and pane are drawn selected. A row pulses while a pane in it is in
+Attention.
+
+Taps:
+
+- `expand`: tapping a workspace or tab opens or closes it. Tapping a pane, or
+  a tab with one pane, focuses that pane.
+- `focus`: tapping a row focuses its workspace, tab or pane in herdr. A
+  separate chevron area at the right edge of a workspace or tab opens or
+  closes it.
+
+Which rows are open is kept per Module for as long as the shell runs, and never
+written anywhere. It survives updates without moving the scroll position; rows
+of workspaces and tabs that close are forgotten.
+
+### Focused workspace
+
+herdr has one Focused workspace. With `highlight_workspace = true` (the
+default), an Agent List tints the Cards of Agents in it; the Workspace List
+draws its row selected. Neither ever hides anything.
+
 ## Rotation and touch
 
 With `rotatable = true`, selecting a Layout whose orientation differs from the
@@ -210,7 +267,8 @@ red badge with the number of Agents in Attention while its Layout is not shown.
 
 An Agent enters Attention when it moves to `blocked` or `done` while herdr does
 not have it focused. Its Card pulses in the theme's urgent colour (blocked) or
-accent colour (done) until herdr focuses it or you tap it. Agents that are
+accent colour (done) until herdr focuses it or you tap it. In a Workspace
+List, its pane row and the tab and workspace rows above it pulse too. Agents that are
 already blocked or done when gjetr starts do not pulse. gjetr sends no
 notifications; herdr owns those.
 
@@ -227,7 +285,8 @@ notifications; herdr owns those.
 ```
 
 A Module is keyed by `<layout>#<position>` (its place among the Layout's valid
-Modules, from 0), a Display by its output name. An
+Modules, from 0), a Display by its output name. An Agent List keeps `sort` and
+`focus`; a Workspace List keeps `focus`. An
 Override equal to the Config value removes itself, so a later Config edit applies
 again. Reset every Override with:
 
@@ -254,7 +313,7 @@ omarchy-shell nytafar.gjetr <function> [argument]
 
 | Function | Does |
 |---|---|
-| `state` | JSON: Display, bar inset, herdr connection, Config summary and errors, the active Layout's `modules` (key, type, weight, rectangle), Deck, Overrides, Attention, Recap, every Card. `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
+| `state` | JSON: Display, bar inset, herdr connection, Config summary and errors, the active Layout's `modules` (key, type, weight, rectangle), `workspaces` (Focused workspace, expansion and rows of the first Workspace List), Deck, Overrides, Attention, Recap, every Card. `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
 | `reconnect` | Drop and reopen the herdr connection |
 | `focus <pane-id>` | Focus an Agent's pane, as a tap does |
 | `toggleRecap <pane-id>` | Open or close an Agent's full Recap in the first Agent List, as a tap on `recap` does. Prints `open`, `closed`, or why nothing happened (`unknown pane`, `no agent list`, `no recap`, `recap is inline, not expand`). `state` → `recap.openCards` lists the open Cards |
@@ -262,6 +321,8 @@ omarchy-shell nytafar.gjetr <function> [argument]
 | `toggleFocus` | Flip Focus behaviour of the first Agent List |
 | `selectLayout <name>` | Show a Layout of the Deck |
 | `nextLayout`, `previousLayout` | The step a swipe takes |
+| `toggleExpand <node>` | Open or close a workspace (`w:<id>`) or tab (`t:<id>`) in the first Workspace List. Prints `expanded`, `collapsed`, `unknown node` or `no workspace list`. `state` → `workspaces.rows` lists the rows drawn |
+| `tapRow <node> <zone>` | Tap a row (`w:<id>`, `t:<id>`, `p:<id>`) of the first Workspace List in zone `row` or `chevron`, as a finger does. Prints what it did |
 | `resetOverrides` | Clear every Override |
 | `useConfigDir <path>` | Read Config from another directory until the shell restarts (testing). `""` goes back |
 
