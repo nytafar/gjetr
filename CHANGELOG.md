@@ -21,6 +21,11 @@ All notable changes to gjetr. The format follows
   for the time gone in the window (accent when usage runs ahead of it), the
   percent as a number and a short reset time (`3h`); hovering shows the full
   label. Chosen by the same density; comfortable keeps the meters as they were.
+- With Focus behaviour `window`, a click on a Dock puts the mouse pointer back
+  where it was after focusing herdr's window (read with `hyprctl -j
+  cursorpos`, moved with the Lua `hl.dsp.cursor.move` dispatch); keyboard focus
+  stays on herdr. Touch surfaces never move the pointer. IPC `pointerFocus
+  <pane-id>` focuses as such a click does; `state` → `windowFocus.cursor`.
 - On a compact row, clicking an inline Recap line opens the whole Recap
   under the row; IPC `toggleRecap` accepts `recap = "inline"` too.
 

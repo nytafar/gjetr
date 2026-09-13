@@ -354,7 +354,7 @@ Item {
           TapHandler {
             id: rowTap
             enabled: root.online
-            onTapped: if (root.service && rowItem.row) root.service.tapWorkspaceRow(root.moduleKey, rowItem.row, "row")
+            onTapped: if (root.service && rowItem.row) root.service.tapWorkspaceRow(root.moduleKey, rowItem.row, "row", root.input)
           }
         }
 
@@ -383,7 +383,7 @@ Item {
           TapHandler {
             id: chevronTap
             enabled: rowItem.chevronZone && root.online
-            onTapped: if (root.service && rowItem.row) root.service.tapWorkspaceRow(root.moduleKey, rowItem.row, "chevron")
+            onTapped: if (root.service && rowItem.row) root.service.tapWorkspaceRow(root.moduleKey, rowItem.row, "chevron", root.input)
           }
         }
       }

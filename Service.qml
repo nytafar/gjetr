@@ -200,7 +200,13 @@ Item {
   // Focus behaviour `window`: the last attempt to bring the hosting terminal
   // window forward. Newer taps supersede older lookups by sequence.
   property int windowFocusSequence: 0
-  property var windowFocus: ({ requests: 0, window: "", workspace: "", candidates: 0, error: "" })
+  property var windowFocus: ({ requests: 0, window: "", workspace: "", candidates: 0, error: "", cursor: "" })
+  // After a click on a pointer Display with Focus behaviour `window`: where
+  // the pointer was, read when the click came, to put it back once the window
+  // is focused (WindowPolicy.restoresCursor).
+  property int cursorSequence: 0
+  property bool pendingCursorWanted: false
+  property var pendingCursor: null
 
   // Cache timers from the cache-ttl herdr plugin. Paths are the plugin's own
   // state and config dirs (HERDR_PLUGIN_STATE_DIR, HERDR_PLUGIN_CONFIG_DIR).
@@ -497,14 +503,14 @@ Item {
 
   // A tap on a row of one Workspace List, in its "row" or "chevron" zone.
   // What it does is WorkspaceTreeModel.tapAction for the Module's tap mode.
-  function tapWorkspaceRow(moduleKey, row, zone) {
+  function tapWorkspaceRow(moduleKey, row, zone, input) {
     var key = moduleKey ? String(moduleKey) : workspaceListKey
     var state = moduleStates[key]
     if (!state || state.type !== "workspace-list") return "no workspace list"
     var action = WorkspaceTreeModel.tapAction(row, state.tap, zone)
     if (action.action === "toggle") return toggleExpanded(key, action.key)
     if (action.action === "focus")
-      return focusTarget(action.kind, action.id, key) ? "focus " + action.kind + " " + action.id : "unknown " + action.kind
+      return focusTarget(action.kind, action.id, key, input) ? "focus " + action.kind + " " + action.id : "unknown " + action.kind
     return "nothing"
   }
 
@@ -517,12 +523,13 @@ Item {
 
   // Focus a workspace, tab or pane of herdr's tree, with the Focus behaviour of
   // the Module that asked. Panes need not hold an Agent.
-  function focusTarget(kind, id, moduleKey) {
+  function focusTarget(kind, id, moduleKey, input) {
     var value = String(id || "")
     var prefix = kind === "workspace" ? "w:" : kind === "tab" ? "t:" : kind === "pane" ? "p:" : ""
     if (prefix === "" || value === "" || !WorkspaceTreeModel.nodeExists(workspaceTree, prefix + value)) return false
     if (kind === "pane") attention = AttentionModel.acknowledge(attention, value)
     pendingFocusMode = focusModeFor(moduleKey)
+    prepareCursorRestore(moduleKey, input)
     return herdr.focusTarget(kind, value)
   }
 
@@ -532,6 +539,19 @@ Item {
     if (deckUsageModules.length === 0) return "no usage module"
     if (usageSource.refreshing) return "already running"
     return usageSource.refresh() ? "started" : "refused"
+  }
+
+  // A click from a pointer Display that will focus the hosting window: read
+  // where the pointer is now, so focusHostWindow can put it back.
+  function prepareCursorRestore(moduleKey, input) {
+    var sequence = ++cursorSequence
+    pendingCursorWanted = WindowPolicy.restoresCursor(String(input || ""), focusModeFor(moduleKey))
+    pendingCursor = null
+    if (!pendingCursorWanted) return
+    commands.run(CommandPolicy.CURSOR_POS, function(text, code) {
+      if (sequence !== cursorSequence) return
+      pendingCursor = code === 0 ? WindowPolicy.parseCursorPos(text) : null
+    })
   }
 
   function focusModeFor(moduleKey) {
@@ -547,9 +567,10 @@ Item {
     var sequence = ++windowFocusSequence
     var parts = { clients: null, processes: null }
     var socket = herdrSocketPath
+    var restoreCursor = pendingCursorWanted
 
     function report(fields) {
-      var next = { requests: windowFocus.requests, window: "", workspace: "", candidates: 0, error: "" }
+      var next = { requests: windowFocus.requests, window: "", workspace: "", candidates: 0, error: "", cursor: "" }
       for (var key in fields) next[key] = fields[key]
       windowFocus = next
       if (next.error !== "") log("window focus: " + next.error)
@@ -566,12 +587,32 @@ Item {
       commands.run(CommandPolicy.focusWindow(chosen.address), function(text, code) {
         if (sequence !== windowFocusSequence) return
         var ok = code === 0 && String(text).trim() === "ok"
-        report({ window: chosen.address, workspace: chosen.workspace, candidates: picked.candidates,
-          error: ok ? "" : "dispatch failed (" + code + "): " + String(text).trim().slice(0, 120) })
+        var fields = { window: chosen.address, workspace: chosen.workspace, candidates: picked.candidates,
+          error: ok ? "" : "dispatch failed (" + code + "): " + String(text).trim().slice(0, 120) }
+        if (!ok || !restoreCursor) {
+          report(fields)
+          return
+        }
+        // Focusing moved the pointer to the window; put it back on the Dock.
+        var at = pendingCursor
+        var argv = at ? CommandPolicy.moveCursor(at.x, at.y) : []
+        if (argv.length === 0) {
+          fields.cursor = "position unknown"
+          report(fields)
+          log("window focus: cursor not restored, position unknown")
+          return
+        }
+        commands.run(argv, function(result, exitCode) {
+          if (sequence !== windowFocusSequence) return
+          var moved = exitCode === 0 && String(result).trim() === "ok"
+          fields.cursor = moved ? "restored " + at.x + "," + at.y : "move failed (" + exitCode + ")"
+          report(fields)
+          if (!moved) log("window focus: cursor " + fields.cursor)
+        })
       })
     }
 
-    windowFocus = { requests: windowFocus.requests + 1, window: "", workspace: "", candidates: 0, error: "" }
+    windowFocus = { requests: windowFocus.requests + 1, window: "", workspace: "", candidates: 0, error: "", cursor: "" }
     commands.run(CommandPolicy.CLIENTS, function(text, code) {
       parts.clients = code === 0 ? text : "[]"
       select()
@@ -620,13 +661,15 @@ Item {
   }
 
   // Focus is only ever asked for a pane that is a known Agent. The Module that
-  // asked decides the Focus behaviour.
-  function focusPane(paneId, moduleKey) {
+  // asked decides the Focus behaviour; `input` is its Display's ("pointer" or
+  // "touch"), for putting the pointer back after a click.
+  function focusPane(paneId, moduleKey, input) {
     var id = String(paneId || "")
     for (var i = 0; i < agents.length; i++) {
       if (agents[i].paneId !== id) continue
       attention = AttentionModel.acknowledge(attention, id)
       pendingFocusMode = focusModeFor(moduleKey)
+      prepareCursorRestore(moduleKey, input)
       return herdr.focusPane(id)
     }
     return false
@@ -654,8 +697,8 @@ Item {
     return true
   }
 
-  function focusAgent(agent, moduleKey) {
-    return !!agent && focusPane(agent.paneId, moduleKey)
+  function focusAgent(agent, moduleKey, input) {
+    return !!agent && focusPane(agent.paneId, moduleKey, input)
   }
 
   function applyCacheTimers(text) {
@@ -911,7 +954,13 @@ Item {
     }
 
     function focus(paneId: string): string {
-      return root.focusPane(paneId, "") ? "requested" : "unknown pane"
+      return root.focusPane(paneId, "", "touch") ? "requested" : "unknown pane"
+    }
+
+    // Focus as a mouse click on a Dock does: with Focus behaviour `window`,
+    // the pointer goes back where it was once the window is focused.
+    function pointerFocus(paneId: string): string {
+      return root.focusPane(paneId, "", "pointer") ? "requested" : "unknown pane"
     }
 
     // The first Agent List of the active Layout, as a header tap does.

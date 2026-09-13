@@ -25,7 +25,8 @@ lives beside the Omarchy bar, and needs no daemon.
   second.
 - **Tap to focus.** A tap focuses the exact pane in herdr. Switch Focus
   behaviour to `window` and gjetr also brings the terminal window running herdr
-  to the front, on whichever workspace it is.
+  to the front, on whichever workspace it is. Clicked from a Dock, the mouse
+  pointer stays where you clicked.
 - **Attention.** When an agent becomes blocked or finishes, its Card pulses in
   your theme's colours until you look at it.
 - **Sorting that fits the job.** `spaces` and `priority` match herdr's own
@@ -195,7 +196,8 @@ is plain JavaScript with node tests; QML only draws.
 Every process gjetr starts is checked against a fixed allowlist and run without
 a shell. The only things it changes outside its own state file are a runtime
 output transform and touch transform on a display you mark `rotatable`, and
-window focus when you tap with Focus behaviour `window`.
+window focus (and, after a click on a Dock, the pointer position) when you tap
+with Focus behaviour `window`.
 
 ## Roadmap
 

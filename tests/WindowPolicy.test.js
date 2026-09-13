@@ -136,3 +136,20 @@ test("selectHost returns no window when nothing hosts the server", () => {
   assert.equal(picked.window, null)
   assert.equal(picked.candidates, 0)
 })
+
+const WindowCursor = loadLib("lib/WindowPolicy.js")
+
+test("the cursor position parses from hyprctl -j cursorpos", () => {
+  assert.deepEqual({ ...WindowCursor.parseCursorPos('{\n    "x": 1712,\n    "y": 860\n}\n') }, { x: 1712, y: 860 })
+  assert.deepEqual({ ...WindowCursor.parseCursorPos('{"x": 12.6, "y": -3}') }, { x: 13, y: -3 })
+  for (const bad of ["", "nope", '{"x": "1", "y": 2}', '{"x": 1}', "[1, 2]", null, '{"x": 1e12, "y": 0}']) {
+    assert.equal(WindowCursor.parseCursorPos(bad), null, String(bad))
+  }
+})
+
+test("the cursor goes back only after a pointer click that focuses the window", () => {
+  assert.equal(WindowCursor.restoresCursor("pointer", "window"), true)
+  assert.equal(WindowCursor.restoresCursor("pointer", "herdr"), false)
+  assert.equal(WindowCursor.restoresCursor("touch", "window"), false)
+  assert.equal(WindowCursor.restoresCursor("", "window"), false)
+})

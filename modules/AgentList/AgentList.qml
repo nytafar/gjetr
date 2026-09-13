@@ -263,7 +263,7 @@ Item {
         readonly property bool recapOpen: root.service ? root.service.recapOpenFor(agent, root.service.recapOpen, root.moduleKey) : false
 
         function focusIt() {
-          if (agent && root.service) root.service.focusAgent(agent, root.moduleKey)
+          if (agent && root.service) root.service.focusAgent(agent, root.moduleKey, root.input)
         }
 
         function toggleRecap() {

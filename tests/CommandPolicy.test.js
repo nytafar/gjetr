@@ -130,3 +130,20 @@ test("usage: the refresh script takes no arguments, and the listing only reads t
   assert.equal(Policy.allowed(["find", dir, "-maxdepth", "1", "-type", "f", "-name", "*", "-printf", "%f\\n"]), false)
   assert.equal(Policy.allowed(["find", dir, "-maxdepth", "1", "-type", "f", "-name", "*.json", "-delete", "%f\\n"]), false)
 })
+
+test("the cursor position is read with a fixed command", () => {
+  assert.deepEqual(Array.from(Command.CURSOR_POS), ["hyprctl", "-j", "cursorpos"])
+  assert.equal(Command.allowed(Array.from(Command.CURSOR_POS)), true)
+})
+
+test("moveCursor builds the Lua cursor dispatch for whole coordinates only", () => {
+  assert.deepEqual(Array.from(Command.moveCursor(1712, 860)),
+    ["hyprctl", "dispatch", "hl.dsp.cursor.move({ x = 1712, y = 860 })"])
+  assert.equal(Command.allowed(Command.moveCursor(1712, 860)), true)
+  assert.equal(Command.allowed(Command.moveCursor(-20, 0)), true)
+  for (const [x, y] of [[1.5, 2], ["10", 2], [NaN, 0], [0, Infinity], [1e9, 0], [null, 0]]) {
+    assert.deepEqual(Array.from(Command.moveCursor(x, y)), [], String(x) + "," + String(y))
+  }
+  assert.equal(Command.allowed(["hyprctl", "dispatch", "hl.dsp.cursor.move({ x = 1, y = 2 }) os.execute('x')"]), false)
+  assert.equal(Command.allowed(["hyprctl", "dispatch", "movecursor 1 2"]), false)
+})

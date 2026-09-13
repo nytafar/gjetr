@@ -283,7 +283,10 @@ A Workspace List follows the same density.
   it. If several windows host a client, the most recently focused one wins.
   Clients started as `herdr`, `herdr --session NAME` and
   `herdr session attach NAME` count. `herdr --remote` and herdr subcommands do
-  not.
+  not. Focusing the window moves the mouse pointer to it; after a click on a
+  Dock, gjetr puts the pointer back where you clicked, so it stays on the Dock
+  while keyboard focus goes to herdr. Taps on a touch surface leave the
+  pointer alone.
 
 #### Status
 
@@ -536,7 +539,8 @@ omarchy-shell nytafar.gjetr <function> [argument]
 |---|---|
 | `state` | JSON: `displays` (every Display: kind, edge, size, shown, surface with layer and exclusive zone, Deck, Modules). The rest describes the primary Display, the first surface: Display, bar inset, herdr connection, Config summary and errors, the active Layout's `modules` (key, type, weight, rectangle), `workspaces` (Focused workspace, expansion and rows of the first Workspace List), Deck, Overrides, Attention, Recap, every Card. `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
 | `reconnect` | Drop and reopen the herdr connection |
-| `focus <pane-id>` | Focus an Agent's pane, as a tap does |
+| `focus <pane-id>` | Focus an Agent's pane, as a tap on a touch surface does, with the first Agent List's Focus behaviour |
+| `pointerFocus <pane-id>` | The same, as a mouse click on a Dock does: with Focus behaviour `window`, the pointer goes back where it was once the window is focused. `state` → `windowFocus.cursor` says `restored x,y` or why not |
 | `toggleRecap <pane-id>` | Open or close an Agent's full Recap in the first Agent List, as a tap on `recap` (or on a compact row's Recap line) does. Prints `open`, `closed`, or why nothing happened (`unknown pane`, `no agent list`, `no recap`, `recap is off`). An inline Recap opens only on a compact row. `state` → `recap.openCards` lists the open Cards |
 | `cycleSort` | Next Sort mode of the first Agent List, as a header tap does |
 | `toggleFocus` | Flip Focus behaviour of the first Agent List |
