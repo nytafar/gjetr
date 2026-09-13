@@ -14,8 +14,11 @@ Choices made on the Display itself (Sort mode, Focus behaviour, the active
 Layout, whether a Dock is shown) are **Overrides**. They live in `~/.local/state/gjetr/state.json` and
 shadow Config until reset. See [Overrides](#overrides).
 
-Copy [`examples/gjetr/`](../examples/gjetr) to `~/.config/gjetr/` to start. With
-no Config at all, gjetr shows one Agent List on `HDMI-A-2`.
+With no Config at all, gjetr detects what to show: see
+[Without a Config](#without-a-config). The presets it picks from, and the
+Layouts it ships, are in [`presets/`](../presets), every key explained; a
+Deck finds those Layouts without copying them (see
+[Layouts gjetr ships](#layouts-gjetr-ships)).
 
 ```
 ~/.config/gjetr/
@@ -26,6 +29,37 @@ no Config at all, gjetr shows one Agent List on `HDMI-A-2`.
     usage.toml
     dock.toml
 ```
+
+## Without a Config
+
+Without a `gjetr.toml`, gjetr shows one of the presets it ships, placed on your
+outputs:
+
+- **`panel`**, when a connected touchscreen is bound to an output of its own:
+  a surface on that output with the Agent List beside usage (Layout `panel`).
+  Hyprland does not report which output a touch device is bound to, so gjetr
+  reads the `hl.device({ name = ..., output = ... })` rules in
+  `~/.config/hypr/input.lua` (see the README's touchscreen setup) and matches
+  them against `hyprctl devices`. A touchscreen that is your only monitor, as
+  on a touch laptop, does not count.
+- **`sidebar`** otherwise: a [Dock](#docks) on the left of your focused monitor,
+  Agents over usage pinned at the bottom (Layout `sidebar`). It starts shown;
+  `toggleDock ""` hides it, and the choice is kept as an Override.
+
+gjetr detects again after a monitor is plugged in or out and when `input.lua`
+changes. Outputs it chose before stay chosen while they are still connected,
+so focusing another monitor never moves the Dock. A `gjetr.toml` that has no
+valid `[[display]]` uses the detected Displays too.
+
+`state` shows what gjetr found and why:
+
+```bash
+omarchy-shell nytafar.gjetr state | jq '.config.source, .detect'
+```
+
+`config.source` is `preset` without a `gjetr.toml` and `file` with one;
+`detect` names the preset, the touchscreen and monitor, and a `reason` such as
+`touchscreen wch.cn-usb2iic_ctp_control is bound to HDMI-A-2`.
 
 ## `gjetr.toml`
 
@@ -59,7 +93,7 @@ your windows on the main monitor. An output holds one Display; a second
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `name` | string | `"HDMI-A-2"` | The output, as `hyprctl monitors` names it. Letters, digits, `.`, `_`, `-`. A Display without a valid name is skipped |
+| `name` | string | required | The output, as `hyprctl monitors` names it. Letters, digits, `.`, `_`, `-`. A Display without a valid name is skipped; with none left, gjetr uses the [detected](#without-a-config) Displays |
 | `kind` | string | `"surface"` | `"surface"`: the whole output. `"dock"`: a strip along one edge, beside windows (see [Docks](#docks)). Any other value skips the Display |
 | `deck` | list of Layout names | `["agents"]` | The Deck: Layouts to tab through, in order. Each is `layouts/<name>.toml`. Names use letters, digits, `-` and `_`, at most 32 characters. Duplicates are dropped |
 | `rotatable` | boolean | `false` | Surface only. May gjetr rotate the output to fit the active Layout's orientation |
@@ -166,13 +200,14 @@ deck = ["wide", "usage"]
 kind = "dock"
 name = "DP-1"
 size = 360
-deck = ["dock"]
+deck = ["sidebar"]
 ```
 
 Without `edge` the Dock goes on the left; add `edge = "right"` (or `top`,
 `bottom`) to move it.
 
-with `layouts/dock.toml`, Agents over usage:
+`sidebar` is a Layout gjetr ships, Agents over usage. As a
+`layouts/sidebar.toml` of your own it would read:
 
 ```toml
 orientation = "portrait"
@@ -253,7 +288,27 @@ A Layout: the Modules on a Display and the orientation they are built for.
 | `orientation` | string | `"portrait"` | `"portrait"`, `"landscape"` or `"any"` |
 | `[[module]]` | tables | one Agent List | The Modules, in order. Every one is drawn |
 
-A missing Layout file gives the default Agent List, with a logged error.
+A Layout found neither in your Config nor among the
+[Layouts gjetr ships](#layouts-gjetr-ships) gives the default Agent List, with a
+logged error.
+
+### Layouts gjetr ships
+
+A Deck looks for each Layout name in `~/.config/gjetr/layouts/` first, then
+among the Layouts gjetr ships in [`presets/layouts/`](../presets/layouts), so
+`deck = ["sidebar"]` works without a file. A file of the same name in your
+Config takes the shipped one's place; copy it from there to change it.
+
+| Layout | Modules |
+|---|---|
+| `agents` | One Agent List, portrait, every key explained |
+| `panel` | The Agent List beside usage limits, any orientation, for a touchscreen |
+| `sidebar` | Agents over usage limits pinned at the bottom, portrait, for a Dock |
+| `usage` | The Agent List beside usage with today's tokens and daily bars, landscape |
+| `workspaces` | The Workspace List beside a compact Agent List, landscape |
+
+`state` → `config.layouts` says where each Layout of the Decks came from:
+`config`, `shipped`, `missing`, or `loading` for a moment after a change.
 
 ### Several Modules
 
@@ -734,7 +789,7 @@ omarchy-shell nytafar.gjetr <function> [argument]
 
 | Function | Does |
 |---|---|
-| `state` | JSON: `displays` (every Display: kind, edge, size, shown, surface with layer and exclusive zone, Deck, Modules). The rest describes the primary Display, the first surface: Display, bar inset, herdr connection (with the server's `version` and `protocol`, the `supported` set, `protocolMismatch`, `pingError` and `unsupported`), Config summary and errors, the active Layout's `modules` (key, type, weight, pin, rectangle), `workspaces` (Focused workspace, expansion and rows of the first Workspace List), Deck, Overrides, Attention, Recap, every Card (with its `name`, `kind`, `kindLabel` and `kindMark`: the SVG file or the letter drawn). `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
+| `state` | JSON: `displays` (every Display: kind, edge, size, shown, surface with layer and exclusive zone, Deck, Modules), `detect` (what gjetr found for [Without a Config](#without-a-config)). The rest describes the primary Display, the first surface: Display, bar inset, herdr connection (with the server's `version` and `protocol`, the `supported` set, `protocolMismatch`, `pingError` and `unsupported`), Config source, summary, errors and where each Layout came from, the active Layout's `modules` (key, type, weight, pin, rectangle), `workspaces` (Focused workspace, expansion and rows of the first Workspace List), Deck, Overrides, Attention, Recap, every Card (with its `name`, `kind`, `kindLabel` and `kindMark`: the SVG file or the letter drawn). `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
 | `reconnect` | Drop and reopen the herdr connection |
 | `focus <pane-id>` | Focus an Agent's pane, as a tap on a touch surface does, with the first Agent List's Focus behaviour |
 | `pointerFocus <pane-id>` | The same, as a mouse click on a Dock does: with Focus behaviour `window`, the pointer goes back where it was once the window is focused. `state` → `windowFocus.cursor` says `restored x,y` or why not |

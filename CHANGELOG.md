@@ -16,10 +16,29 @@ All notable changes to gjetr. The format follows
   space under them. Side by side it keeps its weight share at the right edge.
   `pin` is placement, like `weight`: only a `[[module]]` takes it, and on an
   Agent List or Workspace List it is logged and ignored.
-  `examples/gjetr/layouts/dock.toml` pins its usage; `state` → `modules[].pin`.
+  The shipped `sidebar` Layout pins its usage; `state` → `modules[].pin`.
+- Layouts gjetr ships: `presets/layouts/` holds `agents`, `panel`, `sidebar`,
+  `usage` and `workspaces`. A Deck finds each Layout in
+  `~/.config/gjetr/layouts/` first and then among these, so
+  `deck = ["sidebar"]` works without a file. `state` → `config.layouts` says
+  where each came from.
+- Presets: `presets/` holds `panel` (a touchscreen: the Agent List beside
+  usage), `sidebar` (a Dock on the left of the main monitor, Agents over usage
+  pinned at the bottom), `panel-sidebar` (both) and `minimal` (one Agent List,
+  every key explained).
+- Without a Config gjetr detects what to show: the `panel` preset on a
+  connected touchscreen bound to an output of its own (read from the
+  `hl.device` rules in `~/.config/hypr/input.lua`, as Hyprland does not report
+  it), else the `sidebar` preset as a shown Dock on the focused monitor. It
+  detects again after a hotplug or an `input.lua` change and keeps the outputs
+  it chose while they are connected. `state` → `config.source` and `detect`.
 
 ### Changed
 
+- No more `HDMI-A-2` default: without a Config, or with a `gjetr.toml` that has
+  no valid `[[display]]`, gjetr uses the Displays it detects.
+- `examples/gjetr/` moved to `presets/`: its `gjetr.toml` is the `minimal`
+  preset, and its `dock` Layout is now the shipped `sidebar` Layout.
 - README: new screenshots taken from a demo herdr and demo usage records (the
   Dock as herdr's sidebar on a 4K monitor, the panel in landscape and portrait,
   the Workspace List and Usage), a section on using a Dock in place of herdr's

@@ -1,0 +1,21 @@
+# Preset sidebar: a Dock along the left edge of your main monitor doing the job
+# of herdr's sidebar, every Agent with usage pinned at the bottom. gjetr shows
+# this when there is no Config and no touchscreen (docs/CONFIGURATION.md,
+# "Without a Config").
+#
+# Install it into ~/.config/gjetr to edit it (an existing file is kept as
+# gjetr.toml.bak.<time>):
+#   omarchy-shell nytafar.gjetr installConfig sidebar
+#
+# installConfig fills in the output: "monitor" becomes your focused monitor.
+# Show or hide the Dock with a keybinding in ~/.config/hypr/bindings.lua:
+#   o.bind("SUPER + CTRL + G", "Toggle gjetr dock", "omarchy-shell nytafar.gjetr toggleDock \"\"")
+
+[[display]]
+kind = "dock"
+name = "monitor"
+edge = "left"
+size = 360
+visible = true
+deck = ["sidebar"]
+background = "theme"

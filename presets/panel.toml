@@ -1,0 +1,16 @@
+# Preset panel: gjetr on a touchscreen beside the desk, the Agent List beside
+# each AI provider's limits. gjetr shows this when there is no Config and a
+# touchscreen is bound to an output of its own (docs/CONFIGURATION.md,
+# "Without a Config").
+#
+# Install it into ~/.config/gjetr to edit it (an existing file is kept as
+# gjetr.toml.bak.<time>):
+#   omarchy-shell nytafar.gjetr installConfig panel
+#
+# installConfig fills in the output: "touchscreen" becomes the output your
+# touchscreen is bound to in ~/.config/hypr/input.lua.
+
+[[display]]
+name = "touchscreen"
+deck = ["panel"]
+background = "black"

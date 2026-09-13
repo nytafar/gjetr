@@ -1,5 +1,11 @@
-# gjetr Config. gjetr reads this file and never writes it. Changes apply live.
-# Copy to ~/.config/gjetr/gjetr.toml.
+# Preset minimal: one Agent List on a touchscreen, with every key explained.
+# Install it into ~/.config/gjetr to edit it (an existing file is kept as
+# gjetr.toml.bak.<time>):
+#   omarchy-shell nytafar.gjetr installConfig minimal
+#
+# gjetr reads this file and writes it only when you run installConfig. Changes
+# apply live. Layouts are found in ~/.config/gjetr/layouts/ first, then among
+# the Layouts gjetr ships (presets/layouts/ in the plugin).
 #
 # A mistyped value falls back to its default, and a file that does not parse
 # falls back as a whole. Errors are logged with the file, line and key:
@@ -24,8 +30,9 @@
 # indicator = "icon"
 
 [[display]]
-# The output to draw on, as `hyprctl monitors` names it.
-name = "HDMI-A-2"
+# The output to draw on, as `hyprctl monitors` names it. installConfig fills in
+# the output your touchscreen is bound to; set it yourself if it found none.
+name = "touchscreen"
 
 # The Deck: Layouts to tab through, in order. Each is layouts/<name>.toml.
 # With more than one, tabs appear on a short edge (opposite the bar) and a
@@ -68,5 +75,5 @@ background = "black"
 # size = 360                # logical px: width of a left/right Dock, height of
 #                           # a top/bottom one; 120 to 2000, at most half the output
 # visible = true            # shown at start; toggleDock keeps its choice as an Override
-# deck = ["dock"]           # layouts/dock.toml: Agents over usage, portrait
+# deck = ["sidebar"]        # Agents over usage pinned at the bottom, portrait
 # background = "theme"

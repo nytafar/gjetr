@@ -38,7 +38,8 @@ size = 360
 deck = ["sidebar"]
 ```
 
-`~/.config/gjetr/layouts/sidebar.toml`:
+gjetr ships the `sidebar` Layout, so that is all it takes. To change it, give
+it a file of your own, `~/.config/gjetr/layouts/sidebar.toml`:
 
 ```toml
 orientation = "portrait"
@@ -143,8 +144,11 @@ Module, `omarchy-agent-usage-update`, all of which Omarchy already ships.
 omarchy plugin add https://github.com/nytafar/gjetr.git --enable
 ```
 
-gjetr then appears on `HDMI-A-2`. To use another output, create a Config (below)
-and set its name.
+Without a Config, gjetr works out what to show. A touchscreen bound to an
+output of its own (see [Touchscreen setup](#touchscreen-setup)) gets the Agent
+List beside usage; otherwise a Dock opens on the left of your focused monitor,
+Agents over usage, doing the job of herdr's sidebar. Create a Config (below)
+to choose for yourself.
 
 Update with `omarchy plugin update nytafar.gjetr`.
 
@@ -181,8 +185,9 @@ focus = "window"           # herdr | window
 recap = "inline"           # off | inline | expand
 ```
 
-Changes apply as soon as you save. Commented examples of every key are in
-[`examples/gjetr/`](examples/gjetr), and the full reference is in
+Changes apply as soon as you save. The presets and Layouts gjetr ships, every
+key explained, are in [`presets/`](presets); a Deck finds those Layouts without
+copying them. The full reference is in
 [docs/CONFIGURATION.md](docs/CONFIGURATION.md).
 
 A two-Layout Deck that rotates the panel:
@@ -243,7 +248,7 @@ omarchy-shell nytafar.gjetr state | jq
 
 | Symptom | Check |
 |---|---|
-| Nothing on the display | `state` → `displayPresent`. The name in `[[display]]` must match `hyprctl monitors` exactly |
+| Nothing on the display | `state` → `displayPresent`. The name in `[[display]]` must match `hyprctl monitors` exactly. Without a Config, `state` → `detect.reason` says what gjetr found |
 | "herdr offline, retrying" | Is herdr running? `state` → `herdr.socket` must be the socket `herdr status server` reports |
 | "untested herdr ..." under the header | herdr speaks an API protocol gjetr is not tested with (it supports 0.8.2 and 0.9.0). It keeps working; `state` → `herdr.protocolMismatch` and `herdr.unsupported` say what differs |
 | Config seems ignored | `state` → `config.errors` names the file, line and key that fell back to a default |

@@ -1,0 +1,21 @@
+# Panel: the Agent List beside each AI provider's limits, for a touchscreen
+# such as a 7" 1024x600 panel. The deck of the panel preset. A
+# layouts/panel.toml in your Config takes its place.
+
+# "any" never rotates the output: side by side on a landscape panel, stacked on
+# a portrait one.
+orientation = "any"
+
+[[module]]
+type = "agent-list"
+sort = "priority"
+preset = "detailed"
+# Two thirds of a landscape panel for the Agent List.
+weight = 2
+
+# Rate limits. On a portrait panel they sit at the bottom, as tall as their
+# lines; side by side they keep a third of the width.
+[[module]]
+type = "usage"
+show = ["limits"]
+pin = "end"

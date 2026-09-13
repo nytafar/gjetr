@@ -21,6 +21,8 @@ import "lib/RepoModel.js" as RepoModel
 import "lib/WorkspaceTreeModel.js" as WorkspaceTreeModel
 import "lib/ThemeModel.js" as ThemeModel
 import "lib/UsageModel.js" as UsageModel
+import "lib/DetectPolicy.js" as DetectPolicy
+import "lib/PresetModel.js" as PresetModel
 import "sources"
 import "components"
 
@@ -46,8 +48,32 @@ Item {
   property string configDirOverride: ""
   readonly property string configDir: configDirOverride !== "" ? configDirOverride : home + "/.config/gjetr"
   property var mainText: null
-  property var layoutTexts: ({})
-  readonly property var mainRead: ConfigModel.readMain(mainText, home)
+  // Layouts are read from the Config's layouts/ first, then from the ones gjetr
+  // ships in presets/layouts/ (ConfigModel.overlayLayouts).
+  readonly property string shippedDir: decodeURIComponent(String(Qt.resolvedUrl("presets")).replace(/^file:\/\//, ""))
+  property var layoutUserTexts: ({})
+  property var layoutShippedTexts: ({})
+  readonly property var layoutRead: ConfigModel.overlayLayouts(deckNames, layoutUserTexts, layoutShippedTexts)
+  readonly property var layoutTexts: layoutRead.texts
+  // Without a gjetr.toml, gjetr shows the preset DetectPolicy picks for this
+  // machine, its outputs filled in (PresetModel); its Displays also stand in
+  // for a gjetr.toml that names none. Monitors and touch devices are read on
+  // start and after a hotplug, touch bindings from Hyprland's input.lua.
+  property var presetTexts: ({})
+  readonly property string hyprInputPath: home + "/.config/hypr/input.lua"
+  property var detectMonitors: null
+  property var detectTouchDevices: null
+  property var detectBindings: []
+  property var detection: DetectPolicy.detect(null)
+  property int detectSequence: 0
+  readonly property var presetRender: detection.preset !== "" && typeof presetTexts[detection.preset] === "string"
+    ? PresetModel.render(presetTexts[detection.preset], { touchscreen: detection.touchscreen, monitor: detection.monitor }) : null
+  readonly property var presetRead: presetRender ? ConfigModel.readMain(presetRender.text, home) : null
+  readonly property var detectedDisplays: presetRead ? DetectPolicy.detectedConfig(presetRead.config).displays : []
+  readonly property bool configFromPreset: mainText === null
+  readonly property var mainRead: !configFromPreset ? ConfigModel.readMain(mainText, home, detectedDisplays)
+    : presetRead ? { config: DetectPolicy.detectedConfig(presetRead.config), errors: presetRead.errors }
+    : ConfigModel.readMain(null, home)
   readonly property var config: mainRead.config
   readonly property var deckNames: ConfigModel.deckLayoutNames(config)
 
@@ -480,12 +506,14 @@ Item {
     return RepoModel.label(RepoModel.infoFor(agent, map), agent ? agent.cwd : "", home)
   }
 
-  function setLayoutText(name, text) {
-    if (layoutTexts[name] === text) return
+  // which: "layoutUserTexts" (the Config's file) or "layoutShippedTexts".
+  function setLayoutText(which, name, text) {
+    var current = root[which]
+    if (Object.prototype.hasOwnProperty.call(current, name) && current[name] === text) return
     var next = {}
-    for (var key in layoutTexts) next[key] = layoutTexts[key]
+    for (var key in current) next[key] = current[key]
     next[name] = text
-    layoutTexts = next
+    root[which] = next
   }
 
   function applyOverridesText(text) {
@@ -745,6 +773,42 @@ Item {
     resort()
   }
 
+  function applyDetection() {
+    var next = DetectPolicy.detect({ monitors: detectMonitors, touchDevices: detectTouchDevices, bindings: detectBindings,
+      previous: detection })
+    if (JSON.stringify(next) === JSON.stringify(detection)) return
+    detection = next
+    if (next.ready) log("detected " + (next.preset || "nothing") + " (" + next.reason + ")"
+      + (next.touchscreen !== "" ? ", touchscreen " + next.touchscreen : "") + (next.monitor !== "" ? ", monitor " + next.monitor : ""))
+  }
+
+  // Reads monitors and touch devices, then detects again. A failed monitor read
+  // is retried.
+  function refreshDetection() {
+    var sequence = ++detectSequence
+    var parts = { monitors: undefined, devices: undefined }
+    function done() {
+      if (sequence !== detectSequence || parts.monitors === undefined || parts.devices === undefined) return
+      if (parts.monitors === null) {
+        detectRetry.restart()
+        return
+      }
+      detectMonitors = parts.monitors
+      detectTouchDevices = parts.devices
+      applyDetection()
+    }
+    commands.run(CommandPolicy.MONITORS, function(text, code) {
+      var read = code === 0 ? DetectPolicy.parseMonitors(text) : { ok: false, monitors: [] }
+      parts.monitors = read.ok ? read.monitors : null
+      done()
+    })
+    commands.run(CommandPolicy.DEVICES, function(text, code) {
+      var read = code === 0 ? DetectPolicy.parseTouchDevices(text) : { ok: false, names: [] }
+      parts.devices = read.names
+      done()
+    })
+  }
+
   function useConfigDir(path) {
     var value = String(path || "")
     if (value !== "" && !ConfigModel.isConfigDir(value)) return false
@@ -800,7 +864,12 @@ Item {
       focusOverridden: focusOverridden,
       windowFocus: windowFocus,
       commands: { started: commands.started, refused: commands.refused, lastError: commands.lastError },
-      config: { dir: configDir, summary: configSummary, errors: configErrors, defaults: config.defaults },
+      config: { dir: configDir, source: configFromPreset ? "preset" : "file", preset: configFromPreset ? detection.preset : "",
+        summary: configSummary, errors: configErrors, defaults: config.defaults, layouts: layoutRead.sources },
+      detect: { ready: detection.ready, preset: detection.preset, touchscreen: detection.touchscreen, monitor: detection.monitor,
+        device: detection.device, reason: detection.reason,
+        monitors: (detectMonitors || []).map(function(monitor) { return monitor.name }),
+        touchDevices: detectTouchDevices || [], bindings: detectBindings },
       workspaces: {
         list: workspaceListKey,
         focusedWorkspace: focusedWorkspaceId,
@@ -933,8 +1002,25 @@ Item {
       blockLoading: true
       printErrors: false
       onFileChanged: reload()
-      onLoaded: root.setLayoutText(modelData, text())
-      onLoadFailed: root.setLayoutText(modelData, null)
+      onLoaded: root.setLayoutText("layoutUserTexts", modelData, text())
+      onLoadFailed: root.setLayoutText("layoutUserTexts", modelData, null)
+    }
+  }
+
+  // The Layouts gjetr ships, for each name the Config's layouts/ does not have.
+  Variants {
+    model: root.deckNames
+
+    FileView {
+      required property var modelData
+
+      path: ConfigModel.layoutPath(root.shippedDir, modelData)
+      watchChanges: true
+      blockLoading: true
+      printErrors: false
+      onFileChanged: reload()
+      onLoaded: root.setLayoutText("layoutShippedTexts", modelData, text())
+      onLoadFailed: root.setLayoutText("layoutShippedTexts", modelData, null)
     }
   }
 
@@ -1026,6 +1112,58 @@ Item {
   Component.onCompleted: {
     log("service up, displays [" + displayEntries.join(", ") + "]")
     herdr.start()
+    refreshDetection()
+  }
+
+  // The presets gjetr ships, for detection and installConfig.
+  Variants {
+    model: PresetModel.PRESETS.map(function(preset) { return preset.name })
+
+    FileView {
+      required property var modelData
+
+      path: root.shippedDir + "/" + modelData + ".toml"
+      watchChanges: true
+      blockLoading: true
+      printErrors: false
+      onFileChanged: reload()
+      onLoaded: root.setEntry("presetTexts", modelData, text())
+      onLoadFailed: root.setEntry("presetTexts", modelData, null)
+    }
+  }
+
+  // Touch device output bindings, from Hyprland's input.lua. Read, never written.
+  FileView {
+    path: root.hyprInputPath
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: {
+      root.detectBindings = DetectPolicy.touchBindings(text())
+      root.applyDetection()
+    }
+    onLoadFailed: {
+      root.detectBindings = []
+      root.applyDetection()
+    }
+  }
+
+  // A hotplug: read the outputs again once they have settled.
+  Timer {
+    id: detectRetry
+    interval: 2000
+    onTriggered: root.refreshDetection()
+  }
+
+  Timer {
+    id: detectSettle
+    interval: 500
+    onTriggered: root.refreshDetection()
+  }
+
+  Connections {
+    target: Quickshell
+    function onScreensChanged() { detectSettle.restart() }
   }
   Component.onDestruction: {
     herdr.stop()

@@ -1,0 +1,26 @@
+# Preset panel-sidebar: both at once. The Agent List beside usage on your
+# touchscreen, and a Dock along the left edge of your main monitor with Agents
+# over usage pinned at the bottom.
+#
+# Install it into ~/.config/gjetr to edit it (an existing file is kept as
+# gjetr.toml.bak.<time>):
+#   omarchy-shell nytafar.gjetr installConfig panel-sidebar
+#
+# installConfig fills in the outputs: "touchscreen" becomes the output your
+# touchscreen is bound to, "monitor" your focused monitor.
+
+[[display]]
+name = "touchscreen"
+deck = ["panel"]
+background = "black"
+
+# Show or hide the Dock with a keybinding in ~/.config/hypr/bindings.lua:
+#   o.bind("SUPER + CTRL + G", "Toggle gjetr dock", "omarchy-shell nytafar.gjetr toggleDock \"\"")
+[[display]]
+kind = "dock"
+name = "monitor"
+edge = "left"
+size = 360
+visible = true
+deck = ["sidebar"]
+background = "theme"

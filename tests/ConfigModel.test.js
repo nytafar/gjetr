@@ -12,14 +12,28 @@ function plain(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
-test("a missing gjetr.toml yields the defaults without errors", () => {
+test("a missing gjetr.toml yields the defaults without errors, with a Display on no output until one is detected", () => {
   const read = Config.readMain(null, HOME)
   assert.deepEqual(Array.from(read.errors), [])
   assert.deepEqual(plain(read.config), {
     socket: "/home/test/.config/herdr/herdr.sock",
-    displays: [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black", touchDevices: [], refreshSeconds: null, kind: "surface", edge: "", size: 0, visible: true }],
+    displays: [{ name: "", deck: ["agents"], rotatable: false, background: "black", touchDevices: [], refreshSeconds: null, kind: "surface", edge: "", size: 0, visible: true }],
     defaults: plain(Config.moduleDefaults())
   })
+})
+
+test("a gjetr.toml without a valid Display uses the detected Displays", () => {
+  const detected = Config.readMain('[[display]]\nkind = "dock"\nname = "DP-1"\ndeck = ["sidebar"]\n', HOME).config.displays
+  const bad = Config.readMain('[[display]]\nname = "HDMI A 2; rm"\n', HOME, detected)
+  assert.deepEqual(plain(bad.config.displays), plain(detected))
+  assert.match(bad.errors.join("\n"), /gjetr\.toml: no valid display, using the detected Displays/)
+  const none = Config.readMain('socket = "/run/h.sock"\n', HOME, detected)
+  assert.deepEqual(Array.from(none.errors), [])
+  assert.deepEqual(plain(none.config.displays), plain(detected))
+  // The detected Displays are copied, never shared.
+  none.config.displays[0].deck.push("x")
+  assert.deepEqual(Array.from(detected[0].deck), ["sidebar"])
+  assert.equal(Config.readMain('socket = "/run/h.sock"\n', HOME, []).config.displays[0].name, "")
 })
 
 test("readMain reads displays, deck order and socket", () => {
@@ -85,10 +99,10 @@ test("a duplicate deck entry is dropped quietly", () => {
   assert.deepEqual(Array.from(read.errors), [])
 })
 
-test("a display without a valid name is skipped; none left means the default", () => {
+test("a display without a valid name is skipped; none left and none detected means a Display on no output", () => {
   const read = Config.readMain('[[display]]\nname = "HDMI A 2; rm"\ndeck = ["agents"]\n', HOME)
   assert.equal(read.config.displays.length, 1)
-  assert.equal(read.config.displays[0].name, "HDMI-A-2")
+  assert.equal(read.config.displays[0].name, "")
   assert.match(read.errors.join("\n"), /display\[0\]\.name: /)
   assert.match(read.errors.join("\n"), /no valid display/)
 })
@@ -110,7 +124,7 @@ test("unknown top-level keys and wrong shapes are reported", () => {
   const read = Config.readMain('display = "HDMI-A-2"\nthemes = 1\n', HOME)
   assert.match(read.errors.join("\n"), /gjetr\.toml: display: /)
   assert.match(read.errors.join("\n"), /gjetr\.toml: themes: unknown key/)
-  assert.equal(read.config.displays[0].name, "HDMI-A-2")
+  assert.equal(read.config.displays[0].name, "")
 })
 
 test("sockets must be absolute, short enough for a unix socket and free of NUL", () => {
@@ -226,7 +240,7 @@ test("prototype keys in TOML never reach the config", () => {
 test("huge inputs are refused before parsing", () => {
   const read = Config.readMain("# " + "x".repeat(Config.MAX_BYTES + 1), HOME)
   assert.match(read.errors.join("\n"), /too large/)
-  assert.equal(read.config.displays[0].name, "HDMI-A-2")
+  assert.equal(read.config.displays[0].name, "")
 })
 
 test("isConfigDir accepts absolute directories only", () => {
@@ -264,6 +278,23 @@ test("recap_open is card or overlay per Agent List, default card", () => {
     assert.equal(read.layout.modules[0].recapOpen, "card", bad)
     assert.match(read.errors.join("\n"), /layouts\/agents\.toml: module\[0\]\.recap_open: expected one of card, overlay/, bad)
   }
+})
+
+test("a Layout is read from the Config first, then from the Layouts gjetr ships", () => {
+  const read = Config.overlayLayouts(["mine", "shipped", "loading", "missing", "waiting", "empty"],
+    { mine: "user", shipped: null, loading: undefined, missing: null, waiting: null, empty: "" },
+    { mine: "ship", shipped: "ship", loading: "ship", missing: null, empty: "ship" })
+  assert.deepEqual(plain(read.texts), { mine: "user", shipped: "ship", missing: null, empty: "" })
+  assert.equal(Object.prototype.hasOwnProperty.call(read.texts, "loading"), false)
+  assert.equal(Object.prototype.hasOwnProperty.call(read.texts, "waiting"), false)
+  assert.deepEqual(plain(read.sources), { mine: "config", shipped: "shipped", loading: "loading", missing: "missing",
+    waiting: "loading", empty: "config" })
+  assert.deepEqual(plain(Config.overlayLayouts(null, null, null)), { texts: {}, sources: {} })
+})
+
+test("a Layout found nowhere says so and falls back to the Agent List", () => {
+  const read = Config.readLayout("nowhere", null)
+  assert.match(read.errors.join("\n"), /layouts\/nowhere\.toml: not found in the Config or among gjetr's Layouts, using the default Agent List/)
 })
 
 test("every [[module]] of a Layout is read, in order, with an optional weight", () => {

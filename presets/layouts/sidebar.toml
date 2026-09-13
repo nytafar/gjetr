@@ -1,6 +1,7 @@
-# Dock, portrait: Agents on top, usage pinned underneath, for a Dock along the
-# left or right edge of a main monitor. Use it as the deck of a kind = "dock"
-# Display in gjetr.toml (see the commented Dock there).
+# Sidebar, portrait: Agents on top, usage pinned underneath, for a Dock along
+# the left or right edge of a main monitor, doing the job of herdr's sidebar.
+# The deck of the sidebar preset; name it in the deck of any kind = "dock"
+# Display. A layouts/sidebar.toml in your Config takes its place.
 #
 # A left or right Dock is portrait and a top or bottom Dock landscape, from its
 # shape; a Dock never rotates its output. Modules stack in portrait.

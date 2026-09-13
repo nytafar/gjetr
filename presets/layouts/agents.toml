@@ -1,5 +1,6 @@
 # A Layout: the Modules on a Display and the orientation they are built for.
-# The file name (agents) is the name a Deck uses.
+# The file name (agents) is the name a Deck uses. gjetr ships this Layout; a
+# layouts/agents.toml in your Config takes its place.
 
 # "portrait", "landscape" or "any". On a rotatable Display, selecting this
 # Layout turns the output to match; "any" leaves the output as it is.
