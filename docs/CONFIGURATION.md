@@ -110,7 +110,7 @@ Every Agent across workspaces as a Card.
 | Key | Values | Default | Meaning |
 |---|---|---|---|
 | `sort` | `"spaces"`, `"priority"`, `"cache"` | `"spaces"` | Default Sort mode. Tapping the list header cycles it as an Override |
-| `preset` | `"detailed"`, `"compact"` | `"detailed"` | Card Fields: detailed shows status, kind, name, workspace › tab and Cache timer; compact drops workspace › tab |
+| `preset` | `"detailed"`, `"compact"` | `"detailed"` | Card Fields: detailed shows status (glyph and word), kind, name, workspace › tab and Cache timer; compact drops workspace › tab and the status word, keeping the glyph |
 | `focus` | `"herdr"`, `"window"` | `"herdr"` | Focus behaviour on tap. Tapping `focus` in the header flips it as an Override |
 | `recap` | `"off"`, `"inline"`, `"expand"` | `"off"` | Recap Field for Claude Agents |
 | `recap_open` | `"card"`, `"overlay"` | `"card"` | With `recap = "expand"`: open the full Recap inside the Card or over the list |
@@ -154,6 +154,22 @@ recap_open = "card"
   Clients started as `herdr`, `herdr --session NAME` and
   `herdr session attach NAME` count. `herdr --remote` and herdr subcommands do
   not.
+
+#### Status
+
+A Card shows its Agent's status as a glyph and a word, so it reads without
+colour. While the Agent is working, the glyph turns:
+
+| Status | Glyph | Colour |
+|---|---|---|
+| working | ◌, turning | accent |
+| idle | ○ | none; the glyph and the Card's text are slightly dimmed |
+| blocked | ▲ | urgent |
+| done | ✓ | the theme's green (`green` in its `colors.toml`), else accent |
+| unknown | · | muted |
+
+The `compact` preset shows the glyph without the word. Blocked and done Cards
+also pulse while their Agent is in Attention.
 
 #### Recap
 
@@ -202,15 +218,16 @@ type = "agent-list"
 
 Rows, from the top of the tree down:
 
-- **Workspace**: status bar, label (its number when it has none), tab count.
-- **Tab**, indented: status bar, label or number, and its pane count. A tab with
+- **Workspace**: status glyph, label (its number when it has none), tab count.
+- **Tab**, indented: status glyph, label or number, and its pane count. A tab with
   a single pane shows that pane's agent kind instead (`shell` without an
   agent) and does not expand, since it would only repeat itself.
-- **Pane**, indented again: status bar, agent kind mark, name, and the kind
+- **Pane**, indented again: status glyph, agent kind mark, name, and the kind
   (`shell` without an agent). Names follow the Agent name rules.
 
 A workspace's or tab's status is the one herdr reports for it, else the most
-urgent status below it (blocked, done, working, idle). The Focused workspace,
+urgent status below it (blocked, done, working, idle). Glyphs, colours and the
+turning working glyph are the same as on a Card, without the word. The Focused workspace,
 tab and pane are drawn selected. A row pulses while a pane in it is in
 Attention.
 
@@ -305,6 +322,7 @@ omarchy-shell nytafar.gjetr resetOverrides
 | `~/.config/herdr/plugins/config/cache-ttl/config.json` | cache-ttl herdr plugin | Warn and critical thresholds |
 | `~/.claude/projects/*/<session-id>.jsonl` | Claude Code | Recap (only when `recap` is not `off`) |
 | `$OMARCHY_PATH/shell/plugins/agents/assets/*.svg` | Omarchy | Agent kind marks |
+| `~/.local/state/omarchy/current/theme/colors.toml` | Omarchy theme | `green`, the colour of `done` |
 
 ## IPC
 

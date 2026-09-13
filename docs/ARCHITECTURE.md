@@ -90,7 +90,8 @@ toggle), Offline banner, and the rows of `WorkspaceTreeModel.rows` for its
 Module key. Rows live in a `ListModel` keyed by node and updated in place, and
 `LayoutPolicy.keepRowScroll` holds the row at the top of the view when rows
 open, close or change above it. A row draws its status bar, kind mark, label,
-detail, Attention pulse and, for a parent, a chevron. Every tap goes to
+detail, Attention pulse and, for a parent, a chevron. Its status glyph is
+`StatusPolicy`'s, as on a Card. Every tap goes to
 `Service.tapWorkspaceRow(key, row, zone)`.
 
 Does not own: the tree, expansion state, what a tap does
@@ -108,7 +109,8 @@ keep scroll position and running animations. A Flickable places them with
 its Recap open grows and pushes the rows below it down; `keepScroll` holds the
 view when a Card above it changes height. A Card draws its Fields, its
 Attention pulse and its Recap, and reports taps, long presses and the Recap
-disclosure. With `highlight_workspace`, Cards of Agents in the Focused workspace
+disclosure. Status is a glyph (turning while working) and, outside the
+compact preset, a word, from `StatusPolicy`. With `highlight_workspace`, Cards of Agents in the Focused workspace
 get a faint accent tint.
 
 Does not own: Agents, sorting, Attention or Recap state, colours (theme tokens
@@ -123,7 +125,9 @@ come from `CardPolicy`), or what a tap does.
 | `SortPolicy.js` | `spaces` and `priority` matching herdr's agent panel; `cache` soonest-expiring first | Cache timer arithmetic |
 | `NamePolicy.js` | Agent name fallback and the workspace › tab Field | |
 | `CacheTimerModel.js` | `timers.json` and plugin thresholds to a Cache timer, level and label | File watching |
-| `CardPolicy.js` | Presets and Fields, status and cache tones, touch sizes, kind icons | Colours themselves |
+| `CardPolicy.js` | Presets and Fields, cache tones, touch sizes, kind icons | Colours themselves |
+| `StatusPolicy.js` | Per status: glyph, word, theme tone, motion and dim; which presets show the word | Colours themselves, animation |
+| `ThemeModel.js` | The theme's `green` from `colors.toml`, for `done` | Watching the file |
 | `AttentionModel.js` | Entering and leaving Attention from Agent lists and taps | Pulse animation |
 | `RecapModel.js` | Transcript path checks, stat parsing, the latest `away_summary`, cleaning untrusted text, which Recaps are open per Module and pane | Finding or reading files |
 | `ConfigModel.js` | TOML to validated Displays, Decks, Layouts and Module settings (including `weight`), with per-key errors; a Layout's Modules with their keys | Loading or watching files |

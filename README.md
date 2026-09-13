@@ -18,7 +18,8 @@ lives beside the Omarchy bar, and needs no daemon.
 
 ## Features
 
-- **Every agent, live.** One Card per herdr agent with status, agent kind,
+- **Every agent, live.** One Card per herdr agent with its status (a glyph and
+  a word that read without colour; the working glyph turns), agent kind,
   a readable name, workspace › tab and, for Claude, the prompt Cache timer
   (`42m`, `4:59`, `cold`). Updates arrive from herdr's event stream within a
   second.

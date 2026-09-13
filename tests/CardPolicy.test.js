@@ -27,15 +27,6 @@ test("cards are at least a touch target tall", () => {
   assert.ok(Card.MIN_TOUCH_PX >= 48)
 })
 
-test("status maps to theme tokens, attention states loudest", () => {
-  assert.equal(Card.statusTone("blocked"), "urgent")
-  assert.equal(Card.statusTone("done"), "accent")
-  assert.equal(Card.statusTone("working"), "foreground")
-  assert.equal(Card.statusTone("idle"), "muted")
-  assert.equal(Card.statusTone("unknown"), "muted")
-  assert.equal(Card.statusTone("bogus"), "muted")
-})
-
 test("cache levels map to theme tokens", () => {
   assert.equal(Card.cacheTone("ok"), "muted")
   assert.equal(Card.cacheTone("warn"), "accent")

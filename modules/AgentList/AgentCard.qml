@@ -1,6 +1,7 @@
 import QtQuick
 import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
+import "../../lib/StatusPolicy.js" as StatusPolicy
 
 // One Agent as a Card. Shows the Fields its preset selects; colours arrive as
 // resolved theme tokens from the list. The Card's height is its Fields band,
@@ -13,7 +14,11 @@ Item {
   property var fields: CardPolicy.fieldsFor(CardPolicy.DEFAULT_PRESET)
   property real textScale: 1
   property bool interactive: true
+  // Status: glyph, word, tone and motion (StatusPolicy), and its tone resolved.
+  property var indicator: StatusPolicy.indicator("unknown")
   property color statusColor: Color.muted
+  // Whether the status word shows beside the glyph (not in the compact preset).
+  property bool showStatusWord: true
   property color cacheColor: Color.muted
   // The Agent is in herdr's Focused workspace (highlight_workspace).
   property bool inFocusedWorkspace: false
@@ -77,13 +82,34 @@ Item {
     }
   }
 
-  // Status indicator: a bar down the leading edge in the status tone.
-  Rectangle {
-    id: statusBar
+  // Status glyph at the leading edge: a distinct shape per status, so it reads
+  // without colour; it turns while the Agent is working.
+  Item {
+    id: statusGlyph
     visible: root.fields.status
-    anchors { left: parent.left; top: parent.top; bottom: parent.bottom; margins: 1 }
-    width: visible ? 5 : 0
-    color: root.statusColor
+    anchors { left: parent.left; leftMargin: root.pad; verticalCenter: band.verticalCenter }
+    width: visible ? 28 : 0
+    height: 28
+
+    Text {
+      id: glyph
+      anchors.centerIn: parent
+      text: root.indicator.glyph
+      color: root.statusColor
+      opacity: root.indicator.opacity
+      font.family: Style.font.family
+      font.pixelSize: Math.round(Style.font.title * root.textScale * 1.3)
+      font.bold: root.indicator.status === "blocked" || root.indicator.status === "done"
+
+      RotationAnimation on rotation {
+        running: root.indicator.motion === "spin" && root.visible
+        from: 0
+        to: 360
+        duration: 1800
+        loops: Animation.Infinite
+        onRunningChanged: if (!running) glyph.rotation = 0
+      }
+    }
   }
 
   // The Fields band: the Card as it is while no Recap is open in it.
@@ -96,7 +122,7 @@ Item {
   Item {
     id: kindIcon
     visible: root.fields.kind
-    anchors { left: statusBar.right; leftMargin: root.pad; verticalCenter: band.verticalCenter }
+    anchors { left: statusGlyph.right; leftMargin: root.pad; verticalCenter: band.verticalCenter }
     width: visible ? 28 : 0
     height: 28
 
@@ -137,6 +163,7 @@ Item {
       visible: root.fields.name
       text: root.service && root.agent ? root.service.agentName(root.agent) : ""
       color: Color.foreground
+      opacity: root.indicator.textOpacity
       font.family: Style.font.family
       font.pixelSize: Math.round(Style.font.title * root.textScale)
       font.bold: root.focused
@@ -149,6 +176,7 @@ Item {
       visible: root.fields.location
       text: root.service && root.agent ? root.service.agentLocation(root.agent) : ""
       color: Color.muted
+      opacity: root.indicator.textOpacity
       font.family: Style.font.family
       font.pixelSize: Math.round(Style.font.body * root.textScale)
       elide: Text.ElideMiddle
@@ -191,13 +219,16 @@ Item {
       font.features: { "tnum": 1 }
     }
 
+    // The status word, beside the glyph's colour; dropped by the compact preset.
     Text {
       anchors.right: parent.right
-      visible: root.fields.status && root.fields.location
-      text: root.agent ? root.agent.status : ""
+      visible: root.fields.status && root.showStatusWord
+      text: root.indicator.label
       color: root.statusColor
+      opacity: root.indicator.opacity
       font.family: Style.font.family
       font.pixelSize: Math.round(Style.font.caption * root.textScale)
+      font.bold: root.indicator.status === "blocked"
     }
   }
 
@@ -270,7 +301,7 @@ Item {
     Text {
       id: recapBody
       anchors {
-        left: parent.left; leftMargin: statusBar.width + root.pad
+        left: parent.left; leftMargin: statusGlyph.width + root.pad * 2
         right: parent.right; rightMargin: root.pad
         top: parent.top; topMargin: root.pad / 2
       }

@@ -48,6 +48,7 @@ touchscreen.
 | M17 | Leaves room for the Omarchy bar's strip on the Display |
 | M18 | Recap Field for Claude Agents: latest `away_summary` from the session transcript herdr names; per Module `recap = off / inline / expand`, expand by a disclosure area or long press, opening in the Card (growing it; several at once, open state per pane, not persisted) or an overlay per `recap_open = card / overlay`; plain text only |
 | M19 | Touch input rotates with a runtime rotation (per named device, or the global touchdevice transform) |
+| M23 | Status reads without colour on Cards and Workspace List rows: a distinct glyph and word per status (working ◌ turning, idle ○ only dimmed, blocked ▲, done ✓, unknown ·), colours accent, urgent, the theme's green and muted; the compact preset and rows keep the glyph without the word; blocked and done keep the Attention pulse |
 | M21 | Workspace List Module: herdr's workspace > tab > pane tree expanding in place, panes without an Agent included; rows show rolled-up status, label, counts or the single Agent's kind, and Attention; `tap = expand` (toggle, a leaf pane focuses) or `focus` (focus workspace, tab or pane; a chevron expands); per-Module Focus behaviour; expansion per Module in the service, not persisted, kept across updates without scroll jumps |
 | M22 | Focused workspace: an Agent List highlights Agents in herdr's Focused workspace with a subtle theme tint, never filtering; `highlight_workspace = true` (default) or `false` |
 | M20 | A Layout draws every `[[module]]`: side by side as equal columns in landscape, stacked in portrait, with an optional per-Module `weight`; each Module keeps its own settings, Overrides and session state under `<layout>#<index>` |
@@ -78,8 +79,9 @@ As of v0.1.0. "Live" means checked on the real panel and recorded in
 | M17 | Done, live | T02, T09 |
 | M18 | Done, partly live | Recaps read for 17 of 21 real Claude Agents; Recap opened in a Card via IPC `toggleRecap` on the panel; neither Card nor overlay opened by touch |
 | M19 | Done, partly live | Touch transform follows rotation (`getoption`); tap accuracy in portrait to be confirmed on the panel |
+| M23 | Done, partly live | Glyphs, words, the idle dim and the theme green seen on the panel on detailed Cards, compact Cards and Workspace List rows (`/tmp/gjetr-status.png`, `/tmp/gjetr-status-rows.png`); mapping by tests. Whether the working glyph turns smoothly is not visible in a still and not yet watched on the panel |
 | M21 | Done, partly live | 7 real workspaces drawn beside an Agent List on the panel (`/tmp/gjetr-workspaces.png`); expansion by IPC `toggleExpand` kept the tree in place; rolled-up statuses and counts matched `herdr api snapshot`. Taps by touch, `focus` mode and focusing a workspace or tab in herdr by tests only |
-| M22 | Done, partly live | `state` → `cards.inFocusedWorkspace` followed a live workspace switch in herdr (w9 → wA) and marked exactly wA's 2 Agents; the tinted Cards were below the fold of the screenshot, so the tint itself is not yet looked at on the panel |
+| M22 | Done, live | `state` → `cards.inFocusedWorkspace` followed a live workspace switch in herdr (w9 → wA) and marked exactly wA's 2 Agents; the tint on those Cards is visible on the panel (`/tmp/gjetr-status.png`) |
 | M20 | Done, partly live | Two Agent Lists (priority, cache) side by side on the panel; `cycleSort` changed only `split#0`. Portrait stacking and weights by tests |
 
 ### Next

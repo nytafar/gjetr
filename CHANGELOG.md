@@ -39,6 +39,11 @@ All notable changes to gjetr. The format follows
 
 ### Changed
 
+- Status reads without colour. Cards and Workspace List rows show a glyph
+  instead of a thin coloured line: working ◌ (turning, accent), idle ○
+  (slightly dimmed, no colour), blocked ▲ (urgent), done ✓ (the theme's green)
+  and unknown · (muted). Detailed Cards add the word; the compact preset and
+  rows keep the glyph only. Blocked and done still pulse in Attention.
 - The `cache` Sort mode is soonest-expiring first: live Cache timers by time
   left, shortest first, then expired (`cold`) ones, then Agents without a
   timer; ties by state (blocked, done, working, idle, unknown), then recency.

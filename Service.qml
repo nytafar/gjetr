@@ -17,6 +17,7 @@ import "lib/AttentionModel.js" as AttentionModel
 import "lib/DeckPolicy.js" as DeckPolicy
 import "lib/RecapModel.js" as RecapModel
 import "lib/WorkspaceTreeModel.js" as WorkspaceTreeModel
+import "lib/ThemeModel.js" as ThemeModel
 
 // Owns Display selection, the herdr connection and everything that must
 // outlive a surface. The surface itself is created per matching screen and
@@ -200,6 +201,12 @@ Item {
   // creates, and a read-only property makes that throw and the service load
   // twice.
   property string omarchyPath: Quickshell.env("OMARCHY_PATH") || "/usr/share/omarchy"
+  // The theme's green, for the `done` status (StatusPolicy tone "success").
+  // qs.Commons Color has no green, so it is read from the theme's colors.toml
+  // at the same path Color reads its palette from; accent when there is none.
+  readonly property string themeColorsPath: home + "/.local/state/omarchy/current/theme/colors.toml"
+  property string themeSuccess: ""
+  readonly property color successColor: themeSuccess !== "" ? themeSuccess : Color.accent
   readonly property bool lightBackground: (0.2126 * background.r + 0.7152 * background.g + 0.0722 * background.b) > 0.5
 
   // Attention, from status transitions between published Agent lists and from
@@ -753,6 +760,7 @@ Item {
         error: overridesError, modules: overrides.modules },
       focus: { requests: herdr.focuses, lastError: herdr.lastFocusError },
       attention: attention.attention,
+      theme: { success: String(successColor), fromTheme: themeSuccess !== "" },
       cache: {
         timers: Object.keys(cacheTimers).length,
         error: cacheTimersError,
@@ -877,6 +885,23 @@ Item {
     onFileChanged: reload()
     onLoaded: root.applyCacheTimers(text())
     onLoadFailed: root.applyCacheTimers("{}")
+  }
+
+  FileView {
+    id: themeColorsFile
+    path: root.themeColorsPath
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.themeSuccess = ThemeModel.successColor(text())
+    onLoadFailed: root.themeSuccess = ""
+  }
+
+  // A theme switch repoints the theme directory, which a file watch may miss;
+  // the shell's palette changing is the signal to read colors.toml again.
+  Connections {
+    target: Color
+    function onAccentChanged() { themeColorsFile.reload() }
   }
 
   FileView {

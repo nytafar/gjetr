@@ -5,6 +5,7 @@ import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
 import "../../lib/LayoutPolicy.js" as LayoutPolicy
 import "../../lib/ListSyncPolicy.js" as ListSyncPolicy
+import "../../lib/StatusPolicy.js" as StatusPolicy
 
 // The Agent List Module: every Agent as a Card, in this Module's Sort mode.
 // Presentation only. Its settings (Config shadowed by Overrides) come from the
@@ -109,6 +110,7 @@ Item {
   }
 
   function toneColor(tone) {
+    if (tone === "success") return service ? service.successColor : Color.accent
     if (tone === "urgent") return Color.urgent
     if (tone === "accent") return Color.accent
     if (tone === "foreground") return Color.foreground
@@ -236,7 +238,9 @@ Item {
         textScale: root.textScale
         baseHeight: root.baseCardHeight
         interactive: root.online
-        statusColor: root.toneColor(CardPolicy.statusTone(agent ? agent.status : ""))
+        indicator: StatusPolicy.indicator(agent ? agent.status : "")
+        statusColor: root.toneColor(indicator.tone)
+        showStatusWord: StatusPolicy.showsLabel(root.preset)
         cacheColor: root.toneColor(CardPolicy.cacheTone(cacheTimer ? cacheTimer.level : ""))
         attention: root.service ? root.service.attentionFor(agent, root.service.attention) : ""
         inFocusedWorkspace: root.highlightedWorkspace !== "" && !!agent && agent.workspaceId === root.highlightedWorkspace

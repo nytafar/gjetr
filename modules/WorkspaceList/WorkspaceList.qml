@@ -5,6 +5,7 @@ import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
 import "../../lib/LayoutPolicy.js" as LayoutPolicy
 import "../../lib/ListSyncPolicy.js" as ListSyncPolicy
+import "../../lib/StatusPolicy.js" as StatusPolicy
 
 // The Workspace List Module: herdr's workspaces, tabs and panes as a tree that
 // expands in place, panes without an Agent included. Presentation only. Rows
@@ -76,6 +77,7 @@ Item {
   }
 
   function toneColor(tone) {
+    if (tone === "success") return service ? service.successColor : Color.accent
     if (tone === "urgent") return Color.urgent
     if (tone === "accent") return Color.accent
     if (tone === "foreground") return Color.foreground
@@ -185,7 +187,10 @@ Item {
         // In focus mode a parent row keeps a separate chevron area to expand it.
         readonly property bool chevronZone: root.tapMode === "focus" && parentRow
         readonly property int depth: row ? row.depth : 0
-        readonly property color statusColor: root.toneColor(CardPolicy.statusTone(row ? row.status : ""))
+        // Status as glyph, tone and motion (StatusPolicy), the same as on a Card;
+        // rows show the glyph without the word.
+        readonly property var indicator: StatusPolicy.indicator(row ? row.status : "")
+        readonly property color statusColor: root.toneColor(indicator.tone)
         readonly property color attentionColor: row && row.attention === "blocked" ? Color.urgent : Color.accent
         readonly property string iconUrl: row && row.kind !== "" && root.service ? root.service.kindIconUrl(row.kind) : ""
 
@@ -226,17 +231,37 @@ Item {
           }
         }
 
-        Rectangle {
-          id: statusBar
-          anchors { left: parent.left; top: parent.top; bottom: parent.bottom; margins: 1 }
-          width: 5
-          color: rowItem.statusColor
+        Item {
+          id: statusGlyph
+          anchors { left: parent.left; leftMargin: root.gap; verticalCenter: parent.verticalCenter }
+          width: 24
+          height: 24
+
+          Text {
+            id: glyph
+            anchors.centerIn: parent
+            text: rowItem.indicator.glyph
+            color: rowItem.statusColor
+            opacity: rowItem.indicator.opacity
+            font.family: Style.font.family
+            font.pixelSize: Math.round((rowItem.depth === 0 ? Style.font.title : Style.font.body) * root.textScale * 1.2)
+            font.bold: rowItem.indicator.status === "blocked" || rowItem.indicator.status === "done"
+
+            RotationAnimation on rotation {
+              running: rowItem.indicator.motion === "spin" && rowItem.visible
+              from: 0
+              to: 360
+              duration: 1800
+              loops: Animation.Infinite
+              onRunningChanged: if (!running) glyph.rotation = 0
+            }
+          }
         }
 
         Item {
           id: kindIcon
           visible: rowItem.row !== null && rowItem.row.kind !== "" && rowItem.row.type !== "workspace"
-          anchors { left: statusBar.right; leftMargin: root.pad; verticalCenter: parent.verticalCenter }
+          anchors { left: statusGlyph.right; leftMargin: root.gap; verticalCenter: parent.verticalCenter }
           width: visible ? 24 : 0
           height: 24
 
@@ -271,6 +296,7 @@ Item {
           text: rowItem.row ? rowItem.row.label : ""
           textFormat: Text.PlainText
           color: Color.foreground
+          opacity: rowItem.indicator.textOpacity
           elide: Text.ElideRight
           maximumLineCount: 1
           font.family: Style.font.family
@@ -286,7 +312,7 @@ Item {
             verticalCenter: parent.verticalCenter
           }
           text: rowItem.row ? rowItem.row.detail : ""
-          color: rowItem.row && rowItem.row.type === "pane" && !rowItem.row.isAgent ? Color.muted : rowItem.statusColor
+          color: Color.muted
           font.family: Style.font.family
           font.pixelSize: Math.round(Style.font.body * root.textScale)
         }
