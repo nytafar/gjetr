@@ -156,6 +156,68 @@ test("moduleRects treats junk weights as 1 and never goes negative", () => {
   assert.deepEqual(Layout.moduleRects(500, 300, [1], 8).map(r => ({ ...r })), [{ x: 0, y: 0, width: 500, height: 300 }])
 })
 
+test("moduleRects gives a pinned stacked Module its content height, flush at the bottom", () => {
+  // An Agent List over a pinned Usage 180 px tall: the list takes the rest, whatever the weights.
+  const rects = Layout.moduleRects(360, 1000, [2, 1], 8, [null, 180])
+  assert.deepEqual(rects.map(r => ({ ...r })), [
+    { x: 0, y: 0, width: 360, height: 812 },
+    { x: 0, y: 820, width: 360, height: 180 }
+  ])
+})
+
+test("moduleRects moves pinned Modules after the others, in their own order", () => {
+  const rects = Layout.moduleRects(360, 1000, [1, 1, 1], 10, [100, null, 50])
+  assert.deepEqual(rects.map(r => [r.y, r.height]), [[840, 100], [0, 830], [950, 50]])
+  assert.equal(rects[2].y + rects[2].height, 1000)
+})
+
+test("moduleRects shares the rest by weight among the Modules that are not pinned", () => {
+  const rects = Layout.moduleRects(300, 1000, [2, 1, 5], 10, [null, null, 170])
+  assert.deepEqual(rects.map(r => [r.y, r.height]), [[0, 540], [550, 270], [830, 170]])
+})
+
+test("moduleRects caps pinned Modules at half the length together", () => {
+  assert.deepEqual(Layout.moduleRects(300, 1000, [1, 1], 0, [null, 900]).map(r => [r.y, r.height]), [[0, 500], [500, 500]])
+  // Two pinned Modules asking 400 and 200 of a 500 px budget shrink in proportion.
+  assert.deepEqual(Layout.moduleRects(300, 1000, [1, 1, 1], 0, [null, 400, 200]).map(r => [r.y, r.height]),
+    [[0, 501], [501, 333], [834, 166]])
+})
+
+test("moduleRects keeps the weight share of a pinned Module not measured yet, at the end", () => {
+  for (const unknown of [0, -5, NaN, undefined, "180", true]) {
+    const rects = Layout.moduleRects(300, 1000, [1, 1], 8, [unknown === undefined ? 0 : unknown, null])
+    assert.deepEqual(rects.map(r => [r.y, r.height]), [[504, 496], [0, 496]], String(unknown))
+  }
+})
+
+test("moduleRects puts a pinned Module at the right edge side by side, sized by weight", () => {
+  const rects = Layout.moduleRects(1000, 500, [1, 2], 10, [120, null])
+  assert.deepEqual(rects.map(r => [r.x, r.width, r.height]), [[670, 330, 500], [0, 660, 500]])
+})
+
+test("moduleRects splits by weight in order when every Module is pinned, or none is", () => {
+  assert.deepEqual(Layout.moduleRects(300, 1000, [1, 1], 0, [100, 100]).map(r => [r.y, r.height]), [[0, 500], [500, 500]])
+  assert.deepEqual(Layout.moduleRects(300, 1000, [1, 1], 0, [null, null]).map(r => [r.y, r.height]), [[0, 500], [500, 500]])
+  assert.deepEqual(Layout.moduleRects(300, 1000, [1, 1], 0, "junk").map(r => [r.y, r.height]), [[0, 500], [500, 500]])
+})
+
+test("moduleRects never goes negative with a pinned Module in too little room", () => {
+  for (const rect of Layout.moduleRects(300, 12, [1, 1, 1], 8, [null, 40, null])) {
+    assert.ok(rect.y >= 0 && rect.height >= 0 && rect.y + rect.height <= 12, JSON.stringify(rect))
+  }
+})
+
+test("moduleDividers draws a hairline in each gap between placed neighbours", () => {
+  const stacked = Layout.moduleRects(360, 1000, [1, 1], 8, [180, null])
+  assert.deepEqual(Layout.moduleDividers(360, 1000, stacked, 8).map(d => ({ ...d })),
+    [{ x: 0, y: 812 + 4, width: 360, height: 1 }])
+  const row = Layout.moduleRects(940, 600, [1, 1, 1], 9)
+  assert.deepEqual(Layout.moduleDividers(940, 600, row, 9).map(d => [d.x, d.y, d.width, d.height]),
+    [[row[1].x - 5, 0, 1, 600], [row[2].x - 5, 0, 1, 600]])
+  assert.deepEqual(Layout.moduleDividers(360, 1000, [], 8), [])
+  assert.deepEqual(Layout.moduleDividers(360, 1000, null, 8), [])
+})
+
 test("keepRowScroll holds the row at the top of the view when rows change above or below it", () => {
   const before = ["a", "b", "c", "d", "e"]
   // View top at 130 with 60 px rows: row c (index 2) is at the top, 10 px scrolled into it.

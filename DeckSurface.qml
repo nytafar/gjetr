@@ -54,10 +54,30 @@ PanelWindow {
     DeckPolicy.withTabs(inset, tabEdge, tabThickness, tabsShown))
 
   // Where each Module of the active Layout goes in the content area: side by
-  // side on a landscape area, stacked on a portrait one, sized by weight.
+  // side on a landscape area, stacked on a portrait one, sized by weight. A
+  // pinned Module goes to the end; stacked, it takes the content height its
+  // slot reports into contentHeights, keyed by Module key. Only a stacked
+  // area reads them: side by side a Module's width follows the rectangles, and
+  // its content height with it.
   readonly property int moduleGap: Style.spacing.lg
+  readonly property bool stacked: LayoutPolicy.stacksModules(contentRect.width, contentRect.height)
+  property var contentHeights: ({})
   readonly property var moduleRects: LayoutPolicy.moduleRects(contentRect.width, contentRect.height,
-    deck ? deck.activeModules.map(function(module) { return module.weight }) : [], moduleGap)
+    deck ? deck.activeModules.map(function(module) { return module.weight }) : [], moduleGap,
+    deck ? deck.activeModules.map(function(module) {
+      if (module.pin !== "end") return null
+      return root.stacked ? (root.contentHeights[module.key] || 0) : 0
+    }) : [])
+  readonly property var moduleDividers: LayoutPolicy.moduleDividers(contentRect.width, contentRect.height,
+    moduleRects, moduleGap)
+
+  function setContentHeight(key, height) {
+    if (root.contentHeights[key] === height) return
+    var next = {}
+    for (var name in root.contentHeights) next[name] = root.contentHeights[name]
+    next[key] = height
+    root.contentHeights = next
+  }
 
   // Modules are placed into the content area, which never sits under the bar.
   default property alias content: contentArea.data
@@ -120,7 +140,14 @@ PanelWindow {
         height: rect.height
         clip: true
 
+        // A pinned Module's content height, for its place in the Layout. Only a
+        // Usage Module has one.
+        readonly property int contentHeight: modelData.pin === "end" && loader.item
+          && loader.item.contentHeight !== undefined ? loader.item.contentHeight : 0
+        onContentHeightChanged: if (modelData.pin === "end") root.setContentHeight(modelData.key, contentHeight)
+
         Loader {
+          id: loader
           anchors.fill: parent
           sourceComponent: slot.modelData.type === "agent-list" ? agentList
             : slot.modelData.type === "workspace-list" ? workspaceList
@@ -162,19 +189,16 @@ PanelWindow {
 
     // A hairline between neighbouring Modules, in the middle of the gap.
     Repeater {
-      model: Math.max(0, root.moduleRects.length - 1)
+      model: root.moduleDividers
 
       Rectangle {
-        required property int index
-
-        readonly property var next: root.moduleRects[index + 1]
-        readonly property bool row: next.x > 0
+        required property var modelData
 
         color: Util.alpha(Color.foreground, 0.12)
-        x: row ? next.x - Math.ceil(root.moduleGap / 2) : 0
-        y: row ? 0 : next.y - Math.ceil(root.moduleGap / 2)
-        width: row ? 1 : contentArea.width
-        height: row ? contentArea.height : 1
+        x: modelData.x
+        y: modelData.y
+        width: modelData.width
+        height: modelData.height
       }
     }
 

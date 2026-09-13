@@ -6,6 +6,18 @@ All notable changes to gjetr. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Pinned Usage: `pin = "end"` on a Usage `[[module]]` puts it after the other
+  Modules, flush against the end of its Layout. Stacked, it is exactly as tall
+  as its content (at most half the height, scrolling beyond) and follows it as
+  providers and limits appear, while the other Modules share the rest by
+  weight, so a Dock's Agent List reaches down to the usage lines with no empty
+  space under them. Side by side it keeps its weight share at the right edge.
+  `pin` is placement, like `weight`: only a `[[module]]` takes it, and on an
+  Agent List or Workspace List it is logged and ignored.
+  `examples/gjetr/layouts/dock.toml` pins its usage; `state` → `modules[].pin`.
+
 ## [0.2.0] - 2026-09-13
 
 ### Added

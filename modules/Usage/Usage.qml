@@ -47,6 +47,13 @@ Item {
     return best
   }
 
+  // The height this Module's content needs at its width, for a Layout that
+  // pins it (LayoutPolicy.moduleRects). It follows the width and what there is
+  // to show, never the Module's own height, so sizing the Module to it settles
+  // at once.
+  readonly property int contentHeight: Math.ceil(header.height
+    + (providers.length === 0 ? emptyText.implicitHeight + gap * 4 : body.contentHeight))
+
   readonly property real textScale: density.textScale
   readonly property int gap: density.gap
   readonly property int pad: density.pad
@@ -656,6 +663,7 @@ Item {
   }
 
   Text {
+    id: emptyText
     anchors.centerIn: body
     width: body.width - root.gap * 4
     horizontalAlignment: Text.AlignHCenter

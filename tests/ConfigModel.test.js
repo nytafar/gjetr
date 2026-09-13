@@ -340,9 +340,37 @@ weight = 2
 `)
   assert.deepEqual(Array.from(read.errors), [])
   assert.deepEqual(plain(read.layout.modules), [{ type: "usage", show: ["limits", "today", "recent_days", "models"],
-    providers: ["claude", "codex"], refreshSeconds: 300, weight: 2, density: "auto" }])
+    providers: ["claude", "codex"], refreshSeconds: 300, weight: 2, pin: "none", density: "auto" }])
   assert.deepEqual(plain(Config.readLayout("u", '[[module]]\ntype = "usage"\n').layout.modules),
-    [{ type: "usage", show: ["limits"], providers: [], refreshSeconds: null, weight: 1, density: "auto" }])
+    [{ type: "usage", show: ["limits"], providers: [], refreshSeconds: null, weight: 1, pin: "none", density: "auto" }])
+})
+
+test("a usage Module may be pinned to the end of its Layout", () => {
+  const read = Config.readLayout("dock", '[[module]]\ntype = "agent-list"\n[[module]]\ntype = "usage"\npin = "end"\n')
+  assert.deepEqual(Array.from(read.errors), [])
+  assert.equal(read.layout.modules[1].pin, "end")
+  const modules = plain(Config.layoutModules(read.layout))
+  assert.deepEqual(modules.map(m => [m.key, m.pin]), [["dock#0", "none"], ["dock#1", "end"]])
+  assert.equal(Config.readLayout("u", '[[module]]\ntype = "usage"\npin = "none"\n').layout.modules[0].pin, "none")
+  for (const bad of ['"bottom"', '"END"', "true", "1"]) {
+    const wrong = Config.readLayout("u", `[[module]]\ntype = "usage"\npin = ${bad}\n`)
+    assert.equal(wrong.layout.modules[0].pin, "none", bad)
+    assert.match(wrong.errors.join("\n"), /layouts\/u\.toml: module\[0\]\.pin: expected one of none, end/, bad)
+  }
+})
+
+test("pin is only for a usage Module and only in a [[module]]", () => {
+  const list = Config.readLayout("a", '[[module]]\ntype = "agent-list"\npin = "end"\n[[module]]\ntype = "workspace-list"\npin = "end"\n')
+  const text = list.errors.join("\n")
+  assert.match(text, /layouts\/a\.toml: module\[0\]\.pin: only a Usage Module sizes to its content \(ignored\)/)
+  assert.match(text, /layouts\/a\.toml: module\[1\]\.pin: only a Usage Module sizes to its content \(ignored\)/)
+  assert.doesNotMatch(text, /unknown key/)
+  assert.deepEqual(plain(Config.layoutModules(list.layout)).map(m => m.pin), ["none", "none"])
+  assert.equal(list.layout.modules[0].pin, undefined)
+  const main = Config.readMain('[defaults]\npin = "end"\n[defaults.usage]\npin = "end"\n', HOME)
+  assert.match(main.errors.join("\n"), /gjetr\.toml: defaults\.pin: only in a \[\[module\]\] \(ignored\)/)
+  assert.match(main.errors.join("\n"), /gjetr\.toml: defaults\.usage\.pin: only in a \[\[module\]\] \(ignored\)/)
+  assert.equal(main.config.defaults.usage.pin, "none")
 })
 
 test("an old cost_30d show item is reported and ignored", () => {

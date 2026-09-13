@@ -117,7 +117,7 @@ Every Module setting in the tables under [`layouts/<name>.toml`](#layoutsnametom
 can be a default (`density`; for Agent Lists `sort`, `preset`, `focus`,
 `recap`, `recap_open`, `highlight_workspace`, `indicator`, `working_effect`;
 for Workspace Lists `tap`, `focus`, `indicator`, `working_effect`; for Usage
-`show`, `providers`, `refresh_seconds`). `type` and `weight`
+`show`, `providers`, `refresh_seconds`). `type`, `weight` and `pin`
 place a Module in its Layout, so only a `[[module]]` takes them.
 
 - A bad value in the defaults is logged once, naming `gjetr.toml` and the
@@ -179,13 +179,16 @@ orientation = "portrait"
 
 [[module]]
 type = "agent-list"
-weight = 2
 preset = "compact"
 
 [[module]]
 type = "usage"
 show = ["limits"]
+pin = "end"              # as tall as its lines, at the bottom
 ```
+
+The Agent List takes all the height the pinned usage lines leave (see
+[Pinned to the end](#pinned-to-the-end)).
 
 **Density.** A Dock is used with the mouse, so by default its Agent List and
 Workspace List draw compact rows instead of touch Cards (see
@@ -287,6 +290,38 @@ type = "agent-list"
 sort = "cache"
 preset = "compact"
 ```
+
+#### Pinned to the end
+
+A Usage Module takes `pin = "end"`. It then goes after the other Modules,
+flush against the end of the Layout, wherever it is in the file:
+
+- Stacked (portrait), it is exactly as tall as its content: its header and
+  what it shows for its providers. The other Modules share the rest of the
+  height by weight, so a Dock's Agent List reaches down to the usage lines
+  with no empty space between them. It grows and shrinks as providers and
+  limits appear or go.
+- It never takes more than half of the height, and scrolls beyond that. Two
+  pinned Modules share that half in proportion to their content.
+- Side by side (landscape), a Module's width does not follow its content, so a
+  pinned Module keeps its `weight` share and sits at the right edge.
+
+```toml
+orientation = "portrait"
+
+[[module]]
+type = "agent-list"
+
+[[module]]
+type = "usage"
+pin = "end"
+```
+
+`pin` places a Module in its Layout, as `weight` does, so only a `[[module]]`
+takes it: in `[defaults]` it is logged and ignored. An Agent List or Workspace
+List scrolls and has no content height to size to, so `pin` on one is logged
+and ignored too. When every Module of a Layout is pinned, they split by weight
+as usual.
 
 ### `[[module]]` with `type = "agent-list"`
 
@@ -557,6 +592,7 @@ Tap the Module's header to refresh now.
 | `show` | list of `"limits"`, `"today"`, `"recent_days"`, `"models"` | `["limits"]` | What each provider shows, in this order. Unknown items are skipped with an error |
 | `providers` | list of provider ids | every ready provider | Which providers, in this order. A named provider that is not ready, or has no record yet, is shown quietly |
 | `refresh_seconds` | whole number, 60 to 86400 | the Display's, else `900` | Seconds between refreshes. With several Usage Modules in the Deck, the smallest wins |
+| `pin` | `"none"`, `"end"` | `"none"` | `"end"`: after the other Modules at the end of the Layout, and stacked, exactly as tall as its content. See [Pinned to the end](#pinned-to-the-end) |
 
 ```toml
 orientation = "landscape"
@@ -698,7 +734,7 @@ omarchy-shell nytafar.gjetr <function> [argument]
 
 | Function | Does |
 |---|---|
-| `state` | JSON: `displays` (every Display: kind, edge, size, shown, surface with layer and exclusive zone, Deck, Modules). The rest describes the primary Display, the first surface: Display, bar inset, herdr connection (with the server's `version` and `protocol`, the `supported` set, `protocolMismatch`, `pingError` and `unsupported`), Config summary and errors, the active Layout's `modules` (key, type, weight, rectangle), `workspaces` (Focused workspace, expansion and rows of the first Workspace List), Deck, Overrides, Attention, Recap, every Card (with its `name`, `kind`, `kindLabel` and `kindMark`: the SVG file or the letter drawn). `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
+| `state` | JSON: `displays` (every Display: kind, edge, size, shown, surface with layer and exclusive zone, Deck, Modules). The rest describes the primary Display, the first surface: Display, bar inset, herdr connection (with the server's `version` and `protocol`, the `supported` set, `protocolMismatch`, `pingError` and `unsupported`), Config summary and errors, the active Layout's `modules` (key, type, weight, pin, rectangle), `workspaces` (Focused workspace, expansion and rows of the first Workspace List), Deck, Overrides, Attention, Recap, every Card (with its `name`, `kind`, `kindLabel` and `kindMark`: the SVG file or the letter drawn). `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
 | `reconnect` | Drop and reopen the herdr connection |
 | `focus <pane-id>` | Focus an Agent's pane, as a tap on a touch surface does, with the first Agent List's Focus behaviour |
 | `pointerFocus <pane-id>` | The same, as a mouse click on a Dock does: with Focus behaviour `window`, the pointer goes back where it was once the window is focused. `state` → `windowFocus.cursor` says `restored x,y` or why not |
