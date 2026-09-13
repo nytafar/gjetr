@@ -4,6 +4,9 @@ import Quickshell.Io
 import qs.Commons
 import "lib/LayoutPolicy.js" as LayoutPolicy
 import "lib/HerdrModel.js" as HerdrModel
+import "lib/NamePolicy.js" as NamePolicy
+import "lib/SortPolicy.js" as SortPolicy
+import "lib/CacheTimerModel.js" as CacheTimerModel
 
 // Owns Display selection, the herdr connection and everything that must
 // outlive a surface. The surface itself is created per matching screen and
@@ -44,8 +47,55 @@ Item {
   // Offline once a connection attempt has failed; before that, still connecting.
   readonly property bool herdrOffline: !herdr.online && herdr.attempt > 0
 
+  // Sort mode. T06 replaces the default with Config and Overrides.
+  property string sortMode: SortPolicy.DEFAULT_MODE
+
+  // Cache timers from the cache-ttl herdr plugin. Paths are the plugin's own
+  // state and config dirs (HERDR_PLUGIN_STATE_DIR, HERDR_PLUGIN_CONFIG_DIR).
+  readonly property string home: Quickshell.env("HOME")
+  readonly property string cacheTimersPath: home + "/.local/state/herdr/plugins/cache-ttl/timers.json"
+  readonly property string cacheSettingsPath: home + "/.config/herdr/plugins/config/cache-ttl/config.json"
+  property var cacheTimers: ({})
+  property string cacheTimersError: ""
+  property var cacheSettings: CacheTimerModel.DEFAULT_SETTINGS
+  // Display clock, whole seconds. Ticks only while a countdown is visible.
+  property int nowSeconds: CacheTimerModel.nowSeconds(Date.now())
+  readonly property bool cacheClockNeeded: CacheTimerModel.hasLiveTimer(agents, cacheTimers, nowSeconds)
+
+  // Agents in the current Sort mode. Replaced only when the order or the
+  // Agents themselves change, so Cards are not rebuilt on every tick.
+  property var sortedAgents: []
+
   function log(message) {
     console.info("[gjetr] " + message)
+  }
+
+  function resort() {
+    var remaining = sortMode === "cache" ? CacheTimerModel.remainingByPane(agents, cacheTimers, nowSeconds) : null
+    var next = SortPolicy.sortAgents(agents, sortMode, remaining)
+    if (!SortPolicy.sameOrder(next, sortedAgents)) sortedAgents = next
+  }
+
+  // Field helpers for Modules. Pass `nowSeconds` from a binding so the Cache
+  // timer re-evaluates on every tick.
+  function agentName(agent) {
+    return NamePolicy.agentName(agent)
+  }
+
+  function agentLocation(agent) {
+    return NamePolicy.location(agent)
+  }
+
+  function cacheTimerFor(agent, now) {
+    return CacheTimerModel.cacheTimer(agent, cacheTimers, now, cacheSettings)
+  }
+
+  function applyCacheTimers(text) {
+    var parsed = CacheTimerModel.parseTimers(text)
+    if (parsed.error !== cacheTimersError && parsed.error !== "") log("cache timers unreadable: " + parsed.error)
+    cacheTimersError = parsed.error
+    cacheTimers = parsed.timers
+    nowSeconds = CacheTimerModel.nowSeconds(Date.now())
   }
 
   function registerSurface(surface) {
@@ -83,13 +133,62 @@ Item {
         eventsSeen: herdr.eventsSeen,
         snapshots: herdr.snapshots,
         publishes: herdr.publishes
-      }
+      },
+      sortMode: sortMode,
+      cache: {
+        timers: Object.keys(cacheTimers).length,
+        error: cacheTimersError,
+        settings: cacheSettings,
+        clock: cacheClockNeeded
+      },
+      cards: sortedAgents.map(function(agent) {
+        var timer = cacheTimerFor(agent, nowSeconds)
+        return {
+          paneId: agent.paneId,
+          status: agent.status,
+          name: agentName(agent),
+          location: agentLocation(agent),
+          cache: timer ? timer.label + " " + timer.level : ""
+        }
+      })
     })
   }
 
   HerdrConnection {
     id: herdr
     socketPath: root.herdrSocketPath
+  }
+
+  onAgentsChanged: resort()
+  onSortModeChanged: resort()
+  onCacheTimersChanged: resort()
+
+  FileView {
+    path: root.cacheTimersPath
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.applyCacheTimers(text())
+    onLoadFailed: root.applyCacheTimers("{}")
+  }
+
+  FileView {
+    path: root.cacheSettingsPath
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.cacheSettings = CacheTimerModel.parseSettings(text())
+    onLoadFailed: root.cacheSettings = CacheTimerModel.DEFAULT_SETTINGS
+  }
+
+  Timer {
+    interval: 1000
+    repeat: true
+    running: root.cacheClockNeeded
+    onTriggered: {
+      root.nowSeconds = CacheTimerModel.nowSeconds(Date.now())
+      if (root.sortMode === "cache") root.resort()
+    }
   }
 
   Component.onCompleted: {
