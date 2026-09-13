@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "nytafar.gjetr",
   "name": "gjetr",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "nytafar",
   "license": "MIT",
   "description": "herdr agent dashboard for a secondary touchscreen: every agent as a live Card, tap to focus, attention pulses, tabs and rotation.",

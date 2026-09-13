@@ -6,6 +6,8 @@ All notable changes to gjetr. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-13
+
 ### Added
 
 - Kind logos: Pi, Gemini, Cursor, Cline, OpenCode, GitHub Copilot, Kimi, Qwen
