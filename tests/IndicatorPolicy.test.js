@@ -146,3 +146,26 @@ test("hueStep walks the palette in a loop", () => {
   assert.deepEqual([last.from, last.to], [2, 0])
   assert.deepEqual(Indicator.hueStep(3, NaN), { from: 0, to: 1, t: 0 })
 })
+
+// What the hue fill was: Qt.tint(palette[from], Util.alpha(palette[to], t)),
+// which is Qt's tintColor(base, tint).
+function qtTint(base, tint) {
+  const a = tint.a
+  const inv = 1 - a
+  return { r: tint.r * a + base.r * inv, g: tint.g * a + base.g * inv, b: tint.b * a + base.b * inv, a: a + inv * base.a }
+}
+
+test("hueColor mixes the palette's colours as Qt.tint with the next colour at alpha t did", () => {
+  const palette = [{ r: 1, g: 0.2, b: 0.1, a: 1 }, { r: 0.1, g: 0.8, b: 0.3, a: 1 }, { r: 0.2, g: 0.4, b: 1, a: 0.5 }]
+  for (let phase = 0; phase < 1; phase += 0.07) {
+    const step = Indicator.hueStep(palette.length, phase)
+    const expected = qtTint(palette[step.from], { r: palette[step.to].r, g: palette[step.to].g, b: palette[step.to].b, a: step.t })
+    const got = Indicator.hueColor(palette, phase)
+    for (const channel of ["r", "g", "b", "a"]) {
+      assert.ok(Math.abs(got[channel] - expected[channel]) < 1e-12, `${channel} at ${phase}: ${got[channel]} != ${expected[channel]}`)
+    }
+  }
+  assert.equal(Indicator.hueColor([], 0.5), null)
+  assert.equal(Indicator.hueColor([palette[0]], 0.5), null)
+  assert.equal(Indicator.hueColor(null, 0.5), null)
+})

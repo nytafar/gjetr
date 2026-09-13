@@ -58,10 +58,16 @@ Item {
   readonly property real phase: moving && mark ? MotionPolicy.phase(phaseMotion.ms, mark.period) : 0
   readonly property var f: IndicatorPolicy.frame(moving ? motion : "", phase)
   readonly property color highlight: Qt.lighter(toneColor, IndicatorPolicy.SWEEP_HIGHLIGHT)
+  // The palette as colour components, read when it changes rather than on
+  // every frame of the hue cycle.
+  readonly property var paletteColors: (palette || []).map(function(entry) {
+    var c = typeof entry === "string" ? Qt.color(entry) : entry
+    return { r: c.r, g: c.g, b: c.b, a: c.a }
+  })
   readonly property color fillColor: {
-    if (motion !== "hue" || !palette || palette.length < 2) return toneColor
-    var step = IndicatorPolicy.hueStep(palette.length, phase)
-    return Qt.tint(palette[step.from], Util.alpha(palette[step.to], step.t))
+    if (motion !== "hue") return toneColor
+    var c = IndicatorPolicy.hueColor(paletteColors, phase)
+    return c ? Qt.rgba(c.r, c.g, c.b, c.a) : toneColor
   }
   // Drawn as a mask: stateful, or a one-colour SVG.
   readonly property bool masked: stateful || (tinted && iconUrl !== "")
