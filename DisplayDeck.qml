@@ -38,7 +38,7 @@ Item {
   readonly property bool shown: !isDock || OverrideModel.displayVisible(service ? service.overrides : null, name, display.visible)
   readonly property bool shownOverridden: isDock && shown !== display.visible
 
-  readonly property var layoutsByName: service ? service.readLayouts(display.deck, service.layoutTexts) : ({})
+  readonly property var layoutsByName: service ? service.readLayouts(display.deck, service.layoutTexts, service.config.defaults) : ({})
 
   // The Deck: the Layouts this Display can show now, and the active one. A
   // fixed Display skips Layouts built for the other orientation; a Dock's

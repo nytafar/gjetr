@@ -19,7 +19,7 @@ no Config at all, gjetr shows one Agent List on `HDMI-A-2`.
 
 ```
 ~/.config/gjetr/
-  gjetr.toml            socket and Displays
+  gjetr.toml            socket, Displays and defaults
   layouts/
     agents.toml         one file per Layout
     workspaces.toml
@@ -78,6 +78,62 @@ background = "#c0000000"
 
 A surface sits on the Bottom layer, so ordinary windows cover it and the
 Omarchy bar stays on top. Content steps out of the bar's strip on its own.
+
+### `[defaults]`
+
+Module settings given once for every Layout. `[defaults]` gives a setting to
+every Module whose type takes that key; `[defaults.agent-list]`,
+`[defaults.workspace-list]` and `[defaults.usage]` give it to every Module of
+one type. A `[[module]]`'s own key wins over both, and an
+[Override](#overrides) made on the Display wins over all of Config:
+
+```
+built-in default < [defaults] < [defaults.<type>] < the [[module]]'s own key < Override
+```
+
+```toml
+[defaults]
+density = "compact"      # every Agent List, Workspace List and Usage Module
+focus = "window"         # Agent Lists and Workspace Lists; Usage takes no focus
+
+[defaults.agent-list]
+sort = "priority"
+recap = "inline"
+```
+
+with `layouts/dock.toml`:
+
+```toml
+[[module]]
+type = "agent-list"      # compact, focus window, sort priority, recap inline
+
+[[module]]
+type = "agent-list"
+sort = "cache"           # its own sort; everything else still from the defaults
+density = "full"
+```
+
+Every Module setting in the tables under [`layouts/<name>.toml`](#layoutsnametoml)
+can be a default (`density`; for Agent Lists `sort`, `preset`, `focus`,
+`recap`, `recap_open`, `highlight_workspace`; for Workspace Lists `tap`,
+`focus`; for Usage `show`, `providers`, `refresh_seconds`). `type` and `weight`
+place a Module in its Layout, so only a `[[module]]` takes them.
+
+- A bad value in the defaults is logged once, naming `gjetr.toml` and the
+  table (`gjetr.toml: defaults.agent-list.sort: expected one of spaces,
+  priority, cache, got "abc"`), and the level below it applies.
+- A key no Module type takes, a key under `[defaults.<type>]` that type does
+  not take (`defaults.workspace-list.sort: unknown key for workspace-list
+  (ignored)`), and a table that names no Module type are logged and ignored.
+- A bad value in a `[[module]]` falls back to what the defaults give, not to
+  the built-in default.
+- `state` → `config.defaults` shows each Module type's settings after the
+  defaults.
+
+There are no defaults per Display: `[display.defaults]` is logged and ignored.
+A Layout shown on two Displays is the same Modules, sharing its Overrides, so
+it cannot take different settings on each; give a Dock its own Layout file
+instead.
 
 ## Docks
 
@@ -212,6 +268,10 @@ Keys every `[[module]]` takes, whatever its type:
 | `type` | `"agent-list"`, `"workspace-list"`, `"usage"` | required | Module type. Unknown types are skipped |
 | `weight` | number above 0, at most 100 | `1` | The Module's share of the width (landscape) or height (portrait). `weight = 2` beside a `weight = 1` takes two thirds |
 | `density` | `"auto"`, `"compact"`, `"full"` | `"auto"` | How big the Module draws: chosen from its size and input, always compact, or full. See [Density](#density) |
+
+Every setting in the tables below, and `density`, can also be given once for
+all Layouts in [`[defaults]`](#defaults). The Defaults column is the built-in
+value.
 
 ```toml
 orientation = "landscape"

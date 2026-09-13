@@ -269,17 +269,18 @@ Item {
     var errors = read.errors.slice()
     for (var i = 0; i < names.length; i++) {
       if (texts[names[i]] === undefined) continue
-      errors = errors.concat(ConfigModel.readLayout(names[i], texts[names[i]]).errors)
+      errors = errors.concat(ConfigModel.readLayout(names[i], texts[names[i]], read.config.defaults).errors)
     }
     return errors
   }
 
   // A Layout whose file has not answered yet counts as `any`, so it is not
-  // skipped (and logged as skipped) while it loads.
-  function readLayouts(names, texts) {
+  // skipped (and logged as skipped) while it loads. `defaults` is gjetr.toml's
+  // cascade of Module settings (config.defaults).
+  function readLayouts(names, texts, defaults) {
     var out = {}
     for (var i = 0; i < names.length; i++) {
-      var layout = ConfigModel.readLayout(names[i], texts[names[i]]).layout
+      var layout = ConfigModel.readLayout(names[i], texts[names[i]], defaults).layout
       if (texts[names[i]] === undefined) layout.orientation = "any"
       out[names[i]] = layout
     }
@@ -784,7 +785,7 @@ Item {
       focusOverridden: focusOverridden,
       windowFocus: windowFocus,
       commands: { started: commands.started, refused: commands.refused, lastError: commands.lastError },
-      config: { dir: configDir, summary: configSummary, errors: configErrors },
+      config: { dir: configDir, summary: configSummary, errors: configErrors, defaults: config.defaults },
       workspaces: {
         list: workspaceListKey,
         focusedWorkspace: focusedWorkspaceId,

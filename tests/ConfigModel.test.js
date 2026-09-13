@@ -17,7 +17,8 @@ test("a missing gjetr.toml yields the defaults without errors", () => {
   assert.deepEqual(Array.from(read.errors), [])
   assert.deepEqual(plain(read.config), {
     socket: "/home/test/.config/herdr/herdr.sock",
-    displays: [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black", touchDevices: [], refreshSeconds: null, kind: "surface", edge: "", size: 0, visible: true }]
+    displays: [{ name: "HDMI-A-2", deck: ["agents"], rotatable: false, background: "black", touchDevices: [], refreshSeconds: null, kind: "surface", edge: "", size: 0, visible: true }],
+    defaults: plain(Config.moduleDefaults())
   })
 })
 
@@ -42,7 +43,8 @@ background = "theme"
     displays: [
       { name: "HDMI-A-2", deck: ["agents", "overview"], rotatable: true, background: "#101315", touchDevices: [], refreshSeconds: null, kind: "surface", edge: "", size: 0, visible: true },
       { name: "DP-2", deck: ["agents"], rotatable: false, background: "theme", touchDevices: [], refreshSeconds: null, kind: "surface", edge: "", size: 0, visible: true }
-    ]
+    ],
+    defaults: plain(Config.moduleDefaults())
   })
 })
 
@@ -501,4 +503,136 @@ test("density is auto, compact or full on every Module type, default auto", () =
     assert.equal(read.layout.modules[0].density, "auto", bad)
     assert.match(read.errors.join("\n"), /layouts\/d\.toml: module\[0\]\.density: expected one of auto, compact, full/, bad)
   }
+})
+
+// ------------------------------------------------------------------ defaults
+
+function layoutWith(main, layoutText) {
+  const read = Config.readMain(main, HOME)
+  return { main: read, layout: Config.readLayout("l", layoutText, read.config.defaults) }
+}
+
+test("without [defaults] every Module type starts from its built-in settings", () => {
+  const read = Config.readMain(null, HOME)
+  assert.deepEqual(plain(read.config.defaults), plain(Config.moduleDefaults()))
+  assert.deepEqual(plain(Config.readLayout("l", '[[module]]\ntype = "agent-list"\n', read.config.defaults).layout.modules),
+    plain(Config.readLayout("l", '[[module]]\ntype = "agent-list"\n').layout.modules))
+})
+
+test("[defaults] applies to every Module type that has the key", () => {
+  const { main, layout } = layoutWith('[defaults]\ndensity = "compact"\nfocus = "window"\nsort = "cache"\nshow = ["today"]\n',
+    '[[module]]\ntype = "agent-list"\n[[module]]\ntype = "workspace-list"\n[[module]]\ntype = "usage"\n')
+  assert.deepEqual(Array.from(main.errors), [])
+  assert.deepEqual(Array.from(layout.errors), [])
+  const [agents, workspaces, usage] = plain(layout.layout.modules)
+  assert.deepEqual([agents.density, workspaces.density, usage.density], ["compact", "compact", "compact"])
+  assert.equal(agents.focus, "window")
+  assert.equal(workspaces.focus, "window")
+  assert.equal(agents.sort, "cache")
+  assert.deepEqual(usage.show, ["today"])
+  assert.equal(workspaces.sort, undefined)
+  assert.equal(usage.focus, undefined)
+})
+
+test("precedence: built-in < [defaults] < [defaults.<type>] < the Module's own key", () => {
+  const main = `
+[defaults]
+density = "compact"
+sort = "cache"
+recap = "inline"
+
+[defaults.agent-list]
+sort = "priority"
+preset = "compact"
+`
+  const { main: read, layout } = layoutWith(main, `
+[[module]]
+type = "agent-list"
+preset = "detailed"
+
+[[module]]
+type = "agent-list"
+sort = "spaces"
+density = "full"
+`)
+  assert.deepEqual(Array.from(read.errors), [])
+  const [first, second] = plain(layout.layout.modules)
+  assert.deepEqual([first.density, first.sort, first.preset, first.recap, first.focus], ["compact", "priority", "detailed", "inline", "herdr"])
+  assert.deepEqual([second.density, second.sort, second.preset, second.recap], ["full", "spaces", "compact", "inline"])
+})
+
+test("an Override still shadows the cascaded Config value", () => {
+  const Overrides = loadLib("lib/OverrideModel.js")
+  const { layout } = layoutWith('[defaults.agent-list]\nsort = "priority"\n', '[[module]]\ntype = "agent-list"\n')
+  const modules = Config.layoutModules(layout.layout)
+  const overrides = Overrides.set(Overrides.empty(), "l#0", "sort", "cache", "priority")
+  const state = Overrides.moduleStates(modules, overrides)["l#0"]
+  assert.equal(state.sort, "cache")
+  assert.equal(state.sortOverridden, true)
+  assert.equal(state.config.sort, "priority")
+  assert.equal(Overrides.moduleStates(modules, Overrides.empty())["l#0"].sort, "priority")
+})
+
+test("a bad value in [defaults] names gjetr.toml and the table, once, and keeps the built-in", () => {
+  const { main, layout } = layoutWith('[defaults]\nfocus = "teleport"\ndensity = 3\n[defaults.usage]\nrefresh_seconds = 5\n',
+    '[[module]]\ntype = "agent-list"\n[[module]]\ntype = "workspace-list"\n[[module]]\ntype = "usage"\n')
+  assert.deepEqual(Array.from(main.errors), [
+    "gjetr.toml: defaults.density: expected one of auto, compact, full, got 3",
+    'gjetr.toml: defaults.focus: expected one of herdr, window, got "teleport"',
+    "gjetr.toml: defaults.usage.refresh_seconds: expected whole seconds from 60 to 86400, got 5; using 60"
+  ])
+  assert.deepEqual(Array.from(layout.errors), [])
+  const [agents, workspaces, usage] = plain(layout.layout.modules)
+  assert.equal(agents.focus, "herdr")
+  assert.equal(workspaces.density, "auto")
+  assert.equal(usage.refreshSeconds, 60)
+})
+
+test("a bad Module value falls back to the cascaded default, naming the Layout file", () => {
+  const { layout } = layoutWith('[defaults.agent-list]\nsort = "cache"\n', '[[module]]\ntype = "agent-list"\nsort = "alphabetical"\n')
+  assert.equal(layout.layout.modules[0].sort, "cache")
+  assert.match(layout.errors.join("\n"), /layouts\/l\.toml: module\[0\]\.sort: expected one of spaces, priority, cache/)
+})
+
+test("unknown keys and tables under [defaults] are logged and ignored", () => {
+  const read = Config.readMain(`
+[defaults]
+colour = "red"
+type = "usage"
+weight = 2
+
+[defaults.workspace-list]
+sort = "cache"
+tap = "focus"
+
+[defaults.clock]
+size = 3
+`, HOME)
+  const text = read.errors.join("\n")
+  assert.match(text, /gjetr\.toml: defaults\.colour: unknown key \(ignored\)/)
+  assert.match(text, /gjetr\.toml: defaults\.type: only in a \[\[module\]\] \(ignored\)/)
+  assert.match(text, /gjetr\.toml: defaults\.weight: only in a \[\[module\]\] \(ignored\)/)
+  assert.match(text, /gjetr\.toml: defaults\.workspace-list\.sort: unknown key for workspace-list \(ignored\)/)
+  assert.match(text, /gjetr\.toml: defaults\.clock: expected a Module type \(agent-list, workspace-list, usage\) \(ignored\)/)
+  assert.equal(read.config.defaults["workspace-list"].tap, "focus")
+  assert.equal(read.config.defaults["agent-list"].sort, "spaces")
+  const shape = Config.readMain('defaults = "compact"\n', HOME)
+  assert.match(shape.errors.join("\n"), /gjetr\.toml: defaults: expected a \[defaults\] table/)
+})
+
+test("list defaults are copied into each Module, and a Module's list replaces them", () => {
+  const { layout } = layoutWith('[defaults.usage]\nproviders = ["claude"]\nshow = ["limits", "today"]\n',
+    '[[module]]\ntype = "usage"\n[[module]]\ntype = "usage"\nproviders = ["codex"]\n')
+  const [first, second] = layout.layout.modules
+  assert.deepEqual(plain(first.providers), ["claude"])
+  assert.deepEqual(plain(second.providers), ["codex"])
+  assert.deepEqual(plain(second.show), ["limits", "today"])
+  first.show.push("models")
+  assert.deepEqual(plain(second.show), ["limits", "today"])
+})
+
+test("defaults per Display are refused: a Layout is the same Modules on every Display", () => {
+  const read = Config.readMain('[[display]]\nname = "DP-1"\n[display.defaults]\ndensity = "compact"\n', HOME)
+  assert.match(read.errors.join("\n"), /gjetr\.toml: display\[0\]\.defaults: not per Display, a Layout is the same Modules on every Display; use \[defaults\] \(ignored\)/)
+  assert.equal(read.config.defaults["agent-list"].density, "auto")
 })

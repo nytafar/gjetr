@@ -8,6 +8,16 @@ All notable changes to gjetr. The format follows
 
 ### Added
 
+- Defaults: Module settings given once in `gjetr.toml`. `[defaults]` applies a
+  setting to every Module type that takes the key, `[defaults.<type>]` to one
+  type (`agent-list`, `workspace-list`, `usage`); the order is built-in default,
+  `[defaults]`, `[defaults.<type>]`, the `[[module]]`'s own key, then an
+  Override. Every Module setting cascades (`density`, `sort`, `preset`,
+  `focus`, `recap`, `recap_open`, `highlight_workspace`, `tap`, `show`,
+  `providers`, `refresh_seconds`). Errors name `gjetr.toml` and the table;
+  unknown keys and tables are logged and ignored; a bad `[[module]]` value
+  falls back to the defaults. `[display.defaults]` is refused, since a Layout
+  is the same Modules on every Display. `state` → `config.defaults`.
 - Every agent kind herdr 0.8.2 and 0.9.0 can report (23: Pi, Claude, Codex,
   Gemini, Cursor, Devin, Antigravity, Cline, Oh My Pi, Mastra Code, OpenCode,
   GitHub Copilot, Kimi, Kiro, Droid, Amp, Grok, Hermes, Kilo Code, Qoder, Qwen

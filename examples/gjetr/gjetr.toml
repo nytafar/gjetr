@@ -9,6 +9,19 @@
 # herdr's API socket.
 # socket = "~/.config/herdr/herdr.sock"
 
+# Module settings for every Layout at once. [defaults] gives a setting to every
+# Module type that takes the key; [defaults.agent-list], [defaults.workspace-list]
+# and [defaults.usage] to one type. A [[module]]'s own key wins, and an Override
+# made on the Display wins over both. Not per Display: a Layout is the same
+# Modules everywhere.
+# [defaults]
+# density = "compact"
+# focus = "window"
+#
+# [defaults.agent-list]
+# sort = "priority"
+# recap = "inline"
+
 [[display]]
 # The output to draw on, as `hyprctl monitors` names it.
 name = "HDMI-A-2"
