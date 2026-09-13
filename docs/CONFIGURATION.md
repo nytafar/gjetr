@@ -420,6 +420,32 @@ A provider whose collector reports it is not ready (signed out, unreachable)
 shows only its name and status line, muted. Numbers older than two refreshes
 show when they were last updated.
 
+**Compact.** On a Dock, or in a touch column narrower than 360 pixels (see
+[Density](#density)), `limits` is one line per limit, with little text:
+
+```
+✳  5h   ━━━━━━┃─────────────   26   3h
+   7d   ━━━━┃───────────────   21   5d
+   F7d  ━━━━┃───────────────   19   5d
+◎  5h   ━━┃─────────────────   11  52m
+```
+
+- The provider's mark (Omarchy's icon, else two letters) starts its first line.
+- A short code for the window: `5h`, `7d`, and the initial of what a limit
+  covers when it is not everything (`F7d` for "Fable Weekly").
+- A thin meter of the share used, in the theme's foreground, accent from 75%
+  and urgent from 90%. The tick marks how far through its window the limit is:
+  at an even pace the meter would end at the tick. It turns accent when usage
+  runs more than 10 points ahead of it.
+- The percent as a bare number, in the meter's colour, and, in columns 240
+  pixels or wider, the time to reset in its largest unit (`3h`, `5d`).
+- With the mouse, hovering a line shows its full label, percent and reset time.
+
+A provider that is not ready, or reports no limits, gets one muted line; stale
+numbers are dimmed. The header shows the age of the newest record as a bare
+`4m`. `today`, `recent_days` and `models` keep their own layout at the smaller
+type size.
+
 ## Rotation and touch
 
 With `rotatable = true`, selecting a Layout whose orientation differs from the

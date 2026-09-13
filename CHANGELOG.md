@@ -16,6 +16,11 @@ All notable changes to gjetr. The format follows
   workspace › tab when there is room, the theme's own type sizes, hover
   highlight. A 1080-high Dock shows about 20 Agents instead of 6. Density is
   separate from `preset`.
+- Compact Usage limits: one line per limit, with the provider's mark, a short
+  window code (`5h`, `7d`, `F7d`), a thin meter in its level colour with a tick
+  for the time gone in the window (accent when usage runs ahead of it), the
+  percent as a number and a short reset time (`3h`); hovering shows the full
+  label. Chosen by the same density; comfortable keeps the meters as they were.
 - On a compact row, clicking an inline Recap line opens the whole Recap
   under the row; IPC `toggleRecap` accepts `recap = "inline"` too.
 

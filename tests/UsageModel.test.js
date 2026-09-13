@@ -196,3 +196,92 @@ test("refresh across Decks: the smallest of the Decks that show a Usage Module",
   ]), 300)
   assert.equal(Usage.deckRefreshSeconds(null), 900)
 })
+
+test("limit labels become short codes: the window, with a model initial", () => {
+  assert.equal(Usage.limitCode("Session (5-hour)"), "5h")
+  assert.equal(Usage.limitCode("Weekly (7-day)"), "7d")
+  assert.equal(Usage.limitCode("5h window"), "5h")
+  assert.equal(Usage.limitCode("Fable Weekly"), "F7d")
+  assert.equal(Usage.limitCode("Opus (7-day)"), "O7d")
+  assert.equal(Usage.limitCode("Daily limit"), "1d")
+  assert.equal(Usage.limitCode("Monthly"), "30d")
+  assert.equal(Usage.limitCode("2-week window"), "14d")
+  assert.equal(Usage.limitCode("30 min burst"), "30m")
+  assert.equal(Usage.limitCode("Session"), "Ses")
+  assert.equal(Usage.limitCode("Limit"), "Lim")
+  assert.equal(Usage.limitCode(""), "?")
+  assert.equal(Usage.limitCode(null), "?")
+  assert.ok(Usage.limitCode("Supercalifragilistic Weekly (7-day)").length <= 4)
+})
+
+test("a limit's window length comes from its label", () => {
+  assert.equal(Usage.windowMs("Session (5-hour)"), 5 * 3600000)
+  assert.equal(Usage.windowMs("Weekly (7-day)"), 7 * 86400000)
+  assert.equal(Usage.windowMs("Fable Weekly"), 7 * 86400000)
+  assert.equal(Usage.windowMs("5h window"), 5 * 3600000)
+  assert.equal(Usage.windowMs("Session"), 0)
+  assert.equal(Usage.windowMs(undefined), 0)
+})
+
+test("elapsed share of a window and whether usage runs ahead of it", () => {
+  const five = 5 * 3600000
+  assert.equal(Usage.elapsedFraction(NOW + 3 * 3600000, five, NOW), 0.4)
+  assert.equal(Usage.elapsedFraction(NOW - 1000, five, NOW), 1)
+  assert.equal(Usage.elapsedFraction(NOW + 9 * 3600000, five, NOW), 0)
+  assert.equal(Usage.elapsedFraction(0, five, NOW), -1)
+  assert.equal(Usage.elapsedFraction(NOW + 1000, 0, NOW), -1)
+  assert.equal(Usage.pace(0.6, 0.4), "ahead")
+  assert.equal(Usage.pace(0.45, 0.4), "")
+  assert.equal(Usage.pace(0.2, 0.4), "")
+  assert.equal(Usage.pace(0.9, -1), "")
+})
+
+test("short numbers for small spaces", () => {
+  assert.equal(Usage.percentNumber(0.264), "26")
+  assert.equal(Usage.percentNumber(1), "100")
+  assert.equal(Usage.percentNumber(-1), "–")
+  assert.equal(Usage.shortDuration(30 * 1000), "<1m")
+  assert.equal(Usage.shortDuration(42 * 60000), "42m")
+  assert.equal(Usage.shortDuration(212 * 60000), "3h")
+  assert.equal(Usage.shortDuration((5 * 24 + 22) * 3600000), "5d")
+  assert.equal(Usage.resetShort(NOW + 212 * 60000, NOW), "3h")
+  assert.equal(Usage.resetShort(NOW - 1, NOW), "now")
+  assert.equal(Usage.resetShort(0, NOW), "")
+})
+
+test("a provider mark is two letters of its name", () => {
+  assert.equal(Usage.providerMark({ id: "claude", name: "Claude Code" }), "Cl")
+  assert.equal(Usage.providerMark({ id: "codex", name: "Codex" }), "Co")
+  assert.equal(Usage.providerMark({ id: "fireworks", name: "" }), "Fi")
+  assert.equal(Usage.providerMark(null), "?")
+})
+
+test("compact limits: one line per limit across providers, with level, pace and reset", () => {
+  const providers = [
+    { id: "claude", name: "Claude Code", ready: true, updatedAtMs: NOW, limits: [
+      { label: "Session (5-hour)", fraction: 0.8, resetsAtMs: NOW + 3 * 3600000 },
+      { label: "Fable Weekly", fraction: 0.19, resetsAtMs: NOW + 6 * 86400000 }
+    ] },
+    { id: "fireworks", name: "Fireworks", ready: false, statusText: "signed out", updatedAtMs: 0, limits: [] },
+    { id: "codex", name: "Codex", ready: true, updatedAtMs: NOW, limits: [] }
+  ]
+  const lines = plain(Usage.compactLimits(providers, NOW, 900))
+  assert.deepEqual(lines.map((l) => [l.providerId, l.kind, l.code, l.first]), [
+    ["claude", "limit", "5h", true],
+    ["claude", "limit", "F7d", false],
+    ["fireworks", "status", "", true],
+    ["codex", "status", "", true]
+  ])
+  assert.deepEqual(lines[0], {
+    key: "claude#0", providerId: "claude", mark: "Cl", kind: "limit", first: true, code: "5h", label: "Session (5-hour)",
+    fraction: 0.8, percent: "80", level: "warn", elapsed: 0.4, pace: "ahead", reset: "3h", resetsAtMs: NOW + 3 * 3600000,
+    stale: false, text: ""
+  })
+  assert.equal(lines[1].elapsed.toFixed(3), (1 / 7).toFixed(3))
+  assert.equal(lines[1].pace, "")
+  assert.equal(lines[2].text, "signed out")
+  assert.equal(lines[3].text, "no limits reported")
+  const stale = plain(Usage.compactLimits([{ ...providers[0], updatedAtMs: NOW - 7200 * 1000 }], NOW, 900))
+  assert.equal(stale[0].stale, true)
+  assert.deepEqual(plain(Usage.compactLimits(null, NOW, 900)), [])
+})

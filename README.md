@@ -36,7 +36,8 @@ lives beside the Omarchy bar, and needs no daemon.
   Lists quietly highlight the agents in herdr's focused workspace.
 - **Usage.** Rate limits and usage for Claude, Codex and every other provider
   Omarchy's usage collectors know: meters with time to reset, today's tokens,
-  a week of daily bars and tokens by model.
+  a week of daily bars and tokens by model. In a Dock each limit is one line:
+  a short code, a meter with a pace tick, the percent and the time to reset.
 - **Recap.** For Claude agents, the latest session recap Claude Code wrote,
   inline on the Card or on request.
 - **Decks of Layouts.** Several Layouts per display, with tabs on a short edge,

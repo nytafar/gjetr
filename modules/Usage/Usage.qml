@@ -1,8 +1,10 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Window
 import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
+import "../../lib/DensityPolicy.js" as DensityPolicy
 import "../../lib/UsageModel.js" as UsageModel
 
 // The Usage Module: each AI provider's limits and usage, from the service's
@@ -16,8 +18,17 @@ Item {
   property var service: null
   // <layout>#<index>: this Module's settings.
   property string moduleKey: ""
-  // "pointer" on a Dock, "touch" on a surface.
+  // "pointer" on a Dock, "touch" on a surface: with the Module's size it picks
+  // the density (DensityPolicy). Compact draws each limit as one line.
   property string input: "touch"
+
+  readonly property var density: DensityPolicy.tokens({ width: width, height: height, input: input,
+    fonts: { caption: Style.font.caption, body: Style.font.body, title: Style.font.title },
+    spacing: { sm: Style.spacing.sm, lg: Style.spacing.lg, xxl: Style.spacing.xxl }, dpr: Screen.devicePixelRatio })
+  readonly property bool compact: !density.boxed
+  readonly property bool showsLimits: show.indexOf("limits") >= 0
+  // Compact limit lines across every shown provider (UsageModel.compactLimits).
+  readonly property var compactLines: compact && showsLimits ? UsageModel.compactLimits(providers, now, refreshSeconds) : []
 
   // Checked by type: while a Layout file loads, this key can briefly name a
   // Module of another type.
@@ -35,12 +46,16 @@ Item {
     return best
   }
 
-  readonly property real textScale: 1.25
-  readonly property int gap: Style.spacing.lg
-  readonly property int pad: Style.spacing.xxl
-  readonly property int captionPx: Math.round(Style.font.caption * textScale)
-  readonly property int bodyPx: Math.round(Style.font.body * textScale)
-  readonly property int titlePx: Math.round(Style.font.title * textScale)
+  readonly property real textScale: density.textScale
+  readonly property int gap: density.gap
+  readonly property int pad: density.pad
+  readonly property int headerPad: compact ? density.pad + 2 : gap * 2
+  readonly property int captionPx: density.captionPx
+  readonly property int bodyPx: density.bodyPx
+  readonly property int titlePx: density.titlePx
+  // A compact line: code, meter, percent, and the reset time when there is room.
+  readonly property int lineHeight: density.lineHeight + 3
+  readonly property bool resetShown: width >= 240
 
   // Meter colours: theme tokens only, loudest at the highest share used.
   function levelColor(level) {
@@ -52,7 +67,7 @@ Item {
   Item {
     id: header
     anchors { top: parent.top; left: parent.left; right: parent.right }
-    height: CardPolicy.MIN_TOUCH_PX
+    height: root.density.headerHeight
 
     Rectangle {
       anchors.fill: parent
@@ -60,7 +75,7 @@ Item {
     }
 
     Text {
-      anchors { left: parent.left; leftMargin: root.gap * 2; verticalCenter: parent.verticalCenter }
+      anchors { left: parent.left; leftMargin: root.headerPad; verticalCenter: parent.verticalCenter }
       text: "usage"
       color: Color.foreground
       font.family: Style.font.family
@@ -69,8 +84,11 @@ Item {
     }
 
     Text {
-      anchors { right: parent.right; rightMargin: root.gap * 2; verticalCenter: parent.verticalCenter }
-      text: root.refreshing ? "refreshing" : UsageModel.ageLabel(root.newestUpdate, root.now)
+      anchors { right: parent.right; rightMargin: root.headerPad; verticalCenter: parent.verticalCenter }
+      // Compact: the bare age of the newest record.
+      text: root.compact
+        ? (root.refreshing ? "↻" : root.newestUpdate > 0 ? UsageModel.shortDuration(root.now - root.newestUpdate) : "")
+        : root.refreshing ? "refreshing" : UsageModel.ageLabel(root.newestUpdate, root.now)
       color: Color.muted
       font.family: Style.font.family
       font.pixelSize: root.bodyPx
@@ -100,10 +118,213 @@ Item {
 
     Column {
       id: sections
-      x: root.gap * 2
-      y: root.gap * 2
-      width: body.width - root.gap * 4
+      x: root.compact ? root.headerPad : root.gap * 2
+      y: root.compact ? root.gap * 2 : root.gap * 2
+      width: body.width - x * 2
       spacing: root.gap * 3
+
+      // Compact limits: one line per limit, providers one after another. The
+      // provider's mark starts its first line; the meter shows the share used
+      // in its level colour with a tick where an even pace would be (accent
+      // when usage runs ahead of it); then the percent and the time to reset.
+      Column {
+        id: compactLimits
+        visible: root.compactLines.length > 0
+        width: sections.width
+
+        TextMetrics {
+          id: codeMetrics
+          font.family: Style.font.family
+          font.pixelSize: root.captionPx + 1
+          text: "F14d"
+        }
+
+        TextMetrics {
+          id: percentMetrics
+          font.family: Style.font.family
+          font.pixelSize: root.bodyPx
+          font.bold: true
+          text: "100"
+        }
+
+        TextMetrics {
+          id: resetMetrics
+          font.family: Style.font.family
+          font.pixelSize: root.captionPx
+          text: "30d"
+        }
+
+        Repeater {
+          model: root.compactLines
+
+          delegate: Item {
+            id: line
+            required property var modelData
+            required property int index
+
+            readonly property var entry: modelData
+            readonly property string iconUrl: root.service ? root.service.kindIconUrl(entry.providerId) : ""
+            // Space above a provider's first line, after the one before it.
+            readonly property int lead: entry.first && index > 0 ? root.gap * 2 : 0
+
+            width: compactLimits.width
+            height: root.lineHeight + lead
+            opacity: entry.stale ? 0.5 : 1
+
+            Item {
+              id: row
+              anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+              height: root.lineHeight
+
+              Item {
+                id: mark
+                anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+                width: root.density.iconPx
+                height: root.density.iconPx
+
+                Image {
+                  id: markImage
+                  anchors.fill: parent
+                  visible: line.entry.first && status === Image.Ready
+                  source: line.entry.first ? line.iconUrl : ""
+                  sourceSize.width: root.density.iconSourcePx
+                  sourceSize.height: root.density.iconSourcePx
+                  fillMode: Image.PreserveAspectFit
+                  smooth: true
+                }
+
+                Text {
+                  anchors.centerIn: parent
+                  visible: line.entry.first && markImage.status !== Image.Ready
+                  text: line.entry.mark
+                  color: Color.muted
+                  font.family: Style.font.family
+                  font.pixelSize: root.captionPx
+                  font.bold: true
+                }
+              }
+
+              // A provider that is not ready, or reports no limits: one quiet line.
+              Text {
+                visible: line.entry.kind === "status"
+                anchors { left: mark.right; leftMargin: root.pad; right: parent.right; verticalCenter: parent.verticalCenter }
+                text: line.entry.text
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+                color: Color.muted
+                font.family: Style.font.family
+                font.pixelSize: root.captionPx
+              }
+
+              Text {
+                id: code
+                visible: line.entry.kind === "limit"
+                anchors { left: mark.right; leftMargin: root.pad; verticalCenter: parent.verticalCenter }
+                width: Math.ceil(codeMetrics.advanceWidth)
+                text: line.entry.code
+                color: Color.muted
+                font.family: Style.font.family
+                font.pixelSize: root.captionPx + 1
+              }
+
+              Item {
+                id: meter
+                visible: line.entry.kind === "limit"
+                anchors {
+                  left: code.right; leftMargin: root.pad
+                  right: percent.left; rightMargin: root.pad
+                  verticalCenter: parent.verticalCenter
+                }
+                height: Math.max(8, root.captionPx)
+
+                Rectangle {
+                  anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter }
+                  height: 4
+                  radius: 2
+                  color: Util.alpha(Color.foreground, 0.14)
+                }
+
+                Rectangle {
+                  anchors { left: parent.left; verticalCenter: parent.verticalCenter }
+                  width: Math.round(parent.width * Math.max(0, Math.min(1, line.entry.fraction)))
+                  height: 4
+                  radius: 2
+                  color: root.levelColor(line.entry.level)
+                }
+
+                // Where usage would be at an even pace through the window.
+                Rectangle {
+                  visible: line.entry.elapsed >= 0
+                  x: Math.round((parent.width - width) * line.entry.elapsed)
+                  anchors.verticalCenter: parent.verticalCenter
+                  width: 2
+                  height: parent.height
+                  radius: 1
+                  color: line.entry.pace === "ahead" ? Color.accent : Util.alpha(Color.foreground, 0.5)
+                }
+              }
+
+              Text {
+                id: percent
+                visible: line.entry.kind === "limit"
+                anchors { right: reset.left; rightMargin: reset.visible ? root.pad : 0; verticalCenter: parent.verticalCenter }
+                width: Math.ceil(percentMetrics.advanceWidth)
+                horizontalAlignment: Text.AlignRight
+                text: line.entry.percent
+                color: root.levelColor(line.entry.level)
+                font.family: Style.font.family
+                font.pixelSize: root.bodyPx
+                font.bold: line.entry.level !== "ok"
+                font.features: { "tnum": 1 }
+              }
+
+              Text {
+                id: reset
+                visible: line.entry.kind === "limit" && root.resetShown
+                anchors { right: parent.right; verticalCenter: parent.verticalCenter }
+                width: visible ? Math.ceil(resetMetrics.advanceWidth) : 0
+                horizontalAlignment: Text.AlignRight
+                text: line.entry.reset
+                color: Color.muted
+                opacity: 0.8
+                font.family: Style.font.family
+                font.pixelSize: root.captionPx
+                font.features: { "tnum": 1 }
+              }
+            }
+
+            // With the mouse, the full label and reset time on hover.
+            HoverHandler {
+              id: lineHover
+            }
+
+            Rectangle {
+              visible: lineHover.hovered && line.entry.kind === "limit"
+              z: 5
+              // Above the line, except the first, which the list would clip.
+              anchors.right: parent.right
+              y: line.index === 0 ? line.height : -height
+              width: hoverText.implicitWidth + root.pad * 2
+              height: hoverText.implicitHeight + root.gap
+              radius: Math.min(Style.cornerRadius, 4)
+              color: Color.background
+              border.width: 1
+              border.color: Util.alpha(Color.foreground, 0.2)
+
+              Text {
+                id: hoverText
+                anchors.centerIn: parent
+                text: line.entry.label + "  " + UsageModel.formatPercent(line.entry.fraction)
+                  + (line.entry.resetsAtMs > 0 ? "  ·  " + UsageModel.resetLabel(line.entry.resetsAtMs, root.now) : "")
+                textFormat: Text.PlainText
+                color: Color.foreground
+                font.family: Style.font.family
+                font.pixelSize: root.captionPx
+              }
+            }
+          }
+        }
+      }
 
       Repeater {
         model: root.providers
@@ -114,7 +335,10 @@ Item {
 
           readonly property var provider: modelData
           readonly property bool stale: provider.ready && UsageModel.isStale(provider.updatedAtMs, root.now, root.refreshSeconds)
+          // Compact draws limits as lines above, so a section keeps only the rest.
+          readonly property var items: root.compact ? root.show.filter(function(name) { return name !== "limits" }) : root.show
 
+          visible: !root.compact || items.length > 0
           width: sections.width
           spacing: root.gap
 
@@ -153,7 +377,7 @@ Item {
           }
 
           Text {
-            visible: !section.provider.ready
+            visible: !section.provider.ready && !(root.compact && root.showsLimits)
             width: section.width
             text: section.provider.statusText !== "" ? section.provider.statusText : "not ready"
             textFormat: Text.PlainText
@@ -164,7 +388,7 @@ Item {
           }
 
           Repeater {
-            model: section.provider.ready ? root.show : []
+            model: section.provider.ready ? section.items : []
 
             delegate: Column {
               id: item
