@@ -3,9 +3,9 @@
   "id": "nytafar.gjetr",
   "name": "gjetr",
   "version": "0.1.0",
-  "author": "Lasse Jellum",
+  "author": "nytafar",
   "license": "MIT",
-  "description": "A herdr dashboard for a secondary touchscreen: every agent as a Card, live.",
+  "description": "herdr agent dashboard for a secondary touchscreen: every agent as a live Card, tap to focus, attention pulses, tabs and rotation.",
   "kinds": ["service"],
   "keepLoaded": true,
   "entryPoints": {

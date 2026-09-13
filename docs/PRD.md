@@ -49,6 +49,33 @@ touchscreen.
 | M18 | Recap Field for Claude Agents: latest `away_summary` from the session transcript herdr names; per Module `recap = off / inline / expand`, expand by a disclosure area or long press; plain text only |
 | M19 | Touch input rotates with a runtime rotation (per named device, or the global touchdevice transform) |
 
+### Status
+
+As of v0.1.0. "Live" means checked on the real panel and recorded in
+`docs/findings/`; "tests" means covered by `node --test` only.
+
+| # | Status | Evidence |
+|---|---|---|
+| M1 | Done, live | T02: layer, focus, hotplug |
+| M2 | Done, live | T03, T05 |
+| M3 | Done, live | Priority order matched herdr on 21 real Agents; cache and spaces by tests |
+| M4 | Done, live | T06 |
+| M5 | Done, live | T04 |
+| M6 | Done, live | T05 (detailed on screen; compact in T09 screenshots) |
+| M7 | Done, live | T04 |
+| M8 | Done, live | T05 herdr focus; T07 window focus switched workspace and window |
+| M9 | Done, live | T08 pulse with a fake herdr; T09 badges. A real agent transition not yet seen |
+| M10 | Done, live | T03 |
+| M11 | Done, live | T03 |
+| M12 | Done, live | T02 black; T09 wallpaper and tint |
+| M13 | Done, partly live | Validation by tests; hot reload seen on a temporary Config (T09) |
+| M14 | Done, live | T06, T09 |
+| M15 | Done, partly live | Tabs, badges and selection live; swipe gesture by tests and IPC only |
+| M16 | Done, live | T09 rotation and re-apply after reload |
+| M17 | Done, live | T02, T09 |
+| M18 | Done, live | Recaps read for 17 of 21 real Claude Agents; expand overlay not opened by touch |
+| M19 | Done, partly live | Touch transform follows rotation (`getoption`); tap accuracy in portrait to be confirmed on the panel |
+
 ### Next
 
 Docked surface on the main monitor, reserving space across workspaces.
