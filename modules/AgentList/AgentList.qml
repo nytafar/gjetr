@@ -53,7 +53,8 @@ Item {
     Text {
       anchors { right: parent.right; rightMargin: root.gap * 2; verticalCenter: parent.verticalCenter }
       text: "sort  " + (root.service ? root.service.sortMode : "")
-      color: Color.accent
+      // Accent while an Override shadows the Config default.
+      color: root.service && root.service.sortOverridden ? Color.accent : Color.muted
       font.family: Style.font.family
       font.pixelSize: Math.round(Style.font.body * root.textScale)
     }

@@ -8,6 +8,8 @@ import "lib/NamePolicy.js" as NamePolicy
 import "lib/SortPolicy.js" as SortPolicy
 import "lib/CacheTimerModel.js" as CacheTimerModel
 import "lib/CardPolicy.js" as CardPolicy
+import "lib/ConfigModel.js" as ConfigModel
+import "lib/OverrideModel.js" as OverrideModel
 
 // Owns Display selection, the herdr connection and everything that must
 // outlive a surface. The surface itself is created per matching screen and
@@ -22,11 +24,39 @@ Item {
   property var shell: null
   property var manifest: null
 
-  // The Display this service draws on. T06 replaces the default with Config.
-  property string displayName: "HDMI-A-2"
-  property color background: "black"
-  // T06 replaces the default with Config.
-  property string herdrSocketPath: HerdrModel.socketPath(Quickshell.env("HOME"))
+  readonly property string home: Quickshell.env("HOME")
+
+  // Config, from ~/.config/gjetr. Texts are null while a file is missing;
+  // ConfigModel turns them into validated values with defaults and errors.
+  readonly property string configDir: home + "/.config/gjetr"
+  property var mainText: null
+  property var layoutTexts: ({})
+  readonly property var mainRead: ConfigModel.readMain(mainText, home)
+  readonly property var config: mainRead.config
+  // One Display for now; T09 builds Decks across Displays.
+  readonly property var display: config.displays[0]
+  readonly property var deckNames: ConfigModel.deckLayoutNames(config)
+  readonly property var activeLayoutRead: ConfigModel.readLayout(display.deck[0], layoutTexts[display.deck[0]])
+  readonly property var activeLayout: activeLayoutRead.layout
+  readonly property var agentListConfig: ConfigModel.agentList(activeLayout)
+  readonly property var configErrors: collectConfigErrors(mainRead, layoutTexts, deckNames)
+  readonly property string configSummary: "display " + display.name + ", deck [" + display.deck.join(", ") + "], layout "
+    + activeLayout.name + " " + activeLayout.orientation
+
+  // Overrides, from ~/.local/state/gjetr/state.json. This service is the file's
+  // only writer; writeOverrides is the only place it changes.
+  readonly property string statePath: home + "/.local/state/gjetr/state.json"
+  property var overrides: OverrideModel.empty()
+  property bool overridesLoaded: false
+  property string overridesError: ""
+  readonly property string agentListKey: OverrideModel.moduleKey(activeLayout.name, agentListConfig.index)
+
+  // The Display this service draws on.
+  readonly property string displayName: display.name
+  readonly property color background: display.background === "theme" ? Color.background
+    : display.background === "transparent" ? "transparent"
+    : display.background === "black" ? "black" : display.background
+  readonly property string herdrSocketPath: config.socket
 
   property var activeSurface: null
 
@@ -48,12 +78,13 @@ Item {
   // Offline once a connection attempt has failed; before that, still connecting.
   readonly property bool herdrOffline: !herdr.online && herdr.attempt > 0
 
-  // Sort mode. T06 replaces the default with Config and Overrides.
-  property string sortMode: SortPolicy.DEFAULT_MODE
+  // Module settings: Config, shadowed by Overrides.
+  readonly property string sortMode: OverrideModel.effective(overrides, agentListKey, "sort", agentListConfig.settings.sort)
+  readonly property bool sortOverridden: sortMode !== agentListConfig.settings.sort
+  readonly property string focusMode: OverrideModel.effective(overrides, agentListKey, "focus", agentListConfig.settings.focus)
 
   // Cache timers from the cache-ttl herdr plugin. Paths are the plugin's own
   // state and config dirs (HERDR_PLUGIN_STATE_DIR, HERDR_PLUGIN_CONFIG_DIR).
-  readonly property string home: Quickshell.env("HOME")
   readonly property string cacheTimersPath: home + "/.local/state/herdr/plugins/cache-ttl/timers.json"
   readonly property string cacheSettingsPath: home + "/.config/herdr/plugins/config/cache-ttl/config.json"
   property var cacheTimers: ({})
@@ -63,8 +94,8 @@ Item {
   property int nowSeconds: CacheTimerModel.nowSeconds(Date.now())
   readonly property bool cacheClockNeeded: CacheTimerModel.hasLiveTimer(agents, cacheTimers, nowSeconds)
 
-  // Card preset for the Agent List. T06 replaces the default with Config.
-  property string cardPreset: CardPolicy.DEFAULT_PRESET
+  // Card preset for the Agent List.
+  readonly property string cardPreset: agentListConfig.settings.preset
 
   // Kind icons are the marks Omarchy's agents plugin ships; read in place.
   // Writable on purpose: the shell injects omarchyPath into every service it
@@ -79,6 +110,55 @@ Item {
 
   function log(message) {
     console.info("[gjetr] " + message)
+  }
+
+  // Layout errors count only once a file has answered, so a Layout still
+  // loading is not reported as missing.
+  function collectConfigErrors(read, texts, names) {
+    var errors = read.errors.slice()
+    for (var i = 0; i < names.length; i++) {
+      if (texts[names[i]] === undefined) continue
+      errors = errors.concat(ConfigModel.readLayout(names[i], texts[names[i]]).errors)
+    }
+    return errors
+  }
+
+  function setLayoutText(name, text) {
+    if (layoutTexts[name] === text) return
+    var next = {}
+    for (var key in layoutTexts) next[key] = layoutTexts[key]
+    next[name] = text
+    layoutTexts = next
+  }
+
+  function applyOverridesText(text) {
+    var read = OverrideModel.parse(text)
+    if (read.error !== "") log("overrides unreadable (" + read.error + "), starting from Config")
+    overridesError = read.error
+    overrides = read.overrides
+    overridesLoaded = true
+  }
+
+  // The single writer of state.json. Skips writes that change nothing.
+  function writeOverrides(next) {
+    if (!overridesLoaded) return false
+    var text = OverrideModel.serialize(next)
+    if (text === OverrideModel.serialize(overrides)) return false
+    overrides = next
+    stateFile.setText(text)
+    return true
+  }
+
+  function cycleSortMode() {
+    if (agentListKey === "") return sortMode
+    var next = SortPolicy.nextMode(sortMode)
+    writeOverrides(OverrideModel.set(overrides, agentListKey, "sort", next, agentListConfig.settings.sort))
+    log("sort " + sortMode + (sortOverridden ? " (override)" : ""))
+    return sortMode
+  }
+
+  function resetOverrides() {
+    writeOverrides(OverrideModel.clear(overrides))
   }
 
   function resort() {
@@ -165,6 +245,10 @@ Item {
       },
       sortMode: sortMode,
       cardPreset: cardPreset,
+      focusMode: focusMode,
+      config: { dir: configDir, summary: configSummary, errors: configErrors },
+      overrides: { key: agentListKey, sortOverridden: sortOverridden, loaded: overridesLoaded,
+        error: overridesError, modules: overrides.modules },
       focus: { requests: herdr.focuses, lastError: herdr.lastFocusError },
       cache: {
         timers: Object.keys(cacheTimers).length,
@@ -188,6 +272,49 @@ Item {
   HerdrConnection {
     id: herdr
     socketPath: root.herdrSocketPath
+  }
+
+  onConfigErrorsChanged: {
+    for (var i = 0; i < configErrors.length; i++) log("config: " + configErrors[i])
+  }
+  onConfigSummaryChanged: log("config " + configSummary)
+
+  FileView {
+    path: root.configDir + "/gjetr.toml"
+    watchChanges: true
+    blockLoading: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.mainText = text()
+    onLoadFailed: root.mainText = null
+  }
+
+  Variants {
+    model: root.deckNames
+
+    FileView {
+      required property var modelData
+
+      path: ConfigModel.layoutPath(root.configDir, modelData)
+      watchChanges: true
+      blockLoading: true
+      printErrors: false
+      onFileChanged: reload()
+      onLoaded: root.setLayoutText(modelData, text())
+      onLoadFailed: root.setLayoutText(modelData, null)
+    }
+  }
+
+  FileView {
+    id: stateFile
+    path: root.statePath
+    // Only this service writes the file, so it is not watched.
+    blockLoading: true
+    atomicWrites: true
+    printErrors: false
+    onLoaded: if (!root.overridesLoaded) root.applyOverridesText(text())
+    onLoadFailed: if (!root.overridesLoaded) root.applyOverridesText("")
+    onSaveFailed: function(error) { root.log("overrides not saved: error " + error) }
   }
 
   onAgentsChanged: resort()
@@ -246,6 +373,14 @@ Item {
 
     function focus(paneId: string): string {
       return root.focusPane(paneId) ? "requested" : "unknown pane"
+    }
+
+    function cycleSort(): string {
+      return root.cycleSortMode()
+    }
+
+    function resetOverrides(): void {
+      root.resetOverrides()
     }
   }
 

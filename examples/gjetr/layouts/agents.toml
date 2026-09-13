@@ -1,0 +1,21 @@
+# A Layout: the Modules on a Display and the orientation they are built for.
+# The file name (agents) is the name a Deck uses.
+
+# "portrait", "landscape" or "any".
+orientation = "portrait"
+
+[[module]]
+type = "agent-list"
+
+# Default Sort mode: "spaces" (grouped by workspace), "priority" (blocked,
+# done, idle, working) or "cache" (most urgent Cache timer first). Tapping the
+# list header cycles it as an Override, which is kept until reset.
+sort = "spaces"
+
+# Card preset: "detailed" (status, kind, name, workspace › tab, Cache timer)
+# or "compact" (the same without workspace › tab).
+preset = "detailed"
+
+# Focus on tap: "herdr" focuses the pane in herdr. "window" also brings its
+# terminal window forward.
+focus = "herdr"

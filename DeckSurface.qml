@@ -43,6 +43,7 @@ PanelWindow {
     AgentList {
       anchors.fill: parent
       service: root.service
+      onHeaderTapped: if (root.service) root.service.cycleSortMode()
     }
   }
 }

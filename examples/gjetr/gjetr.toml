@@ -1,0 +1,24 @@
+# gjetr Config. gjetr reads this file and never writes it. Changes apply live.
+# Copy to ~/.config/gjetr/gjetr.toml.
+#
+# A mistyped value falls back to its default, and a file that does not parse
+# falls back as a whole. Errors are logged with the file, line and key:
+#   journalctl --user -f | grep gjetr
+#   omarchy-shell nytafar.gjetr state
+
+# herdr's API socket.
+# socket = "~/.config/herdr/herdr.sock"
+
+[[display]]
+# The output to draw on, as `hyprctl monitors` names it.
+name = "HDMI-A-2"
+
+# Layouts to tab through, in order. Each is layouts/<name>.toml.
+deck = ["agents"]
+
+# May gjetr rotate this output to match a Layout's orientation?
+rotatable = false
+
+# "black", "theme" (the Omarchy theme background), "transparent", or a
+# "#rrggbb" / "#aarrggbb" colour.
+background = "black"
