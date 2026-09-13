@@ -1,8 +1,10 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Window
 import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
+import "../../lib/DensityPolicy.js" as DensityPolicy
 import "../../lib/LayoutPolicy.js" as LayoutPolicy
 import "../../lib/ListSyncPolicy.js" as ListSyncPolicy
 import "../../lib/StatusPolicy.js" as StatusPolicy
@@ -19,6 +21,14 @@ Item {
   property var service: null
   // <layout>#<index>: this Module's settings, Overrides and expansion.
   property string moduleKey: ""
+  // "pointer" on a Dock, "touch" on a surface: with the Module's size it picks
+  // the density (DensityPolicy), the same as an Agent List's.
+  property string input: "touch"
+
+  readonly property var density: DensityPolicy.tokens({ width: width, height: height, input: input,
+    fonts: { caption: Style.font.caption, body: Style.font.body, title: Style.font.title },
+    spacing: { sm: Style.spacing.sm, lg: Style.spacing.lg, xxl: Style.spacing.xxl }, dpr: Screen.devicePixelRatio })
+  readonly property bool compact: !density.boxed
 
   // Checked by type: while a Layout file loads, this key can briefly name a
   // Module of another type.
@@ -32,14 +42,17 @@ Item {
   readonly property bool online: !!service && service.herdrOnline
   readonly property bool offline: !!service && service.herdrOffline
 
-  readonly property real textScale: 1.25
-  readonly property int gap: Style.spacing.lg
-  readonly property int pad: Style.spacing.xxl
-  readonly property int rowHeight: CardPolicy.MIN_TOUCH_PX
-  readonly property int rowGap: Style.spacing.sm
+  readonly property real textScale: density.textScale
+  readonly property int gap: density.gap
+  readonly property int pad: density.pad
+  readonly property int headerPad: compact ? density.pad + 2 : gap * 2
+  readonly property int rowHeight: density.rowHeight
+  readonly property int rowGap: density.rowGap
   readonly property int pitch: rowHeight + rowGap
-  readonly property int indent: 28
-  readonly property int chevronWidth: CardPolicy.MIN_TOUCH_PX
+  readonly property int indent: density.indent
+  readonly property int chevronWidth: compact && input === "pointer" ? density.lineHeight + density.pad : CardPolicy.MIN_TOUCH_PX
+  readonly property int statusSize: compact ? density.statusWidth : 24
+  readonly property int iconSize: compact ? density.iconPx : 24
 
   // Rows are keyed by node in a ListModel updated in place, so a snapshot or
   // an expansion keeps every row, its pulse and the scroll position. Each row
@@ -94,11 +107,11 @@ Item {
   Item {
     id: header
     anchors { top: parent.top; left: parent.left; right: parent.right }
-    height: CardPolicy.MIN_TOUCH_PX
+    height: root.density.headerHeight
 
     Text {
       anchors {
-        left: parent.left; leftMargin: root.gap * 2
+        left: parent.left; leftMargin: root.headerPad
         right: tapLabel.left; rightMargin: root.gap
         verticalCenter: parent.verticalCenter
       }
@@ -106,25 +119,25 @@ Item {
       text: root.workspaceCount === 1 ? "1 workspace" : root.workspaceCount + " workspaces"
       color: Color.foreground
       font.family: Style.font.family
-      font.pixelSize: Math.round(Style.font.title * root.textScale)
+      font.pixelSize: root.density.titlePx
       font.bold: true
     }
 
     // A narrow list (a Dock) shows its header values without captions.
     Text {
       id: tapLabel
-      anchors { right: focusToggle.left; rightMargin: root.gap * 2; verticalCenter: parent.verticalCenter }
+      anchors { right: focusToggle.left; rightMargin: root.headerPad; verticalCenter: parent.verticalCenter }
       text: CardPolicy.headerCaption("tap", root.tapMode, CardPolicy.compactHeader(root.width))
       color: Color.muted
       font.family: Style.font.family
-      font.pixelSize: Math.round(Style.font.body * root.textScale)
+      font.pixelSize: root.density.bodyPx
     }
 
     // Focus behaviour: herdr only, or also the hosting window.
     Rectangle {
       id: focusToggle
       anchors { top: parent.top; bottom: parent.bottom; right: parent.right }
-      width: Math.max(CardPolicy.MIN_TOUCH_PX, focusLabel.implicitWidth + root.gap * 4)
+      width: Math.max(root.density.headerHeight, focusLabel.implicitWidth + root.headerPad * 2)
       color: focusTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent) : "transparent"
 
       Rectangle {
@@ -140,7 +153,7 @@ Item {
         text: CardPolicy.headerCaption("focus", root.focusMode, CardPolicy.compactHeader(root.width))
         color: root.moduleState && root.moduleState.focusOverridden ? Color.accent : Color.muted
         font.family: Style.font.family
-        font.pixelSize: Math.round(Style.font.body * root.textScale)
+        font.pixelSize: root.density.bodyPx
       }
 
       TapHandler {
@@ -172,7 +185,7 @@ Item {
     id: list
     anchors {
       top: banner.bottom; bottom: parent.bottom; left: parent.left; right: parent.right
-      topMargin: root.gap; leftMargin: root.gap
+      topMargin: root.gap; leftMargin: root.compact ? 0 : root.gap
     }
     clip: true
     contentWidth: width
@@ -203,7 +216,7 @@ Item {
 
         x: depth * root.indent
         y: (root.rowIndex[nodeKey] !== undefined ? root.rowIndex[nodeKey] : 0) * root.pitch
-        width: list.width - root.gap - x
+        width: list.width - (root.compact ? 0 : root.gap) - x
         height: root.rowHeight
         visible: row !== null
 
@@ -212,11 +225,19 @@ Item {
           radius: Style.cornerRadius
           color: rowTap.pressed || chevronTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent)
             : rowItem.row && rowItem.row.focused ? Style.selectedFillFor(Color.foreground, Color.accent)
-            : rowItem.depth === 0 ? Style.normalFillFor(Color.foreground, Color.accent)
+            : root.compact && rowHover.hovered ? Util.alpha(Color.foreground, 0.06)
+            : rowItem.depth === 0 && !root.compact ? Style.normalFillFor(Color.foreground, Color.accent)
             : "transparent"
-          border.width: 1
+          // Compact rows have no box: selection and hover are fills only.
+          border.width: root.compact ? 0 : 1
           border.color: rowItem.row && rowItem.row.focused ? Util.alpha(Color.accent, rowItem.depth === 0 ? 0.8 : 0.4)
             : Util.alpha(Color.foreground, rowItem.depth === 0 ? 0.1 : 0.06)
+        }
+
+        HoverHandler {
+          id: rowHover
+          enabled: root.compact && root.online
+          cursorShape: Qt.PointingHandCursor
         }
 
         // Attention: the same breathing tint and border as a Card.
@@ -240,9 +261,9 @@ Item {
 
         Item {
           id: statusGlyph
-          anchors { left: parent.left; leftMargin: root.gap; verticalCenter: parent.verticalCenter }
-          width: 24
-          height: 24
+          anchors { left: parent.left; leftMargin: root.compact ? root.pad : root.gap; verticalCenter: parent.verticalCenter }
+          width: root.statusSize
+          height: root.statusSize
 
           Text {
             id: glyph
@@ -251,7 +272,8 @@ Item {
             color: rowItem.statusColor
             opacity: rowItem.indicator.opacity
             font.family: Style.font.family
-            font.pixelSize: Math.round((rowItem.depth === 0 ? Style.font.title : Style.font.body) * root.textScale * 1.2)
+            font.pixelSize: root.compact ? root.density.glyphPx
+              : Math.round((rowItem.depth === 0 ? Style.font.title : Style.font.body) * root.textScale * 1.2)
             font.bold: rowItem.indicator.status === "blocked" || rowItem.indicator.status === "done"
 
             RotationAnimation on rotation {
@@ -269,15 +291,15 @@ Item {
           id: kindIcon
           visible: rowItem.row !== null && rowItem.row.kind !== "" && rowItem.row.type !== "workspace"
           anchors { left: statusGlyph.right; leftMargin: root.gap; verticalCenter: parent.verticalCenter }
-          width: visible ? 24 : 0
-          height: 24
+          width: visible ? root.iconSize : 0
+          height: root.iconSize
 
           Image {
             id: kindImage
             anchors.fill: parent
             source: rowItem.iconUrl
-            sourceSize.width: 48
-            sourceSize.height: 48
+            sourceSize.width: root.compact ? root.density.iconSourcePx : 48
+            sourceSize.height: root.compact ? root.density.iconSourcePx : 48
             fillMode: Image.PreserveAspectFit
             smooth: true
             visible: status === Image.Ready
@@ -289,14 +311,14 @@ Item {
             text: rowItem.row ? CardPolicy.kindGlyph(rowItem.row.kind, rowItem.row.displayKind) : ""
             color: Color.muted
             font.family: Style.font.family
-            font.pixelSize: Math.round(Style.font.body * root.textScale)
+            font.pixelSize: root.compact ? root.density.detailPx : Math.round(Style.font.body * root.textScale)
             font.bold: true
           }
         }
 
         Text {
           anchors {
-            left: kindIcon.right; leftMargin: kindIcon.visible ? root.pad : 0
+            left: kindIcon.right; leftMargin: kindIcon.visible ? root.pad : (root.compact ? root.gap : 0)
             right: detail.left; rightMargin: root.pad
             verticalCenter: parent.verticalCenter
           }
@@ -307,7 +329,8 @@ Item {
           elide: Text.ElideRight
           maximumLineCount: 1
           font.family: Style.font.family
-          font.pixelSize: Math.round((rowItem.depth === 0 ? Style.font.title : Style.font.body) * root.textScale)
+          font.pixelSize: root.compact ? root.density.namePx
+            : Math.round((rowItem.depth === 0 ? Style.font.title : Style.font.body) * root.textScale)
           font.bold: rowItem.depth === 0 || (!!rowItem.row && rowItem.row.focused)
         }
 
@@ -321,7 +344,7 @@ Item {
           text: rowItem.row ? rowItem.row.detail : ""
           color: Color.muted
           font.family: Style.font.family
-          font.pixelSize: Math.round(Style.font.body * root.textScale)
+          font.pixelSize: root.compact ? root.density.detailPx : Math.round(Style.font.body * root.textScale)
         }
 
         // The row area: toggles, or focuses, as the Module's tap mode says.
@@ -354,7 +377,7 @@ Item {
             text: rowItem.row && rowItem.row.expanded ? "▾" : "▸"
             color: rowItem.chevronZone ? Color.accent : Color.muted
             font.family: Style.font.family
-            font.pixelSize: Math.round(Style.font.title * root.textScale)
+            font.pixelSize: root.compact ? root.density.namePx : Math.round(Style.font.title * root.textScale)
           }
 
           TapHandler {
@@ -373,6 +396,6 @@ Item {
     text: "No workspaces"
     color: Color.muted
     font.family: Style.font.family
-    font.pixelSize: Math.round(Style.font.title * root.textScale)
+    font.pixelSize: root.density.titlePx
   }
 }

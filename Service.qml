@@ -318,14 +318,16 @@ Item {
   }
 
   // Pass `recapOpen` from a binding so a Card re-evaluates when it changes.
+  // An inline Recap opens only on a compact row, where it is clamped to a line.
   function recapOpenFor(agent, open, moduleKey) {
     var state = moduleStates[moduleKey]
-    return !!agent && !!state && state.recap === "expand" && state.recapOpen === "card"
+    return !!agent && !!state && (state.recap === "expand" || state.recap === "inline") && state.recapOpen === "card"
       && RecapModel.isOpen(open, moduleKey, agent.paneId)
   }
 
   // Opens or closes an Agent's full Recap in one Agent List, in its Card or in
-  // the overlay as that Module's recap_open says.
+  // the overlay as that Module's recap_open says. With recap = "inline" this
+  // is what a click on a compact row's clamped Recap line does.
   // -> "open", "closed" or why nothing happened.
   function toggleRecap(paneId, moduleKey) {
     var agent = agentByPane(paneId)
@@ -333,7 +335,7 @@ Item {
     var key = moduleKeyOr(moduleKey)
     var state = moduleStates[key]
     if (!state || state.type !== "agent-list") return "no agent list"
-    if (state.recap !== "expand") return "recap is " + state.recap + ", not expand"
+    if (state.recap === "off") return "recap is off"
     if (recapFor(agent, recaps) === "") return "no recap"
     if (state.recapOpen === "overlay") {
       var shown = recapOverlay.key === key && recapOverlay.pane === agent.paneId

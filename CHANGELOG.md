@@ -8,6 +8,17 @@ All notable changes to gjetr. The format follows
 
 ### Added
 
+- Density: Agent Lists and Workspace Lists choose it from their size and
+  whether the Display is used by touch (a surface) or the mouse (a Dock).
+  Touch keeps the comfortable Cards; a Dock and touch columns under 360 px get
+  compact rows without boxes: status glyph, small kind mark, name and Cache
+  timer on one line, a dim second line with the Recap clamped to one line or
+  workspace › tab when there is room, the theme's own type sizes, hover
+  highlight. A 1080-high Dock shows about 20 Agents instead of 6. Density is
+  separate from `preset`.
+- On a compact row, clicking an inline Recap line opens the whole Recap
+  under the row; IPC `toggleRecap` accepts `recap = "inline"` too.
+
 - Docks: `kind = "dock"` on a `[[display]]` puts gjetr along one `edge` of an
   output (`left`, the default, `right`, `top` or `bottom`; any other value
   skips the Dock),

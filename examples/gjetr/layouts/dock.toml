@@ -12,7 +12,8 @@ orientation = "portrait"
 type = "agent-list"
 weight = 2
 sort = "priority"
-# compact fits a narrow Dock: glyph, kind, name and Cache timer on one line.
+# A Dock draws compact rows whatever the preset (density follows the mouse and
+# the width); compact leaves out workspace › tab and the status word.
 preset = "compact"
 focus = "window"
 # Inline Recaps grow only the Cards that have one.

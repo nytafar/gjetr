@@ -1,8 +1,10 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Window
 import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
+import "../../lib/DensityPolicy.js" as DensityPolicy
 import "../../lib/LayoutPolicy.js" as LayoutPolicy
 import "../../lib/ListSyncPolicy.js" as ListSyncPolicy
 import "../../lib/StatusPolicy.js" as StatusPolicy
@@ -18,6 +20,14 @@ Item {
   property var service: null
   // <layout>#<index>: this Module's Overrides and session state.
   property string moduleKey: ""
+  // "pointer" on a Dock, "touch" on a surface: with the Module's size it picks
+  // the density (DensityPolicy). Comfortable draws Cards, compact draws rows.
+  property string input: "touch"
+
+  readonly property var density: DensityPolicy.tokens({ width: width, height: height, input: input,
+    fonts: { caption: Style.font.caption, body: Style.font.body, title: Style.font.title },
+    spacing: { sm: Style.spacing.sm, lg: Style.spacing.lg, xxl: Style.spacing.xxl }, dpr: Screen.devicePixelRatio })
+  readonly property bool compact: !density.boxed
 
   // Checked by type: while a Layout file loads, this key can briefly name a
   // Module of another type.
@@ -51,17 +61,19 @@ Item {
   property var cardHeights: ({})
   // The height of a Card before it is measured. Each Card's own base height
   // adds room for an inline Recap only when its Agent has one.
-  readonly property int baseCardHeight: CardPolicy.cardHeight(preset)
+  readonly property int baseCardHeight: compact ? DensityPolicy.rowHeight(density, false) : CardPolicy.cardHeight(preset)
   readonly property int cellWidth: Math.floor(grid.width / columns)
-  readonly property var placement: LayoutPolicy.cardPlacement(cardOrder, cardHeights, columns, baseCardHeight, gap)
+  readonly property var placement: LayoutPolicy.cardPlacement(cardOrder, cardHeights, columns, baseCardHeight,
+    compact ? density.rowGap : gap)
   readonly property bool online: !!service && service.herdrOnline
   readonly property bool offline: !!service && service.herdrOffline
-  // Touch panels are read from further away than a desk monitor; scale the
-  // Omarchy type ramp rather than replacing it, so `omarchy display text size`
-  // still applies.
-  readonly property real textScale: 1.25
-  readonly property int gap: Style.spacing.lg
-  readonly property int minCardWidth: 440
+  // Touch panels are read from further away than a desk monitor, so
+  // comfortable scales the Omarchy type ramp rather than replacing it (and
+  // `omarchy display text size` still applies); compact uses it as it is.
+  readonly property real textScale: density.textScale
+  readonly property int gap: density.gap
+  readonly property int headerPad: compact ? density.pad + 2 : gap * 2
+  readonly property int minCardWidth: density.minColumnWidth
   readonly property int columns: LayoutPolicy.columnsFor(width - gap, minCardWidth, 3)
   // A narrow list (a Dock) shows its header toggles as bare values.
   readonly property bool compactHeader: CardPolicy.compactHeader(width)
@@ -124,7 +136,7 @@ Item {
   Item {
     id: header
     anchors { top: parent.top; left: parent.left; right: parent.right }
-    height: CardPolicy.MIN_TOUCH_PX
+    height: root.density.headerHeight
 
     // Everything left of the Focus toggle cycles the Sort mode.
     Rectangle {
@@ -134,7 +146,7 @@ Item {
 
       Text {
         anchors {
-          left: parent.left; leftMargin: root.gap * 2
+          left: parent.left; leftMargin: root.headerPad
           right: sortLabel.left; rightMargin: root.gap
           verticalCenter: parent.verticalCenter
         }
@@ -142,18 +154,18 @@ Item {
         text: root.agents.length === 1 ? "1 agent" : root.agents.length + " agents"
         color: Color.foreground
         font.family: Style.font.family
-        font.pixelSize: Math.round(Style.font.title * root.textScale)
+        font.pixelSize: root.density.titlePx
         font.bold: true
       }
 
       Text {
         id: sortLabel
-        anchors { right: parent.right; rightMargin: root.gap * 2; verticalCenter: parent.verticalCenter }
+        anchors { right: parent.right; rightMargin: root.headerPad; verticalCenter: parent.verticalCenter }
         text: CardPolicy.headerCaption("sort", root.sortMode, root.compactHeader)
         // Accent while an Override shadows the Config default.
         color: root.moduleState && root.moduleState.sortOverridden ? Color.accent : Color.muted
         font.family: Style.font.family
-        font.pixelSize: Math.round(Style.font.body * root.textScale)
+        font.pixelSize: root.density.bodyPx
       }
 
       TapHandler {
@@ -166,7 +178,7 @@ Item {
     Rectangle {
       id: focusToggle
       anchors { top: parent.top; bottom: parent.bottom; right: parent.right }
-      width: Math.max(CardPolicy.MIN_TOUCH_PX, focusLabel.implicitWidth + root.gap * 4)
+      width: Math.max(root.density.headerHeight, focusLabel.implicitWidth + root.headerPad * 2)
       color: focusTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent) : "transparent"
 
       Rectangle {
@@ -182,7 +194,7 @@ Item {
         text: CardPolicy.headerCaption("focus", root.focusMode, root.compactHeader)
         color: root.moduleState && root.moduleState.focusOverridden ? Color.accent : Color.muted
         font.family: Style.font.family
-        font.pixelSize: Math.round(Style.font.body * root.textScale)
+        font.pixelSize: root.density.bodyPx
       }
 
       TapHandler {
@@ -214,7 +226,7 @@ Item {
     id: grid
     anchors {
       top: banner.bottom; bottom: parent.bottom; left: parent.left; right: parent.right
-      topMargin: root.gap; leftMargin: root.gap; rightMargin: 0
+      topMargin: root.gap; leftMargin: root.compact ? 0 : root.gap; rightMargin: 0
     }
     clip: true
     contentWidth: width
@@ -234,33 +246,92 @@ Item {
     Repeater {
       model: cardModel
 
-      delegate: AgentCard {
+      // A Card (comfortable) or a row (compact) per Agent, placed by the list
+      // and reporting its height back to it.
+      delegate: Item {
+        id: cell
         required property string paneId
 
         readonly property var place: root.placement.positions[paneId] || null
+        readonly property var agent: root.agentByPane[paneId] || null
+        readonly property var indicator: StatusPolicy.indicator(agent ? agent.status : "")
+        readonly property var cacheTimer: root.service && agent ? root.service.cacheTimerFor(agent, root.service.nowSeconds) : null
+        readonly property string recapText: root.service ? root.service.recapFor(agent, root.service.recaps) : ""
+        readonly property string attention: root.service ? root.service.attentionFor(agent, root.service.attention) : ""
+        readonly property bool inFocusedWorkspace: root.highlightedWorkspace !== "" && !!agent
+          && agent.workspaceId === root.highlightedWorkspace
+        readonly property bool recapOpen: root.service ? root.service.recapOpenFor(agent, root.service.recapOpen, root.moduleKey) : false
+
+        function focusIt() {
+          if (agent && root.service) root.service.focusAgent(agent, root.moduleKey)
+        }
+
+        function toggleRecap() {
+          if (root.service) root.service.toggleRecap(paneId, root.moduleKey)
+        }
 
         x: place ? place.column * root.cellWidth : 0
         y: place ? place.y : 0
-        width: root.cellWidth - root.gap
-        agent: root.agentByPane[paneId] || null
-        service: root.service
-        fields: root.fields
-        textScale: root.textScale
-        baseHeight: CardPolicy.cardHeightFor(root.preset, root.recapMode, recapText)
-        interactive: root.online
-        indicator: StatusPolicy.indicator(agent ? agent.status : "")
-        statusColor: root.toneColor(indicator.tone)
-        showStatusWord: StatusPolicy.showsLabel(root.preset)
-        cacheColor: root.toneColor(CardPolicy.cacheTone(cacheTimer ? cacheTimer.level : ""))
-        attention: root.service ? root.service.attentionFor(agent, root.service.attention) : ""
-        inFocusedWorkspace: root.highlightedWorkspace !== "" && !!agent && agent.workspaceId === root.highlightedWorkspace
-        recapMode: root.recapMode
-        recapText: root.service ? root.service.recapFor(agent, root.service.recaps) : ""
-        recapOpen: root.service ? root.service.recapOpenFor(agent, root.service.recapOpen, root.moduleKey) : false
-        onTapped: if (agent) root.service.focusAgent(agent, root.moduleKey)
-        onRecapRequested: if (root.service) root.service.toggleRecap(paneId, root.moduleKey)
+        width: root.cellWidth - (root.compact && root.columns === 1 ? 0 : root.gap)
+        height: loader.item ? loader.item.implicitHeight : root.baseCardHeight
         onHeightChanged: root.setCardHeight(paneId, height)
         Component.onCompleted: root.setCardHeight(paneId, height)
+
+        Loader {
+          id: loader
+          width: cell.width
+          sourceComponent: root.compact ? rowComponent : cardComponent
+        }
+
+        Component {
+          id: cardComponent
+
+          AgentCard {
+            width: cell.width
+            agent: cell.agent
+            service: root.service
+            fields: root.fields
+            textScale: root.textScale
+            baseHeight: CardPolicy.cardHeightFor(root.preset, root.recapMode, cell.recapText)
+            interactive: root.online
+            indicator: cell.indicator
+            statusColor: root.toneColor(cell.indicator.tone)
+            showStatusWord: StatusPolicy.showsLabel(root.preset)
+            cacheColor: root.toneColor(CardPolicy.cacheTone(cell.cacheTimer ? cell.cacheTimer.level : ""))
+            attention: cell.attention
+            inFocusedWorkspace: cell.inFocusedWorkspace
+            recapMode: root.recapMode
+            recapText: cell.recapText
+            recapOpen: cell.recapOpen
+            onTapped: cell.focusIt()
+            onRecapRequested: cell.toggleRecap()
+          }
+        }
+
+        Component {
+          id: rowComponent
+
+          AgentRow {
+            width: cell.width
+            agent: cell.agent
+            service: root.service
+            fields: root.fields
+            density: root.density
+            secondLine: DensityPolicy.secondLine(root.density, root.preset, root.recapMode, cell.recapText, root.height)
+            baseHeight: DensityPolicy.rowHeight(root.density, secondLine !== "")
+            interactive: root.online
+            indicator: cell.indicator
+            statusColor: root.toneColor(cell.indicator.tone)
+            cacheColor: root.toneColor(CardPolicy.cacheTone(cell.cacheTimer ? cell.cacheTimer.level : ""))
+            attention: cell.attention
+            inFocusedWorkspace: cell.inFocusedWorkspace
+            recapMode: root.recapMode
+            recapText: cell.recapText
+            recapOpen: cell.recapOpen
+            onTapped: cell.focusIt()
+            onRecapRequested: cell.toggleRecap()
+          }
+        }
       }
     }
   }
@@ -325,6 +396,6 @@ Item {
     text: "No agents"
     color: Color.muted
     font.family: Style.font.family
-    font.pixelSize: Math.round(Style.font.title * root.textScale)
+    font.pixelSize: root.density.titlePx
   }
 }

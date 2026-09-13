@@ -119,6 +119,11 @@ type = "usage"
 show = ["limits"]
 ```
 
+**Density.** A Dock is used with the mouse, so its Agent List and Workspace
+List draw compact rows instead of touch Cards (see [Density](#density)): a
+360-pixel Dock on a 1080-pixel-high monitor shows about 20 Agents with their
+Recap lines.
+
 **Orientation.** A Dock's shape decides it: left and right Docks are portrait,
 top and bottom Docks landscape. Layouts built for the other orientation are
 skipped (all are kept if none fits). A Dock never rotates its output or touch
@@ -231,6 +236,27 @@ focus = "window"
 recap = "expand"
 recap_open = "card"
 ```
+
+#### Density
+
+How big things are is chosen automatically, from how the Display is used and
+the room the Module has; there is no key for it. It is separate from `preset`,
+which chooses the Fields.
+
+- **Comfortable**, on a touch surface: boxed Cards sized for a finger, with a
+  large kind mark and type scaled up for reading from a distance.
+- **Compact**, on a Dock (a mouse), and on a touch surface in a column
+  narrower than 360 pixels: no boxes, one tight row per Agent with the status
+  glyph, a small kind mark, the name and the Cache timer, and the theme's own
+  type sizes. Under it a dim second line shows the Recap clamped to one line
+  (with `recap = "inline"`), else workspace › tab when the preset shows it and
+  20 two-line rows fit. The status word is left out. Clicking the row focuses
+  the Agent; clicking the Recap line, or the `▸` mark with `recap = "expand"`,
+  opens the whole Recap under the row. The focused Agent has a thin accent bar,
+  Attention a pulsing tinted bar. On a touch surface compact rows stay at least
+  56 pixels tall.
+
+A Workspace List follows the same density.
 
 #### Sort modes
 
@@ -485,7 +511,7 @@ omarchy-shell nytafar.gjetr <function> [argument]
 | `state` | JSON: `displays` (every Display: kind, edge, size, shown, surface with layer and exclusive zone, Deck, Modules). The rest describes the primary Display, the first surface: Display, bar inset, herdr connection, Config summary and errors, the active Layout's `modules` (key, type, weight, rectangle), `workspaces` (Focused workspace, expansion and rows of the first Workspace List), Deck, Overrides, Attention, Recap, every Card. `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
 | `reconnect` | Drop and reopen the herdr connection |
 | `focus <pane-id>` | Focus an Agent's pane, as a tap does |
-| `toggleRecap <pane-id>` | Open or close an Agent's full Recap in the first Agent List, as a tap on `recap` does. Prints `open`, `closed`, or why nothing happened (`unknown pane`, `no agent list`, `no recap`, `recap is inline, not expand`). `state` → `recap.openCards` lists the open Cards |
+| `toggleRecap <pane-id>` | Open or close an Agent's full Recap in the first Agent List, as a tap on `recap` (or on a compact row's Recap line) does. Prints `open`, `closed`, or why nothing happened (`unknown pane`, `no agent list`, `no recap`, `recap is off`). An inline Recap opens only on a compact row. `state` → `recap.openCards` lists the open Cards |
 | `cycleSort` | Next Sort mode of the first Agent List, as a header tap does |
 | `toggleFocus` | Flip Focus behaviour of the first Agent List |
 | `selectLayout <name>` | Show a Layout of the primary Display's Deck |

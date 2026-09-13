@@ -16,6 +16,8 @@ Item {
   property var service: null
   // <layout>#<index>: this Module's settings.
   property string moduleKey: ""
+  // "pointer" on a Dock, "touch" on a surface.
+  property string input: "touch"
 
   // Checked by type: while a Layout file loads, this key can briefly name a
   // Module of another type.

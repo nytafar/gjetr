@@ -8,6 +8,7 @@ import "lib/LayoutPolicy.js" as LayoutPolicy
 import "lib/DeckPolicy.js" as DeckPolicy
 import "lib/DockPolicy.js" as DockPolicy
 import "lib/CardPolicy.js" as CardPolicy
+import "lib/DensityPolicy.js" as DensityPolicy
 import "modules/AgentList"
 import "modules/WorkspaceList"
 import "modules/Usage"
@@ -33,6 +34,9 @@ PanelWindow {
   property var deck: null
 
   readonly property bool isDock: !!deck && deck.isDock
+  // How the Display is used, for each Module's density: a Dock with the mouse,
+  // a surface by touch.
+  readonly property string input: DensityPolicy.inputFor(isDock ? "dock" : "surface")
   readonly property string dockEdge: deck ? deck.edge : ""
   readonly property var dockGeometry: DockPolicy.geometry(dockEdge, deck ? deck.dockSize : 0,
     screen ? screen.width : 0, screen ? screen.height : 0)
@@ -130,6 +134,7 @@ PanelWindow {
           AgentList {
             service: root.service
             moduleKey: slot.modelData.key
+            input: root.input
           }
         }
 
@@ -139,6 +144,7 @@ PanelWindow {
           WorkspaceList {
             service: root.service
             moduleKey: slot.modelData.key
+            input: root.input
           }
         }
 
@@ -148,6 +154,7 @@ PanelWindow {
           Usage {
             service: root.service
             moduleKey: slot.modelData.key
+            input: root.input
           }
         }
       }

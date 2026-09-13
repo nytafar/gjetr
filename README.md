@@ -44,6 +44,8 @@ lives beside the Omarchy bar, and needs no daemon.
 - **Dock.** Dock gjetr along an edge of your main monitor too, with its own
   Deck: it stays on every workspace, windows tile beside it, ordinary windows
   never cover it, and a keybinding shows or hides it. Works with the mouse.
+- **Density that fits.** Touchscreens get big Cards; a Dock and narrow columns
+  get compact rows, so a Dock beside your windows lists twenty agents at once.
 - **Rotation.** A Layout declares portrait or landscape; on a display you mark
   rotatable, gjetr turns the output and its touch input to match at runtime.
 - **Offline-tolerant.** If herdr goes away, the last Cards stay visible, greyed,
