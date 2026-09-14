@@ -4,11 +4,11 @@ import QtQuick
 import QtQuick.Window
 import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
+import "../../lib/CardModel.js" as CardModel
 import "../../lib/DensityPolicy.js" as DensityPolicy
 import "../../lib/LayoutPolicy.js" as LayoutPolicy
 import "../../lib/ListSyncPolicy.js" as ListSyncPolicy
-import "../../lib/StatusPolicy.js" as StatusPolicy
-import "../../lib/IndicatorPolicy.js" as IndicatorPolicy
+import "../../components"
 
 // The Agent List Module: every Agent as a Card, in this Module's Sort mode.
 // Presentation only. Its settings (Config shadowed by Overrides) come from the
@@ -41,16 +41,13 @@ Item {
   readonly property string preset: moduleState ? moduleState.preset : CardPolicy.DEFAULT_PRESET
   readonly property string sortMode: moduleState ? moduleState.sort : "spaces"
   readonly property string focusMode: moduleState ? moduleState.focus : "herdr"
-  // highlight_workspace: Cards of Agents in herdr's Focused workspace get a
-  // subtle tint. It never filters the list.
-  readonly property string highlightedWorkspace: service && moduleState && moduleState.highlightWorkspace
-    ? service.focusedWorkspaceId : ""
-
   readonly property string recapMode: moduleState ? moduleState.recap : "off"
-  // The kind mark as status indicator (IndicatorPolicy): glyph, icon or both,
-  // and how a working mark moves.
-  readonly property string indicatorMode: moduleState ? moduleState.indicator : IndicatorPolicy.DEFAULT_MODE
-  readonly property string workingEffect: moduleState ? moduleState.workingEffect : IndicatorPolicy.DEFAULT_WORKING_EFFECT
+  // The service's maps a Card's Fields are resolved from (CardModel.build), in
+  // one object so a change to any of them rebuilds the Cards.
+  readonly property var facts: service ? ({ recaps: service.recaps, repos: service.repos, attention: service.attention,
+    cacheTimers: service.cacheTimers, cacheSettings: service.cacheSettings, recapOpen: service.recapOpen,
+    focusedWorkspaceId: service.focusedWorkspaceId, home: service.home, lightBackground: service.lightBackground,
+    moduleKey: moduleKey, densityName: density.name }) : null
   // Marks move only while this list's window is shown (a hidden Dock is not).
   readonly property bool windowShown: !Window.window || Window.window.visible
   // The Agent whose Recap is open in this Module's overlay (recap_open =
@@ -58,8 +55,9 @@ Item {
   readonly property string recapPane: service && moduleState && moduleState.recapOpen === "overlay"
     && service.recapOverlay.key === moduleKey ? service.recapOverlay.pane : ""
   readonly property var recapAgent: recapPane !== "" ? (agentByPane[recapPane] || null) : null
+  readonly property var recapCard: recapAgent && service
+    ? CardModel.build(recapAgent, moduleState, facts, service.nowSeconds) : CardModel.EMPTY
 
-  readonly property var fields: CardPolicy.fieldsFor(preset)
   readonly property var agents: service ? (service.sortedByMode[sortMode] || []) : []
   // Cards are keyed by pane id in a ListModel that is updated in place, so a
   // new snapshot or a re-sort keeps every Card, its pulse and the scroll
@@ -136,14 +134,6 @@ Item {
 
   ListModel {
     id: cardModel
-  }
-
-  function toneColor(tone) {
-    if (tone === "success") return service ? service.successColor : Color.accent
-    if (tone === "urgent") return Color.urgent
-    if (tone === "accent") return Color.accent
-    if (tone === "foreground") return Color.foreground
-    return Color.muted
   }
 
   Item {
@@ -271,14 +261,9 @@ Item {
 
         readonly property var place: root.placement.positions[paneId] || null
         readonly property var agent: root.agentByPane[paneId] || null
-        readonly property var indicator: StatusPolicy.indicator(agent ? agent.status : "")
-        readonly property var cacheTimer: root.service && agent ? root.service.cacheTimerFor(agent, root.service.nowSeconds) : null
-        readonly property string recapText: root.service ? root.service.recapFor(agent, root.service.recaps) : ""
-        readonly property string attention: root.service ? root.service.attentionFor(agent, root.service.attention) : ""
-        readonly property bool inFocusedWorkspace: root.highlightedWorkspace !== "" && !!agent
-          && agent.workspaceId === root.highlightedWorkspace
-        readonly property bool recapOpen: root.service ? root.service.recapOpenFor(agent, root.service.recapOpen, root.moduleKey) : false
-        readonly property var mark: IndicatorPolicy.markFor(agent ? agent.status : "", attention, root.workingEffect)
+        // Every Field this Agent's Card draws, resolved once.
+        readonly property var card: root.service
+          ? CardModel.build(agent, root.moduleState, root.facts, root.service.nowSeconds) : CardModel.EMPTY
         // Within the list's view and its window shown: only then may a mark move.
         readonly property bool onScreen: root.windowShown && y + height > grid.contentY && y < grid.contentY + grid.height
 
@@ -308,27 +293,13 @@ Item {
 
           AgentCard {
             width: cell.width
-            agent: cell.agent
+            card: cell.card
             service: root.service
-            fields: root.fields
             textScale: root.textScale
-            baseHeight: CardPolicy.cardHeightFor(root.preset, root.recapMode, cell.recapText)
+            baseHeight: CardPolicy.cardHeightFor(root.preset, root.recapMode, cell.card.recap.text)
             interactive: root.online
-            indicator: cell.indicator
-            indicatorMode: root.indicatorMode
-            mark: cell.mark
-            markColor: root.toneColor(cell.mark.tone)
             palette: root.service ? root.service.indicatorPalette : []
             animate: cell.onScreen
-            statusColor: root.toneColor(cell.indicator.tone)
-            showStatusWord: StatusPolicy.showsLabel(root.preset)
-            cacheColor: root.toneColor(CardPolicy.cacheTone(cell.cacheTimer ? cell.cacheTimer.level : ""))
-            cacheBarColor: root.toneColor(CardPolicy.cacheBarTone(cell.cacheTimer ? cell.cacheTimer.level : ""))
-            attention: cell.attention
-            inFocusedWorkspace: cell.inFocusedWorkspace
-            recapMode: root.recapMode
-            recapText: cell.recapText
-            recapOpen: cell.recapOpen
             onTapped: cell.focusIt()
             onRecapRequested: cell.toggleRecap()
           }
@@ -339,29 +310,13 @@ Item {
 
           AgentFullCard {
             width: cell.width
-            agent: cell.agent
+            card: cell.card
             service: root.service
-            fields: root.fields
             density: root.density
-            baseHeight: DensityPolicy.fullCardHeight(root.density, DensityPolicy.fullRecapShown(root.recapMode, cell.recapText))
+            baseHeight: DensityPolicy.fullCardHeight(root.density, cell.card.recap.expandable || cell.card.recap.inline)
             interactive: root.online
-            indicator: cell.indicator
-            indicatorMode: root.indicatorMode
-            mark: cell.mark
-            markColor: root.toneColor(cell.mark.tone)
             palette: root.service ? root.service.indicatorPalette : []
             animate: cell.onScreen
-            statusColor: root.toneColor(cell.indicator.tone)
-            cacheColor: root.toneColor(cell.cacheTimer && cell.cacheTimer.level === "ok" ? "foreground"
-              : CardPolicy.cacheTone(cell.cacheTimer ? cell.cacheTimer.level : ""))
-            cacheBarColor: root.toneColor(CardPolicy.cacheBarTone(cell.cacheTimer ? cell.cacheTimer.level : ""))
-            attention: cell.attention
-            inFocusedWorkspace: cell.inFocusedWorkspace
-            recapMode: root.recapMode
-            recapText: cell.recapText
-            recapOpen: cell.recapOpen
-            repoText: root.service && cell.agent ? root.service.agentRepo(cell.agent, root.service.repos).text : ""
-            locationText: root.service && cell.agent ? root.service.agentLocation(cell.agent) : ""
             onTapped: cell.focusIt()
             onRecapRequested: cell.toggleRecap()
           }
@@ -372,26 +327,14 @@ Item {
 
           AgentRow {
             width: cell.width
-            agent: cell.agent
+            card: cell.card
             service: root.service
-            fields: root.fields
             density: root.density
-            secondLine: DensityPolicy.secondLine(root.density, root.preset, root.recapMode, cell.recapText, root.height)
+            secondLine: DensityPolicy.secondLine(root.density, root.preset, root.recapMode, cell.card.recap.text, root.height)
             baseHeight: DensityPolicy.rowHeight(root.density, secondLine !== "")
             interactive: root.online
-            indicator: cell.indicator
-            indicatorMode: root.indicatorMode
-            mark: cell.mark
-            markColor: root.toneColor(cell.mark.tone)
             palette: root.service ? root.service.indicatorPalette : []
             animate: cell.onScreen
-            statusColor: root.toneColor(cell.indicator.tone)
-            cacheColor: root.toneColor(CardPolicy.cacheTone(cell.cacheTimer ? cell.cacheTimer.level : ""))
-            attention: cell.attention
-            inFocusedWorkspace: cell.inFocusedWorkspace
-            recapMode: root.recapMode
-            recapText: cell.recapText
-            recapOpen: cell.recapOpen
             onTapped: cell.focusIt()
             onRecapRequested: cell.toggleRecap()
           }
@@ -418,7 +361,7 @@ Item {
 
       Text {
         width: parent.width
-        text: root.recapAgent && root.service ? root.service.agentName(root.recapAgent) : ""
+        text: root.recapCard.name
         color: Color.foreground
         font.family: Style.font.family
         font.pixelSize: Math.round(Style.font.title * root.textScale)
@@ -428,7 +371,7 @@ Item {
 
       Text {
         width: parent.width
-        text: root.recapAgent && root.service ? root.service.agentLocation(root.recapAgent) : ""
+        text: root.recapCard.location
         color: Color.muted
         font.family: Style.font.family
         font.pixelSize: Math.round(Style.font.body * root.textScale)
@@ -436,7 +379,7 @@ Item {
 
       Text {
         width: parent.width
-        text: root.recapAgent && root.service ? root.service.recapFor(root.recapAgent, root.service.recaps) : ""
+        text: root.recapCard.recap.text
         textFormat: Text.PlainText
         wrapMode: Text.WordWrap
         color: Color.foreground

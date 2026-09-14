@@ -5,10 +5,10 @@ import Quickshell.Hyprland
 import qs.Commons
 import "lib/LayoutPolicy.js" as LayoutPolicy
 import "lib/HerdrModel.js" as HerdrModel
-import "lib/NamePolicy.js" as NamePolicy
 import "lib/SortPolicy.js" as SortPolicy
 import "lib/CacheTimerModel.js" as CacheTimerModel
 import "lib/CardPolicy.js" as CardPolicy
+import "lib/CardModel.js" as CardModel
 import "lib/ConfigModel.js" as ConfigModel
 import "lib/OverrideModel.js" as OverrideModel
 import "lib/WindowPolicy.js" as WindowPolicy
@@ -288,7 +288,7 @@ Item {
   readonly property bool lightBackground: (0.2126 * background.r + 0.7152 * background.g + 0.0722 * background.b) > 0.5
 
   // Attention, from status transitions between published Agent lists and from
-  // taps. Cards bind to it through attentionFor(agent, attention).
+  // taps. Cards read it through CardModel.build.
   property var attention: AttentionModel.empty()
   readonly property int attentionCount: AttentionModel.count(attention)
 
@@ -358,13 +358,6 @@ Item {
     return deck.applyDockAction(action) ? "shown" : "hidden"
   }
 
-  // Each Agent List decides from its own recap setting whether to show it.
-  function recapFor(agent, map) {
-    if (!agent) return ""
-    var entry = map[agent.sessionId]
-    return entry ? entry.text : ""
-  }
-
   function agentByPane(paneId) {
     var id = String(paneId || "")
     for (var i = 0; i < agents.length; i++) if (agents[i].paneId === id) return agents[i]
@@ -374,14 +367,6 @@ Item {
   // A Module key, or the first Agent List's when none is given.
   function moduleKeyOr(moduleKey) {
     return moduleKey ? String(moduleKey) : agentListKey
-  }
-
-  // Pass `recapOpen` from a binding so a Card re-evaluates when it changes.
-  // An inline Recap opens only on a compact row, where it is clamped to a line.
-  function recapOpenFor(agent, open, moduleKey) {
-    var state = moduleStates[moduleKey]
-    return !!agent && !!state && (state.recap === "expand" || state.recap === "inline") && state.recapOpen === "card"
-      && RecapModel.isOpen(open, moduleKey, agent.paneId)
   }
 
   // Opens or closes an Agent's full Recap in one Agent List, in its Card or in
@@ -395,7 +380,7 @@ Item {
     var state = moduleStates[key]
     if (!state || state.type !== "agent-list") return "no agent list"
     if (state.recap === "off") return "recap is off"
-    if (recapFor(agent, recaps) === "") return "no recap"
+    if (CardModel.recapText(agent, recaps) === "") return "no recap"
     if (state.recapOpen === "overlay") {
       var shown = recapOverlay.key === key && recapOverlay.pane === agent.paneId
       recapOverlay = shown ? { key: "", pane: "" } : { key: key, pane: agent.paneId }
@@ -501,12 +486,6 @@ Item {
       var known = Object.prototype.hasOwnProperty.call(repos, cwd)
       if (!known || !RepoModel.sameInfo(repos[cwd], info)) setEntry("repos", cwd, info)
     })
-  }
-
-  // Pass `repos` from a binding so a Card re-evaluates when it changes.
-  // -> { repo, branch, path, text }
-  function agentRepo(agent, map) {
-    return RepoModel.label(RepoModel.infoFor(agent, map), agent ? agent.cwd : "", home)
   }
 
   // which: "layoutUserTexts" (the Config's file) or "layoutShippedTexts".
@@ -722,20 +701,6 @@ Item {
     if (changed) sortedByMode = next
   }
 
-  // Field helpers for Modules. Pass `nowSeconds` from a binding so the Cache
-  // timer re-evaluates on every tick.
-  function agentName(agent) {
-    return NamePolicy.agentName(agent)
-  }
-
-  function agentLocation(agent) {
-    return NamePolicy.location(agent)
-  }
-
-  function cacheTimerFor(agent, now) {
-    return CacheTimerModel.cacheTimer(agent, cacheTimers, now, cacheSettings)
-  }
-
   // A kind's SVG: Omarchy's read in place, else gjetr's own in assets/kinds.
   function kindIconUrl(kind) {
     return CardPolicy.kindIconUrl(kind, lightBackground, omarchyPath, String(Qt.resolvedUrl("assets/kinds")))
@@ -759,11 +724,6 @@ Item {
       return herdr.focusPane(id)
     }
     return false
-  }
-
-  // Pass `attention` from a binding so a Card re-evaluates when it changes.
-  function attentionFor(agent, model) {
-    return agent ? AttentionModel.attentionOf(model, agent.paneId) : ""
   }
 
   function applyAgents() {
@@ -917,6 +877,13 @@ Item {
 
   // Top-level `display`, `surface`, `modules` and `deck` describe the primary
   // Display; `displays` lists every Display.
+  // The service's maps a Card's Fields are resolved from (CardModel.build).
+  function cardFacts(moduleKey) {
+    return { recaps: recaps, repos: repos, attention: attention, cacheTimers: cacheTimers, cacheSettings: cacheSettings,
+      recapOpen: recapOpen, focusedWorkspaceId: focusedWorkspaceId, home: home, lightBackground: lightBackground,
+      moduleKey: moduleKey, densityName: "comfortable" }
+  }
+
   function stateJson() {
     var primary = primaryDeck ? primaryDeck.describe() : null
     return JSON.stringify({
@@ -1012,21 +979,7 @@ Item {
         running: Object.keys(repoInFlight).length
       },
       cards: sortedAgents.map(function(agent) {
-        var timer = cacheTimerFor(agent, nowSeconds)
-        return {
-          paneId: agent.paneId,
-          status: agent.status,
-          attention: attentionFor(agent, attention),
-          recap: recapFor(agent, recaps) !== "",
-          inFocusedWorkspace: focusedWorkspaceId !== "" && agent.workspaceId === focusedWorkspaceId,
-          name: agentName(agent),
-          kind: agent.kind,
-          kindLabel: CardPolicy.kindLabel(agent.kind, agent.displayKind),
-          kindMark: CardPolicy.kindIconFile(agent.kind, lightBackground) || CardPolicy.kindGlyph(agent.kind, agent.displayKind),
-          location: agentLocation(agent),
-          repo: agentRepo(agent, repos).text,
-          cache: timer ? timer.label + " " + timer.level : ""
-        }
+        return CardModel.summary(CardModel.build(agent, primaryModule, cardFacts(agentListKey), nowSeconds))
       })
     })
   }

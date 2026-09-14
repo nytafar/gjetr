@@ -98,14 +98,6 @@ Item {
       list.contentY = LayoutPolicy.clampScroll(LayoutPolicy.keepRowScroll(before, keys, pitch, y), keys.length * pitch, list.height)
   }
 
-  function toneColor(tone) {
-    if (tone === "success") return service ? service.successColor : Color.accent
-    if (tone === "urgent") return Color.urgent
-    if (tone === "accent") return Color.accent
-    if (tone === "foreground") return Color.foreground
-    return Color.muted
-  }
-
   onRowsChanged: syncRows()
   Component.onCompleted: syncRows()
 
@@ -222,7 +214,7 @@ Item {
         // Status as glyph, tone and motion (StatusPolicy), the same as on a Card;
         // rows show the glyph without the word.
         readonly property var indicator: StatusPolicy.indicator(row ? row.status : "")
-        readonly property color statusColor: root.toneColor(indicator.tone)
+        readonly property color statusColor: Tone.color(indicator.tone, root.service ? root.service.successColor : undefined)
         readonly property color attentionColor: row && row.attention === "blocked" ? Color.urgent : Color.accent
         readonly property string iconUrl: row && row.kind !== "" && root.service ? root.service.kindIconUrl(row.kind) : ""
         readonly property var mark: IndicatorPolicy.markFor(row ? row.status : "", row ? row.attention : "", root.workingEffect)
@@ -315,7 +307,7 @@ Item {
           frameRadius: Math.min(Style.cornerRadius, 4)
           stateful: IndicatorPolicy.marksState(root.indicatorMode)
           mark: rowItem.mark
-          toneColor: root.toneColor(rowItem.mark.tone)
+          toneColor: Tone.color(rowItem.mark.tone, root.service ? root.service.successColor : undefined)
           palette: root.service ? root.service.indicatorPalette : []
           animate: rowItem.onScreen
           clock: root.service ? root.service.motionClock : null

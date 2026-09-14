@@ -1,66 +1,45 @@
 import QtQuick
 import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
-import "../../lib/StatusPolicy.js" as StatusPolicy
-import "../../lib/IndicatorPolicy.js" as IndicatorPolicy
+import "../../lib/CardModel.js" as CardModel
 import "../../lib/MotionPolicy.js" as MotionPolicy
 import "../../components"
 
-// One Agent as a Card. Shows the Fields its preset selects; colours arrive as
-// resolved theme tokens from the list. The Card's height is its Fields band,
-// plus the full Recap below it while that is open in the Card.
+// One Agent as a Card. Draws the Fields its CardModel card resolved; tones
+// become colours here (Tone). The Card's height is its Fields band, plus the
+// full Recap below it while that is open in the Card.
 Item {
   id: root
 
-  property var agent: null
+  // Everything this Card draws about its Agent (CardModel.build).
+  property var card: CardModel.EMPTY
+  // For the motion clock, the theme's green and kind icon URLs.
   property var service: null
-  property var fields: CardPolicy.fieldsFor(CardPolicy.DEFAULT_PRESET)
   property real textScale: 1
   property bool interactive: true
-  // Status: glyph, word, tone and motion (StatusPolicy), and its tone resolved.
-  property var indicator: StatusPolicy.indicator("unknown")
-  // The kind mark as status indicator (IndicatorPolicy): the Module's
-  // indicator setting, this Agent's mark state with its tone resolved, the
-  // theme palette for the hue effect, and whether the mark may move (on screen).
-  property string indicatorMode: IndicatorPolicy.DEFAULT_MODE
-  property var mark: IndicatorPolicy.markFor("unknown", "", "")
-  property color markColor: Color.muted
+  // The theme palette for the hue effect, and whether the mark may move (on screen).
   property var palette: []
   property bool animate: true
-  readonly property bool showGlyph: fields.status && IndicatorPolicy.showsGlyph(indicatorMode, fields.kind)
-  property color statusColor: Color.muted
-  // Whether the status word shows beside the glyph (not in the compact preset).
-  property bool showStatusWord: true
-  property color cacheColor: Color.muted
-  // The draining bar under a live Cache timer (CardPolicy.cacheBarTone).
-  property color cacheBarColor: Color.muted
-  // The Agent is in herdr's Focused workspace (highlight_workspace).
-  property bool inFocusedWorkspace: false
-  // "blocked" or "done" while the Agent is in Attention, else "".
-  property string attention: ""
-  // Recap: "off", "inline" (clamped under the Fields) or "expand" (a
-  // disclosure area and long press ask the list to open or close it).
-  property string recapMode: "off"
-  property string recapText: ""
-  // Whether the full Recap is open inside this Card (recap_open = "card").
-  property bool recapOpen: false
   // Height of the Fields band, from CardPolicy.
   property int baseHeight: CardPolicy.cardHeight(CardPolicy.DEFAULT_PRESET)
 
   signal tapped()
   signal recapRequested()
 
-  readonly property bool recapExpandable: recapMode === "expand" && recapText !== ""
+  readonly property var fields: card.fields
+  readonly property var indicator: card.indicator
+  readonly property string attention: card.attention
+  readonly property bool focused: card.focused
+  readonly property var cacheTimer: fields.cache ? card.cache : null
+  readonly property bool recapExpandable: card.recap.expandable
   // An inline Recap under the Fields; a Card without a Recap stays plain.
-  readonly property bool recapInline: CardPolicy.inlineRecapShown(recapMode, recapText)
-  readonly property bool recapShown: recapOpen && recapExpandable
-
-  readonly property bool focused: !!agent && agent.focused
-  readonly property var cacheTimer: fields.cache && service && agent
-    ? service.cacheTimerFor(agent, service.nowSeconds) : null
-  readonly property string iconUrl: fields.kind && service && agent ? service.kindIconUrl(agent.kind) : ""
+  readonly property bool recapInline: card.recap.inline
+  readonly property bool recapShown: card.recap.shown
+  readonly property string iconUrl: fields.kind && service && card.kind !== "" ? service.kindIconUrl(card.kind) : ""
+  readonly property var successColor: service ? service.successColor : undefined
+  readonly property color statusColor: Tone.color(card.indicator.tone, successColor)
   readonly property int pad: Style.spacing.xxl
-  readonly property color attentionColor: attention === "blocked" ? Color.urgent : Color.accent
+  readonly property color attentionColor: Tone.color(card.attentionTone, successColor)
 
   implicitHeight: baseHeight + (recapShown ? recapBlock.implicitHeight : 0)
 
@@ -70,11 +49,11 @@ Item {
     color: tap.pressed
       ? Style.pressedFillFor(Color.foreground, Color.accent)
       : root.focused ? Style.selectedFillFor(Color.foreground, Color.accent)
-      : root.inFocusedWorkspace ? Util.alpha(Color.accent, 0.08)
+      : root.card.highlighted ? Util.alpha(Color.accent, 0.08)
       : Style.normalFillFor(Color.foreground, Color.accent)
     border.width: 1
     border.color: root.focused ? Color.accent
-      : root.inFocusedWorkspace ? Util.alpha(Color.accent, 0.35)
+      : root.card.highlighted ? Util.alpha(Color.accent, 0.35)
       : Util.alpha(Color.foreground, 0.1)
   }
 
@@ -102,7 +81,7 @@ Item {
   // without colour; it turns while the Agent is working.
   Item {
     id: statusGlyph
-    visible: root.showGlyph
+    visible: root.card.showGlyph
     anchors { left: parent.left; leftMargin: root.pad; verticalCenter: band.verticalCenter }
     width: visible ? 28 : 0
     height: 28
@@ -122,7 +101,7 @@ Item {
       Motion {
         id: spinMotion
         clock: root.service ? root.service.motionClock : null
-        running: root.indicator.motion === "spin" && root.visible && root.showGlyph && root.animate
+        running: root.indicator.motion === "spin" && root.visible && root.card.showGlyph && root.animate
       }
     }
   }
@@ -141,14 +120,14 @@ Item {
     width: visible ? 28 : 0
     height: 28
     iconUrl: root.iconUrl
-    tinted: root.service && root.agent ? root.service.kindIconTinted(root.agent.kind) : false
-    letter: root.agent ? CardPolicy.kindGlyph(root.agent.kind, root.agent.displayKind) : ""
+    tinted: root.card.kindIconTinted
+    letter: root.card.kindGlyph
     sourcePx: 56
     letterPx: Math.round(Style.font.title * root.textScale)
     frameRadius: Math.min(Style.cornerRadius, 6)
-    stateful: IndicatorPolicy.marksState(root.indicatorMode)
-    mark: root.mark
-    toneColor: root.markColor
+    stateful: root.card.marksState
+    mark: root.card.mark
+    toneColor: Tone.color(root.card.mark.tone, root.successColor)
     palette: root.palette
     animate: root.animate && root.visible
     clock: root.service ? root.service.motionClock : null
@@ -167,7 +146,7 @@ Item {
     Text {
       width: parent.width
       visible: root.fields.name
-      text: root.service && root.agent ? root.service.agentName(root.agent) : ""
+      text: root.card.name
       color: Color.foreground
       opacity: root.indicator.textOpacity
       font.family: Style.font.family
@@ -180,7 +159,7 @@ Item {
     Text {
       width: parent.width
       visible: root.fields.location
-      text: root.service && root.agent ? root.service.agentLocation(root.agent) : ""
+      text: root.card.location
       color: Color.muted
       opacity: root.indicator.textOpacity
       font.family: Style.font.family
@@ -193,7 +172,7 @@ Item {
     Text {
       width: parent.width
       visible: root.recapInline
-      text: root.recapText
+      text: root.card.recap.text
       textFormat: Text.PlainText
       color: Color.muted
       font.family: Style.font.family
@@ -217,7 +196,7 @@ Item {
       anchors.right: parent.right
       visible: root.fields.cache && root.cacheTimer !== null
       text: root.cacheTimer ? root.cacheTimer.label : ""
-      color: root.cacheColor
+      color: Tone.color(root.card.cacheTone, root.successColor)
       opacity: root.cacheTimer && root.cacheTimer.level === "cold" ? 0.7 : 1
       font.family: Style.font.family
       font.pixelSize: Math.round(Style.font.title * root.textScale)
@@ -238,14 +217,14 @@ Item {
         anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
         width: root.cacheTimer ? Math.round(parent.width * root.cacheTimer.fraction) : 0
         radius: parent.radius
-        color: root.cacheBarColor
+        color: Tone.color(root.card.cacheBarTone, root.successColor)
       }
     }
 
     // The status word, beside the glyph's colour; dropped by the compact preset.
     Text {
       anchors.right: parent.right
-      visible: root.fields.status && root.showStatusWord
+      visible: root.fields.status && root.card.showStatusWord
       text: root.indicator.label
       color: root.statusColor
       opacity: root.indicator.opacity
@@ -328,7 +307,7 @@ Item {
         right: parent.right; rightMargin: root.pad
         top: parent.top; topMargin: root.pad / 2
       }
-      text: root.recapShown ? root.recapText : ""
+      text: root.recapShown ? root.card.recap.text : ""
       textFormat: Text.PlainText
       wrapMode: Text.WordWrap
       color: Color.foreground

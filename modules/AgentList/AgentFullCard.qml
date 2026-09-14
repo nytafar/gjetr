@@ -1,9 +1,7 @@
 import QtQuick
 import qs.Commons
-import "../../lib/CardPolicy.js" as CardPolicy
+import "../../lib/CardModel.js" as CardModel
 import "../../lib/DensityPolicy.js" as DensityPolicy
-import "../../lib/StatusPolicy.js" as StatusPolicy
-import "../../lib/IndicatorPolicy.js" as IndicatorPolicy
 import "../../lib/MotionPolicy.js" as MotionPolicy
 import "../../components"
 
@@ -12,37 +10,19 @@ import "../../components"
 // branch under it, the Cache timer as a large number over a bar draining in
 // its level's colour, and the Recap's first two lines. Clicking the Recap
 // opens all of it inside the Card, on an accent-tinted panel; clicking again
-// closes it. Clicking anywhere else focuses the Agent. Same inputs as
-// AgentCard and AgentRow, plus the repo and location texts.
+// closes it. Clicking anywhere else focuses the Agent. Draws its CardModel
+// card, as AgentCard and AgentRow do.
 Item {
   id: root
 
-  property var agent: null
+  // Everything this Card draws about its Agent (CardModel.build).
+  property var card: CardModel.EMPTY
   property var service: null
-  property var fields: CardPolicy.fieldsFor(CardPolicy.DEFAULT_PRESET)
   property var density: null
   property bool interactive: true
-  property var indicator: StatusPolicy.indicator("unknown")
-  // The kind mark as status indicator (IndicatorPolicy): the Module's
-  // indicator setting, this Agent's mark state with its tone resolved, the
-  // theme palette for the hue effect, and whether the mark may move (on screen).
-  property string indicatorMode: IndicatorPolicy.DEFAULT_MODE
-  property var mark: IndicatorPolicy.markFor("unknown", "", "")
-  property color markColor: Color.muted
+  // The theme palette for the hue effect, and whether the mark may move (on screen).
   property var palette: []
   property bool animate: true
-  readonly property bool showGlyph: fields.status && IndicatorPolicy.showsGlyph(indicatorMode, fields.kind)
-  property color statusColor: Color.muted
-  property color cacheColor: Color.foreground
-  property color cacheBarColor: Color.muted
-  property bool inFocusedWorkspace: false
-  property string attention: ""
-  property string recapMode: "off"
-  property string recapText: ""
-  property bool recapOpen: false
-  // "repo <mark> branch" or a short path (RepoModel), and workspace › tab.
-  property string repoText: ""
-  property string locationText: ""
   // Height without an open Recap, from DensityPolicy.fullCardHeight.
   property int baseHeight: 80
 
@@ -51,13 +31,17 @@ Item {
 
   readonly property var t: density || DensityPolicy.tokens({ width: 360, height: 714, input: "pointer", setting: "full",
     module: "agent-list" })
-  readonly property bool hasRecap: DensityPolicy.fullRecapShown(recapMode, recapText)
-  readonly property bool recapShown: recapOpen && hasRecap
-  readonly property bool focused: !!agent && agent.focused
-  readonly property var cacheTimer: fields.cache && service && agent
-    ? service.cacheTimerFor(agent, service.nowSeconds) : null
-  readonly property string iconUrl: fields.kind && service && agent ? service.kindIconUrl(agent.kind) : ""
-  readonly property color attentionColor: attention === "blocked" ? Color.urgent : Color.accent
+  readonly property var fields: card.fields
+  readonly property var indicator: card.indicator
+  readonly property string attention: card.attention
+  readonly property bool focused: card.focused
+  readonly property bool hasRecap: card.recap.expandable || card.recap.inline
+  readonly property bool recapShown: card.recap.shown
+  readonly property var cacheTimer: fields.cache ? card.cache : null
+  readonly property string iconUrl: fields.kind && service && card.kind !== "" ? service.kindIconUrl(card.kind) : ""
+  readonly property var successColor: service ? service.successColor : undefined
+  readonly property color statusColor: Tone.color(card.indicator.tone, successColor)
+  readonly property color attentionColor: Tone.color(card.attentionTone, successColor)
   readonly property int radius: Math.min(Style.cornerRadius, 6)
   // Where the text starts, right of the glyph column.
   readonly property int textX: t.pad + (fields.status || fields.kind ? t.statusWidth + t.gap : 0)
@@ -77,7 +61,7 @@ Item {
     color: headTap.pressed || recapTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent)
       : root.focused ? Style.selectedFillFor(Color.foreground, Color.accent)
       : hover.hovered ? Util.alpha(Color.foreground, 0.08)
-      : root.inFocusedWorkspace ? Util.alpha(Color.accent, 0.07)
+      : root.card.highlighted ? Util.alpha(Color.accent, 0.07)
       : Util.alpha(Color.foreground, 0.035)
   }
 
@@ -144,7 +128,7 @@ Item {
   // The glyph column: the status glyph on the name line, the kind mark under it.
   Item {
     id: statusGlyph
-    visible: root.showGlyph
+    visible: root.card.showGlyph
     x: root.t.pad
     anchors.verticalCenter: nameLine.verticalCenter
     width: root.t.statusWidth
@@ -165,7 +149,7 @@ Item {
       Motion {
         id: spinMotion
         clock: root.service ? root.service.motionClock : null
-        running: root.indicator.motion === "spin" && root.visible && root.showGlyph && root.animate
+        running: root.indicator.motion === "spin" && root.visible && root.card.showGlyph && root.animate
       }
     }
   }
@@ -174,22 +158,22 @@ Item {
     id: kindIcon
     // With indicator = "icon" the mark carries the state in the glyph's place,
     // on the name line at the glyph's size.
-    readonly property int size: root.showGlyph || !root.fields.status ? root.t.iconPx : root.t.glyphPx
+    readonly property int size: root.card.showGlyph || !root.fields.status ? root.t.iconPx : root.t.glyphPx
     visible: root.fields.kind
     x: root.t.pad + Math.round((root.t.statusWidth - width) / 2)
     anchors.verticalCenter: size === root.t.iconPx ? metaLine.verticalCenter : nameLine.verticalCenter
     width: size
     height: size
     iconUrl: root.iconUrl
-    tinted: root.service && root.agent ? root.service.kindIconTinted(root.agent.kind) : false
-    letter: root.agent ? CardPolicy.kindGlyph(root.agent.kind, root.agent.displayKind) : ""
+    tinted: root.card.kindIconTinted
+    letter: root.card.kindGlyph
     sourcePx: Math.ceil(root.t.iconSourcePx * size / Math.max(1, root.t.iconPx))
     letterPx: Math.round(root.t.metaPx * size / Math.max(1, root.t.iconPx))
     frameRadius: Math.min(Style.cornerRadius, 4)
     plainOpacity: 0.85
-    stateful: IndicatorPolicy.marksState(root.indicatorMode)
-    mark: root.mark
-    toneColor: root.markColor
+    stateful: root.card.marksState
+    mark: root.card.mark
+    toneColor: Tone.color(root.card.mark.tone, root.successColor)
     palette: root.palette
     animate: root.animate && root.visible
     clock: root.service ? root.service.motionClock : null
@@ -201,7 +185,7 @@ Item {
     anchors.verticalCenter: nameLine.verticalCenter
     width: Math.max(0, root.textRight - x)
     visible: root.fields.name
-    text: root.service && root.agent ? root.service.agentName(root.agent) : ""
+    text: root.card.name
     textFormat: Text.PlainText
     color: Color.foreground
     opacity: root.indicator.textOpacity
@@ -232,7 +216,7 @@ Item {
     anchors.verticalCenter: metaLine.verticalCenter
     width: Math.min(implicitWidth, room)
     visible: text !== "" && room > root.t.metaPx * 3
-    text: root.repoText
+    text: root.card.repo.text
     textFormat: Text.PlainText
     color: Color.muted
     font.family: Style.font.family
@@ -247,7 +231,7 @@ Item {
     x: startX
     anchors.verticalCenter: metaLine.verticalCenter
     visible: root.fields.location && text !== "" && root.metaRight - startX >= implicitWidth
-    text: root.locationText
+    text: root.card.location
     textFormat: Text.PlainText
     color: Color.muted
     opacity: 0.6
@@ -270,7 +254,7 @@ Item {
       anchors { right: parent.right; verticalCenter: undefined }
       y: Math.round((root.t.lineHeight - height) / 2)
       text: root.cacheTimer ? root.cacheTimer.label : ""
-      color: root.cacheColor
+      color: Tone.color(root.card.cacheTone, root.successColor)
       font.family: Style.font.family
       font.pixelSize: root.t.cachePx
       font.weight: root.cacheTimer && root.cacheTimer.level === "critical" ? Font.Bold : Font.Medium
@@ -290,7 +274,7 @@ Item {
         anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
         width: root.cacheTimer ? Math.round(parent.width * root.cacheTimer.fraction) : 0
         radius: parent.radius
-        color: root.cacheBarColor
+        color: Tone.color(root.card.cacheBarTone, root.successColor)
         Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
       }
     }
@@ -331,7 +315,7 @@ Item {
     y: root.headHeight + root.t.recapGap
     width: Math.max(0, root.width - root.t.pad - x)
     height: root.t.recapLineHeight * root.t.recapLines
-    text: visible ? root.recapText : ""
+    text: visible ? root.card.recap.text : ""
     textFormat: Text.PlainText
     wrapMode: Text.Wrap
     maximumLineCount: root.t.recapLines
@@ -365,7 +349,7 @@ Item {
     Text {
       id: recapBody
       anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: root.t.gap; rightMargin: root.t.gap; topMargin: root.t.gap / 2 }
-      text: root.recapShown ? root.recapText : ""
+      text: root.recapShown ? root.card.recap.text : ""
       textFormat: Text.PlainText
       wrapMode: Text.Wrap
       color: Color.foreground

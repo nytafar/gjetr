@@ -1,8 +1,6 @@
 import QtQuick
 import qs.Commons
-import "../../lib/CardPolicy.js" as CardPolicy
-import "../../lib/StatusPolicy.js" as StatusPolicy
-import "../../lib/IndicatorPolicy.js" as IndicatorPolicy
+import "../../lib/CardModel.js" as CardModel
 import "../../lib/MotionPolicy.js" as MotionPolicy
 import "../../components"
 import "../../lib/RepoModel.js" as RepoModel
@@ -13,32 +11,18 @@ import "../../lib/RepoModel.js" as RepoModel
 // the Repo and workspace › tab when the preset shows location and there is
 // room). Clicking the row focuses the Agent;
 // clicking the Recap line, or the disclosure mark with recap = "expand",
-// opens the full Recap under the row. Same inputs as AgentCard.
+// opens the full Recap under the row. Draws its CardModel card, as AgentCard does.
 Item {
   id: root
 
-  property var agent: null
+  // Everything this row draws about its Agent (CardModel.build).
+  property var card: CardModel.EMPTY
   property var service: null
-  property var fields: CardPolicy.fieldsFor("compact")
   property var density: null
   property bool interactive: true
-  property var indicator: StatusPolicy.indicator("unknown")
-  // The kind mark as status indicator (IndicatorPolicy): the Module's
-  // indicator setting, this Agent's mark state with its tone resolved, the
-  // theme palette for the hue effect, and whether the mark may move (on screen).
-  property string indicatorMode: IndicatorPolicy.DEFAULT_MODE
-  property var mark: IndicatorPolicy.markFor("unknown", "", "")
-  property color markColor: Color.muted
+  // The theme palette for the hue effect, and whether the mark may move (on screen).
   property var palette: []
   property bool animate: true
-  readonly property bool showGlyph: fields.status && IndicatorPolicy.showsGlyph(indicatorMode, fields.kind)
-  property color statusColor: Color.muted
-  property color cacheColor: Color.muted
-  property bool inFocusedWorkspace: false
-  property string attention: ""
-  property string recapMode: "off"
-  property string recapText: ""
-  property bool recapOpen: false
   // "recap", "location" or "" (DensityPolicy.secondLine).
   property string secondLine: ""
   // Height of the row's lines, from DensityPolicy.rowHeight.
@@ -50,15 +34,19 @@ Item {
   readonly property var t: density || ({ namePx: 12, detailPx: 10, glyphPx: 14, iconPx: 14, iconSourcePx: 28,
     statusWidth: 16, pad: 8, gap: 6, padY: 5, lineGap: 3, lineHeight: 17, secondLineHeight: 13,
     rowGap: 1, dividerAlpha: 0.08 })
-  readonly property bool recapExpandable: recapMode === "expand" && recapText !== ""
+  readonly property var fields: card.fields
+  readonly property var indicator: card.indicator
+  readonly property string attention: card.attention
+  readonly property bool focused: card.focused
+  readonly property var cacheTimer: fields.cache ? card.cache : null
+  readonly property bool recapExpandable: card.recap.expandable
   // The Recap line opens the full Recap in place, as the disclosure does for expand.
   readonly property bool recapInline: secondLine === "recap"
-  readonly property bool recapShown: recapOpen && recapText !== "" && (recapExpandable || recapInline)
-  readonly property bool focused: !!agent && agent.focused
-  readonly property var cacheTimer: fields.cache && service && agent
-    ? service.cacheTimerFor(agent, service.nowSeconds) : null
-  readonly property string iconUrl: fields.kind && service && agent ? service.kindIconUrl(agent.kind) : ""
-  readonly property color attentionColor: attention === "blocked" ? Color.urgent : Color.accent
+  readonly property bool recapShown: card.recap.shown
+  readonly property string iconUrl: fields.kind && service && card.kind !== "" ? service.kindIconUrl(card.kind) : ""
+  readonly property var successColor: service ? service.successColor : undefined
+  readonly property color statusColor: Tone.color(card.indicator.tone, successColor)
+  readonly property color attentionColor: Tone.color(card.attentionTone, successColor)
 
   implicitHeight: baseHeight + (recapShown ? recapBlock.implicitHeight : 0)
 
@@ -68,7 +56,7 @@ Item {
     color: tap.pressed || recapTap.pressed || disclosureTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent)
       : root.focused ? Style.selectedFillFor(Color.foreground, Color.accent)
       : hover.hovered ? Util.alpha(Color.foreground, 0.06)
-      : root.inFocusedWorkspace ? Util.alpha(Color.accent, 0.07)
+      : root.card.highlighted ? Util.alpha(Color.accent, 0.07)
       : "transparent"
   }
 
@@ -132,7 +120,7 @@ Item {
 
   Item {
     id: statusGlyph
-    visible: root.showGlyph
+    visible: root.card.showGlyph
     anchors { left: parent.left; leftMargin: root.t.pad; verticalCenter: line.verticalCenter }
     width: visible ? root.t.statusWidth : 0
     height: root.t.statusWidth
@@ -152,7 +140,7 @@ Item {
       Motion {
         id: spinMotion
         clock: root.service ? root.service.motionClock : null
-        running: root.indicator.motion === "spin" && root.visible && root.showGlyph && root.animate
+        running: root.indicator.motion === "spin" && root.visible && root.card.showGlyph && root.animate
       }
     }
   }
@@ -164,14 +152,14 @@ Item {
     width: visible ? root.t.iconPx : 0
     height: root.t.iconPx
     iconUrl: root.iconUrl
-    tinted: root.service && root.agent ? root.service.kindIconTinted(root.agent.kind) : false
-    letter: root.agent ? CardPolicy.kindGlyph(root.agent.kind, root.agent.displayKind) : ""
+    tinted: root.card.kindIconTinted
+    letter: root.card.kindGlyph
     sourcePx: root.t.iconSourcePx
     letterPx: root.t.detailPx
     frameRadius: Math.min(Style.cornerRadius, 3)
-    stateful: IndicatorPolicy.marksState(root.indicatorMode)
-    mark: root.mark
-    toneColor: root.markColor
+    stateful: root.card.marksState
+    mark: root.card.mark
+    toneColor: Tone.color(root.card.mark.tone, root.successColor)
     palette: root.palette
     animate: root.animate && root.visible
     clock: root.service ? root.service.motionClock : null
@@ -186,7 +174,7 @@ Item {
       verticalCenter: line.verticalCenter
     }
     visible: root.fields.name
-    text: root.service && root.agent ? root.service.agentName(root.agent) : ""
+    text: root.card.name
     textFormat: Text.PlainText
     color: Color.foreground
     opacity: root.indicator.textOpacity
@@ -202,7 +190,7 @@ Item {
     anchors { right: disclosure.left; rightMargin: disclosure.visible ? root.t.gap : root.t.pad; verticalCenter: line.verticalCenter }
     visible: root.fields.cache && root.cacheTimer !== null
     text: root.cacheTimer ? root.cacheTimer.label : ""
-    color: root.cacheColor
+    color: Tone.color(root.card.cacheTone, root.successColor)
     opacity: root.cacheTimer && root.cacheTimer.level === "cold" ? 0.6 : 1
     font.family: Style.font.family
     font.pixelSize: root.t.detailPx + 1
@@ -220,9 +208,8 @@ Item {
     y: line.y + line.height + root.t.lineGap
     height: root.t.secondLineHeight
     verticalAlignment: Text.AlignVCenter
-    text: root.secondLine === "recap" ? root.recapText
-      : root.secondLine === "location" && root.service && root.agent
-        ? RepoModel.withLocation(root.service.agentRepo(root.agent, root.service.repos).text, root.service.agentLocation(root.agent)) : ""
+    text: root.secondLine === "recap" ? root.card.recap.text
+      : root.secondLine === "location" ? RepoModel.withLocation(root.card.repo.text, root.card.location) : ""
     textFormat: Text.PlainText
     color: Color.muted
     opacity: root.recapShown ? 0.5 : 0.85
@@ -293,7 +280,7 @@ Item {
       id: recapBody
       x: nameText.x
       width: Math.max(0, parent.width - x - root.t.pad)
-      text: root.recapShown ? root.recapText : ""
+      text: root.recapShown ? root.card.recap.text : ""
       textFormat: Text.PlainText
       wrapMode: Text.WordWrap
       color: Color.foreground
