@@ -141,3 +141,67 @@ test("without a Config or a touchscreen the shipped sidebar preset is a shown Do
   assert.deepEqual(plain(config.displays.map(d => ({ kind: d.kind, name: d.name, edge: d.edge, visible: d.visible, deck: d.deck }))),
     [{ kind: "dock", name: "DP-1", edge: "left", visible: true, deck: ["sidebar"] }])
 })
+
+// step: detection as a pipeline, driven by a script of events.
+
+test("step: a refresh reads monitors and touch devices", () => {
+  const out = Detect.step(Detect.initial(), { type: "refresh" }, 1000)
+  assert.deepEqual(plain(out.commands.map(c => c.argv)), [["hyprctl", "-j", "monitors"], ["hyprctl", "-j", "devices"]])
+  assert.equal(out.state.detection.ready, false)
+})
+
+function reply(state, id, text, now) {
+  return Detect.step(state, { type: "reply", id, text, code: 0 }, now)
+}
+
+test("step: replies in either order detect once both are in; a reply from the previous refresh is ignored", () => {
+  let out = Detect.step(Detect.initial(), { type: "bindings", bindings: Detect.touchBindings(INPUT_LUA) }, 900)
+  out = Detect.step(out.state, { type: "refresh" }, 1000)
+  const [monitors1, devices1] = out.commands.map(c => c.id)
+  // A hotplug starts a second refresh before the first has answered.
+  out = Detect.step(out.state, { type: "refresh" }, 1100)
+  const [monitors2, devices2] = out.commands.map(c => c.id)
+  out = reply(out.state, devices2, DEVICES, 1200)
+  assert.equal(out.state.detection.ready, false)
+  // The first refresh answers late, with a panel that has gone.
+  out = reply(out.state, monitors1, JSON.stringify([{ name: "DP-1", focused: true }]), 1250)
+  out = reply(out.state, devices1, JSON.stringify({ touch: [] }), 1260)
+  assert.equal(out.state.detection.ready, false)
+  out = reply(out.state, monitors2, MONITORS, 1300)
+  assert.deepEqual(plain(out.state.detection), { ready: true, preset: "panel", touchscreen: "HDMI-A-2", monitor: "DP-1",
+    device: "wch.cn-usb2iic_ctp_control", reason: "touchscreen wch.cn-usb2iic_ctp_control is bound to HDMI-A-2" })
+  assert.deepEqual(plain(out.commands), [])
+})
+
+test("step: a failed monitor read is read again, with the devices, only once retryAt has passed", () => {
+  let out = Detect.step(Detect.initial(), { type: "refresh" }, 1000)
+  const [monitors, devices] = out.commands.map(c => c.id)
+  out = Detect.step(out.state, { type: "reply", id: monitors, text: "", code: 1 }, 1100)
+  out = reply(out.state, devices, DEVICES, 1200)
+  assert.equal(out.state.detection.ready, false)
+  assert.equal(out.state.retryAt, 1200 + Detect.RETRY_MS)
+  assert.deepEqual(plain(Detect.step(out.state, { type: "tick" }, 1200 + Detect.RETRY_MS - 1).commands), [])
+  const retry = Detect.step(out.state, { type: "tick" }, 1200 + Detect.RETRY_MS)
+  assert.deepEqual(plain(retry.commands.map(c => c.argv)), [["hyprctl", "-j", "monitors"], ["hyprctl", "-j", "devices"]])
+  // Once retried, later ticks do not ask again.
+  assert.deepEqual(plain(Detect.step(retry.state, { type: "tick" }, 1200 + Detect.RETRY_MS * 3).commands), [])
+})
+
+test("step: inputs that did not change keep the detection, and a re-read that detects the same keeps its reference", () => {
+  let out = Detect.step(Detect.initial(), { type: "bindings", bindings: Detect.touchBindings(INPUT_LUA) }, 900)
+  out = Detect.step(out.state, { type: "refresh" }, 1000)
+  let [monitors, devices] = out.commands.map(c => c.id)
+  out = reply(reply(out.state, monitors, MONITORS, 1100).state, devices, DEVICES, 1200)
+  const detected = out.state
+  assert.equal(detected.detection.preset, "panel")
+  // input.lua read again with the same bindings.
+  assert.equal(Detect.step(detected, { type: "bindings", bindings: Detect.touchBindings(INPUT_LUA) }, 1300).state, detected)
+  // A hotplug elsewhere reads the same outputs again.
+  out = Detect.step(detected, { type: "refresh" }, 2000);
+  [monitors, devices] = out.commands.map(c => c.id)
+  out = reply(reply(out.state, devices, DEVICES, 2100).state, monitors, MONITORS, 2200)
+  assert.equal(out.state.detection, detected.detection)
+  // Removing the panel's binding changes it.
+  out = Detect.step(out.state, { type: "bindings", bindings: [] }, 2300)
+  assert.equal(out.state.detection.preset, "sidebar")
+})

@@ -12,7 +12,6 @@ import "lib/CardModel.js" as CardModel
 import "lib/ConfigModel.js" as ConfigModel
 import "lib/OverrideModel.js" as OverrideModel
 import "lib/WindowPolicy.js" as WindowPolicy
-import "lib/CommandPolicy.js" as CommandPolicy
 import "lib/AttentionModel.js" as AttentionModel
 import "lib/DeckPolicy.js" as DeckPolicy
 import "lib/DockPolicy.js" as DockPolicy
@@ -61,14 +60,11 @@ Item {
   // Without a gjetr.toml, gjetr shows the preset DetectPolicy picks for this
   // machine, its outputs filled in (PresetModel); its Displays also stand in
   // for a gjetr.toml that names none. Monitors and touch devices are read on
-  // start and after a hotplug, touch bindings from Hyprland's input.lua.
+  // start and after a hotplug, touch bindings from Hyprland's input.lua; the
+  // pipeline is DetectPolicy.step, run by detectDriver.
   property var presetTexts: ({})
   readonly property string hyprInputPath: home + "/.config/hypr/input.lua"
-  property var detectMonitors: null
-  property var detectTouchDevices: null
-  property var detectBindings: []
-  property var detection: DetectPolicy.detect(null)
-  property int detectSequence: 0
+  readonly property var detection: detectDriver.state.detection
   readonly property var presetRender: detection.preset !== "" && typeof presetTexts[detection.preset] === "string"
     ? PresetModel.render(presetTexts[detection.preset], { touchscreen: detection.touchscreen, monitor: detection.monitor }) : null
   readonly property var presetRead: presetRender ? ConfigModel.readMain(presetRender.text, home) : null
@@ -119,8 +115,8 @@ Item {
 
   // Recap: the latest away_summary of each Claude Agent's session, found by
   // session id under ~/.claude/projects and re-read when the transcript's
-  // modification time or size changes. Polled only while an Agent List shows
-  // Recaps.
+  // modification time or size changes (RecapModel.step, run by recapDriver).
+  // Polled only while an Agent List shows Recaps.
   // The first Agent List's Recap settings, for `state` and IPC. Each Agent
   // List reads its own from moduleStates.
   readonly property string recapMode: primaryModule && primaryModule.recap ? primaryModule.recap : "off"
@@ -134,12 +130,7 @@ Item {
   // Both follow pane ids, so they survive re-sorts and updates.
   property var recapOpen: RecapModel.emptyOpen()
   property var recapOverlay: ({ key: "", pane: "" })
-  readonly property string claudeProjectsDir: RecapModel.projectsDir(home)
-  property var recapPaths: ({})
-  property var recapLocated: ({})
-  property var recapStamps: ({})
-  property var recaps: ({})
-  property bool recapPolling: false
+  readonly property var recaps: recapDriver.state.recaps
   // Every Module of every Display's active Layout, keyed <layout>#<index>, and
   // each Module's settings shadowed by its own Overrides. A Layout on two
   // Displays is the same Modules, listed once. A hidden Dock's Modules keep
@@ -180,13 +171,11 @@ Item {
   property double usageNowMs: Date.now()
 
   // Repo: the git repository and branch of each Agent's cwd, else a short path
-  // (RepoModel). git is asked once per distinct cwd, when it first appears and
-  // again every 30 s, while an Agent List is shown. `repos` (cwd -> info or
-  // null) changes only when an answer does; when each cwd was last asked and
-  // which are running are plain bookkeeping no binding reads. Never written.
-  property var repos: ({})
-  property var repoChecked: ({})
-  property var repoInFlight: ({})
+  // (RepoModel.step, run by repoDriver). git is asked once per distinct cwd,
+  // when it first appears and again every 30 s, while an Agent List is shown.
+  // `repos` (cwd -> info or null) changes only when an answer does. Never
+  // written.
+  readonly property var repos: repoDriver.state.repos
   readonly property bool repoNeeded: shownModules.some(function(module) { return module.type === "agent-list" })
 
   // Session state, never written: the expanded workspaces and tabs of each
@@ -239,17 +228,6 @@ Item {
   }
   // Focus behaviour of the Module whose tap is in flight.
   property string pendingFocusMode: "herdr"
-
-  // Focus behaviour `window`: the last attempt to bring the hosting terminal
-  // window forward. Newer taps supersede older lookups by sequence.
-  property int windowFocusSequence: 0
-  property var windowFocus: ({ requests: 0, window: "", workspace: "", candidates: 0, error: "", cursor: "" })
-  // After a click on a pointer Display with Focus behaviour `window`: where
-  // the pointer was, read when the click came, to put it back once the window
-  // is focused (WindowPolicy.restoresCursor).
-  property int cursorSequence: 0
-  property bool pendingCursorWanted: false
-  property var pendingCursor: null
 
   // Cache timers from the cache-ttl herdr plugin. Paths are the plugin's own
   // state and config dirs (HERDR_PLUGIN_STATE_DIR, HERDR_PLUGIN_CONFIG_DIR).
@@ -333,7 +311,7 @@ Item {
 
   // Runs an allowlisted command for a Deck (rotation, touch).
   function runCommand(argv, callback) {
-    return commands.run(argv, callback)
+    return commandRunner.run(argv, callback)
   }
 
   // A Layout of the primary Display's Deck.
@@ -402,90 +380,12 @@ Item {
     if (recapOverlay.pane !== "" && ids.indexOf(recapOverlay.pane) < 0) closeRecapOverlay()
   }
 
-  function recapSessions() {
-    var out = []
-    for (var i = 0; i < agents.length; i++) {
-      var id = agents[i].sessionId
-      if (agents[i].kind === "claude" && RecapModel.isSessionId(id) && out.indexOf(id) < 0) out.push(id)
-    }
-    return out
-  }
-
   function setEntry(name, key, value) {
     var next = {}
     var current = root[name]
     for (var k in current) next[k] = current[k]
     next[key] = value
     root[name] = next
-  }
-
-  function readRecap(sessionId, path) {
-    commands.run(CommandPolicy.grepRecaps(path), function(text, code) {
-      // grep exits 1 when the transcript has no recap yet.
-      if (code !== 0 && code !== 1) return
-      var recap = RecapModel.latestRecap(text, sessionId)
-      var current = recaps[sessionId]
-      if (recap && (!current || current.text !== recap.text)) setEntry("recaps", sessionId, recap)
-    })
-  }
-
-  function pollRecaps() {
-    if (!recapNeeded || recapPolling) return
-    var sessions = recapSessions()
-    var now = Date.now()
-    var paths = []
-    var bySession = {}
-    for (var i = 0; i < sessions.length; i++) {
-      var id = sessions[i]
-      var path = recapPaths[id]
-      if (path) {
-        paths.push(path)
-        bySession[path] = id
-      } else if (!recapLocated[id] || now - recapLocated[id] > 60000) {
-        setEntry("recapLocated", id, now)
-        locateRecap(id)
-      }
-    }
-    if (paths.length === 0) return
-    recapPolling = true
-    commands.run(CommandPolicy.statTranscripts(paths.slice(0, 64)), function(text, code) {
-      recapPolling = false
-      var stamps = RecapModel.parseStat(text, paths)
-      for (var p in stamps) {
-        if (recapStamps[p] === stamps[p]) continue
-        setEntry("recapStamps", p, stamps[p])
-        readRecap(bySession[p], p)
-      }
-    })
-  }
-
-  function locateRecap(sessionId) {
-    commands.run(CommandPolicy.locateTranscript(claudeProjectsDir, sessionId), function(text, code) {
-      var path = RecapModel.parseLocate(text, claudeProjectsDir, sessionId)
-      if (path === "") return
-      setEntry("recapPaths", sessionId, path)
-      pollTimer.restart()
-    })
-  }
-
-  function pollRepos() {
-    if (!repoNeeded) return
-    var pruned = RepoModel.prune(repos, agents)
-    if (pruned !== repos) repos = pruned
-    repoChecked = RepoModel.prune(repoChecked, agents)
-    var due = RepoModel.dueCwds(agents, repoChecked, repoInFlight, Date.now(), RepoModel.REFRESH_MS)
-    for (var i = 0; i < due.length; i++) resolveRepo(due[i])
-  }
-
-  function resolveRepo(cwd) {
-    repoInFlight[cwd] = true
-    commands.run(CommandPolicy.gitRepo(cwd), function(text, code) {
-      delete repoInFlight[cwd]
-      repoChecked[cwd] = Date.now()
-      var info = RepoModel.parseRevParse(text, code)
-      var known = Object.prototype.hasOwnProperty.call(repos, cwd)
-      if (!known || !RepoModel.sameInfo(repos[cwd], info)) setEntry("repos", cwd, info)
-    })
   }
 
   // which: "layoutUserTexts" (the Config's file) or "layoutShippedTexts".
@@ -589,7 +489,7 @@ Item {
     if (prefix === "" || value === "" || !WorkspaceTreeModel.nodeExists(workspaceTree, prefix + value)) return false
     if (kind === "pane") attention = AttentionModel.acknowledge(attention, value)
     pendingFocusMode = focusModeFor(moduleKey)
-    prepareCursorRestore(moduleKey, input)
+    hostFocus.prepare(WindowPolicy.restoresCursor(String(input || ""), focusModeFor(moduleKey)))
     return herdr.focusTarget(kind, value)
   }
 
@@ -601,86 +501,9 @@ Item {
     return usageSource.refresh() ? "started" : "refused"
   }
 
-  // A click from a pointer Display that will focus the hosting window: read
-  // where the pointer is now, so focusHostWindow can put it back.
-  function prepareCursorRestore(moduleKey, input) {
-    var sequence = ++cursorSequence
-    pendingCursorWanted = WindowPolicy.restoresCursor(String(input || ""), focusModeFor(moduleKey))
-    pendingCursor = null
-    if (!pendingCursorWanted) return
-    commands.run(CommandPolicy.CURSOR_POS, function(text, code) {
-      if (sequence !== cursorSequence) return
-      pendingCursor = code === 0 ? WindowPolicy.parseCursorPos(text) : null
-    })
-  }
-
   function focusModeFor(moduleKey) {
     var state = moduleStates[moduleKeyOr(moduleKey)]
     return state && state.focus ? state.focus : "herdr"
-  }
-
-  // After herdr focused a pane: find the most recently focused Hyprland window
-  // hosting a herdr client of our server, and focus it, which also switches
-  // to its workspace. Selection is lib/WindowPolicy.js; every command is
-  // allowlisted in lib/CommandPolicy.js.
-  function focusHostWindow() {
-    var sequence = ++windowFocusSequence
-    var parts = { clients: null, processes: null }
-    var socket = herdrSocketPath
-    var restoreCursor = pendingCursorWanted
-
-    function report(fields) {
-      var next = { requests: windowFocus.requests, window: "", workspace: "", candidates: 0, error: "", cursor: "" }
-      for (var key in fields) next[key] = fields[key]
-      windowFocus = next
-      if (next.error !== "") log("window focus: " + next.error)
-    }
-
-    function select() {
-      if (sequence !== windowFocusSequence || parts.clients === null || parts.processes === null) return
-      var picked = WindowPolicy.selectHost(parts.clients, parts.processes, socket, home)
-      if (!picked.window) {
-        report({ error: "no window hosts a herdr client of " + socket })
-        return
-      }
-      var chosen = picked.window
-      commands.run(CommandPolicy.focusWindow(chosen.address), function(text, code) {
-        if (sequence !== windowFocusSequence) return
-        var ok = code === 0 && String(text).trim() === "ok"
-        var fields = { window: chosen.address, workspace: chosen.workspace, candidates: picked.candidates,
-          error: ok ? "" : "dispatch failed (" + code + "): " + String(text).trim().slice(0, 120) }
-        if (!ok || !restoreCursor) {
-          report(fields)
-          return
-        }
-        // Focusing moved the pointer to the window; put it back on the Dock.
-        var at = pendingCursor
-        var argv = at ? CommandPolicy.moveCursor(at.x, at.y) : []
-        if (argv.length === 0) {
-          fields.cursor = "position unknown"
-          report(fields)
-          log("window focus: cursor not restored, position unknown")
-          return
-        }
-        commands.run(argv, function(result, exitCode) {
-          if (sequence !== windowFocusSequence) return
-          var moved = exitCode === 0 && String(result).trim() === "ok"
-          fields.cursor = moved ? "restored " + at.x + "," + at.y : "move failed (" + exitCode + ")"
-          report(fields)
-          if (!moved) log("window focus: cursor " + fields.cursor)
-        })
-      })
-    }
-
-    windowFocus = { requests: windowFocus.requests + 1, window: "", workspace: "", candidates: 0, error: "", cursor: "" }
-    commands.run(CommandPolicy.CLIENTS, function(text, code) {
-      parts.clients = code === 0 ? text : "[]"
-      select()
-    })
-    commands.run(CommandPolicy.PROCESSES, function(text, code) {
-      parts.processes = code === 0 ? text : ""
-      select()
-    })
   }
 
   function resetOverrides() {
@@ -720,7 +543,7 @@ Item {
       if (agents[i].paneId !== id) continue
       attention = AttentionModel.acknowledge(attention, id)
       pendingFocusMode = focusModeFor(moduleKey)
-      prepareCursorRestore(moduleKey, input)
+      hostFocus.prepare(WindowPolicy.restoresCursor(String(input || ""), focusModeFor(moduleKey)))
       return herdr.focusPane(id)
     }
     return false
@@ -731,45 +554,14 @@ Item {
     var entered = AttentionModel.count(next) > AttentionModel.count(attention)
     attention = next
     pruneRecapOpen()
-    if (repoNeeded) Qt.callLater(pollRepos)
     if (entered) log("attention " + Object.keys(next.attention).join(", ").replace(/p:/g, ""))
     resort()
   }
 
-  function applyDetection() {
-    var next = DetectPolicy.detect({ monitors: detectMonitors, touchDevices: detectTouchDevices, bindings: detectBindings,
-      previous: detection })
-    if (JSON.stringify(next) === JSON.stringify(detection)) return
-    detection = next
-    if (next.ready) log("detected " + (next.preset || "nothing") + " (" + next.reason + ")"
-      + (next.touchscreen !== "" ? ", touchscreen " + next.touchscreen : "") + (next.monitor !== "" ? ", monitor " + next.monitor : ""))
-  }
-
-  // Reads monitors and touch devices, then detects again. A failed monitor read
-  // is retried.
-  function refreshDetection() {
-    var sequence = ++detectSequence
-    var parts = { monitors: undefined, devices: undefined }
-    function done() {
-      if (sequence !== detectSequence || parts.monitors === undefined || parts.devices === undefined) return
-      if (parts.monitors === null) {
-        detectRetry.restart()
-        return
-      }
-      detectMonitors = parts.monitors
-      detectTouchDevices = parts.devices
-      applyDetection()
-    }
-    commands.run(CommandPolicy.MONITORS, function(text, code) {
-      var read = code === 0 ? DetectPolicy.parseMonitors(text) : { ok: false, monitors: [] }
-      parts.monitors = read.ok ? read.monitors : null
-      done()
-    })
-    commands.run(CommandPolicy.DEVICES, function(text, code) {
-      var read = code === 0 ? DetectPolicy.parseTouchDevices(text) : { ok: false, names: [] }
-      parts.devices = read.names
-      done()
-    })
+  function logDetection() {
+    if (detection.ready) log("detected " + (detection.preset || "nothing") + " (" + detection.reason + ")"
+      + (detection.touchscreen !== "" ? ", touchscreen " + detection.touchscreen : "")
+      + (detection.monitor !== "" ? ", monitor " + detection.monitor : ""))
   }
 
   // installConfig's file access: one FileView per read or write, loading and
@@ -915,14 +707,14 @@ Item {
       cardPreset: cardPreset,
       focusMode: focusMode,
       focusOverridden: focusOverridden,
-      windowFocus: windowFocus,
-      commands: { started: commands.started, refused: commands.refused, lastError: commands.lastError },
+      windowFocus: hostFocus.result,
+      commands: { started: commandRunner.started, refused: commandRunner.refused, lastError: commandRunner.lastError },
       config: { dir: configDir, source: configFromPreset ? "preset" : "file", preset: configFromPreset ? detection.preset : "",
         summary: configSummary, errors: configErrors, defaults: config.defaults, layouts: layoutRead.sources },
       detect: { ready: detection.ready, preset: detection.preset, touchscreen: detection.touchscreen, monitor: detection.monitor,
         device: detection.device, reason: detection.reason,
-        monitors: (detectMonitors || []).map(function(monitor) { return monitor.name }),
-        touchDevices: detectTouchDevices || [], bindings: detectBindings },
+        monitors: (detectDriver.state.monitors || []).map(function(monitor) { return monitor.name }),
+        touchDevices: detectDriver.state.touchDevices || [], bindings: detectDriver.state.bindings },
       workspaces: {
         list: workspaceListKey,
         focusedWorkspace: focusedWorkspaceId,
@@ -957,8 +749,8 @@ Item {
         open: recapOpenMode,
         openCards: RecapModel.openPanes(recapOpen, agentListKey),
         overlay: recapOverlay.pane,
-        sessions: recapSessions().length,
-        located: Object.keys(recapPaths).length,
+        sessions: RecapModel.sessionsOf(agents).length,
+        located: Object.keys(recapDriver.state.paths).length,
         recaps: Object.keys(recaps).length
       },
       overrides: { key: agentListKey, sortOverridden: sortOverridden, loaded: overridesLoaded,
@@ -976,7 +768,7 @@ Item {
         needed: repoNeeded,
         cwds: Object.keys(repos).length,
         inRepo: Object.keys(repos).filter(function(cwd) { return !!repos[cwd] }).length,
-        running: Object.keys(repoInFlight).length
+        running: Object.keys(repoDriver.state.inFlight).length
       },
       cards: sortedAgents.map(function(agent) {
         return CardModel.summary(CardModel.build(agent, primaryModule, cardFacts(agentListKey), nowSeconds))
@@ -988,12 +780,47 @@ Item {
     id: herdr
     socketPath: root.herdrSocketPath
     treeWanted: root.workspaceListKey !== ""
-    onTargetFocused: if (root.pendingFocusMode === "window") root.focusHostWindow()
+    onTargetFocused: if (root.pendingFocusMode === "window") hostFocus.focus()
   }
 
   CommandRunner {
-    id: commands
+    id: commandRunner
   }
+
+  HostWindowFocus {
+    id: hostFocus
+    commands: commandRunner
+    socketPath: root.herdrSocketPath
+    home: root.home
+  }
+
+  // The pipelines (ADR 0003): each is a pure step in lib/, run by a driver.
+  PipelineDriver {
+    id: recapDriver
+    machine: ({ initial: function() { return RecapModel.initial(root.home) }, step: RecapModel.step })
+    commands: commandRunner
+    agents: root.agents
+    active: root.recapNeeded
+    intervalMs: 5000
+  }
+
+  PipelineDriver {
+    id: repoDriver
+    machine: RepoModel
+    commands: commandRunner
+    agents: root.agents
+    active: root.repoNeeded
+    intervalMs: 5000
+  }
+
+  PipelineDriver {
+    id: detectDriver
+    machine: DetectPolicy
+    commands: commandRunner
+    active: true
+    intervalMs: DetectPolicy.RETRY_MS
+  }
+  onDetectionChanged: logDetection()
 
   MotionClock {
     id: motionClockObject
@@ -1001,7 +828,7 @@ Item {
 
   OmarchyUsageSource {
     id: usageSource
-    runner: commands
+    runner: commandRunner
     dir: root.usageDir
     active: root.deckUsageModules.length > 0
     refreshSeconds: root.usageRefreshSeconds
@@ -1087,23 +914,6 @@ Item {
   onAgentsChanged: applyAgents()
   onWorkspaceTreeChanged: treeExpanded = WorkspaceTreeModel.pruneExpanded(treeExpanded, workspaceTree)
 
-  Timer {
-    id: pollTimer
-    interval: 5000
-    repeat: true
-    triggeredOnStart: true
-    running: root.recapNeeded && root.agents.length > 0
-    onTriggered: root.pollRecaps()
-  }
-
-  Timer {
-    interval: 5000
-    repeat: true
-    triggeredOnStart: true
-    running: root.repoNeeded && root.agents.length > 0
-    onTriggered: root.pollRepos()
-  }
-
   onCacheTimersChanged: resort()
 
   FileView {
@@ -1160,7 +970,7 @@ Item {
   Component.onCompleted: {
     log("service up, displays [" + displayEntries.join(", ") + "]")
     herdr.start()
-    refreshDetection()
+    detectDriver.feed({ type: "refresh" })
   }
 
   Component {
@@ -1197,27 +1007,15 @@ Item {
     watchChanges: true
     printErrors: false
     onFileChanged: reload()
-    onLoaded: {
-      root.detectBindings = DetectPolicy.touchBindings(text())
-      root.applyDetection()
-    }
-    onLoadFailed: {
-      root.detectBindings = []
-      root.applyDetection()
-    }
+    onLoaded: detectDriver.feed({ type: "bindings", bindings: DetectPolicy.touchBindings(text()) })
+    onLoadFailed: detectDriver.feed({ type: "bindings", bindings: [] })
   }
 
   // A hotplug: read the outputs again once they have settled.
   Timer {
-    id: detectRetry
-    interval: 2000
-    onTriggered: root.refreshDetection()
-  }
-
-  Timer {
     id: detectSettle
     interval: 500
-    onTriggered: root.refreshDetection()
+    onTriggered: detectDriver.feed({ type: "refresh" })
   }
 
   Connections {

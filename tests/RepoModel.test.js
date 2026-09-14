@@ -96,3 +96,54 @@ test("a compact location line joins the Repo and workspace \u203a tab", () => {
   assert.equal(Repo.withLocation("~/notes", ""), "~/notes")
   assert.equal(Repo.withLocation(null, undefined), "")
 })
+
+// step: the Repo pipeline, driven by a script of events.
+
+function plain(value) {
+  return JSON.parse(JSON.stringify(value))
+}
+
+function git(cwd) {
+  return ["git", "-C", cwd, "rev-parse", "--show-toplevel", "--abbrev-ref", "HEAD"]
+}
+
+test("step: Agents arriving ask git once per distinct cwd", () => {
+  const out = Repo.step(Repo.initial(), { type: "agents", agents: [{ cwd: "/a" }, { cwd: "/b" }, { cwd: "/a" }] }, 1000)
+  assert.deepEqual(plain(out.commands), [{ id: "repo:/a", argv: git("/a") }, { id: "repo:/b", argv: git("/b") }])
+})
+
+test("step: replies in any order publish each cwd's Repo; an answer that shows the same keeps the state", () => {
+  const agents = [{ cwd: "/home/test/code/gjetr" }, { cwd: "/home/test/notes" }]
+  let out = Repo.step(Repo.initial(), { type: "agents", agents }, 1000)
+  out = Repo.step(out.state, { type: "reply", id: "repo:/home/test/notes", text: "", code: 128 }, 1200)
+  assert.deepEqual(plain(out.state.repos), { "/home/test/notes": null })
+  assert.deepEqual(plain(out.commands), [])
+  out = Repo.step(out.state, { type: "reply", id: "repo:/home/test/code/gjetr", text: "/home/test/code/gjetr\nmain\n", code: 0 }, 1300)
+  assert.equal(out.state.repos["/home/test/code/gjetr"].branch, "main")
+  assert.deepEqual(plain(out.state.inFlight), {})
+  const repos = out.state.repos
+
+  // 30 s on, both are asked again; the same answers change nothing a binding reads.
+  out = Repo.step(out.state, { type: "tick" }, 31300)
+  assert.deepEqual(plain(out.commands.map(c => c.id)), ["repo:/home/test/code/gjetr", "repo:/home/test/notes"])
+  out = Repo.step(out.state, { type: "reply", id: "repo:/home/test/code/gjetr", text: "/home/test/code/gjetr\nmain\n", code: 0 }, 31400)
+  out = Repo.step(out.state, { type: "reply", id: "repo:/home/test/notes", text: "", code: 128 }, 31500)
+  assert.equal(out.state.repos, repos)
+  // A reply nobody is waiting for is dropped.
+  const settled = out.state
+  assert.equal(Repo.step(settled, { type: "reply", id: "repo:/home/test/notes", text: "/home/test/notes\nx\n", code: 0 }, 31600).state, settled)
+})
+
+test("step: an Agent leaving drops its cwd's Repo; Agents unchanged keep everything", () => {
+  let out = Repo.step(Repo.initial(), { type: "agents", agents: [{ cwd: "/a" }, { cwd: "/b" }] }, 1000)
+  out = Repo.step(out.state, { type: "reply", id: "repo:/a", text: "/a\nmain\n", code: 0 }, 1100)
+  out = Repo.step(out.state, { type: "reply", id: "repo:/b", text: "/b\ndev\n", code: 0 }, 1100)
+  const both = out.state
+  // The same Agents again (herdr republishing, or Offline keeping the last ones).
+  out = Repo.step(both, { type: "agents", agents: [{ cwd: "/a" }, { cwd: "/b" }] }, 2000)
+  assert.equal(out.state.repos, both.repos)
+  assert.deepEqual(plain(out.commands), [])
+  out = Repo.step(out.state, { type: "agents", agents: [{ cwd: "/a" }] }, 3000)
+  assert.deepEqual(Object.keys(out.state.repos), ["/a"])
+  assert.deepEqual(Object.keys(out.state.checked), ["/a"])
+})

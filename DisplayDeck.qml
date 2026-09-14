@@ -8,6 +8,7 @@ import "lib/DeckPolicy.js" as DeckPolicy
 import "lib/DockPolicy.js" as DockPolicy
 import "lib/LayoutPolicy.js" as LayoutPolicy
 import "lib/CommandPolicy.js" as CommandPolicy
+import "lib/LatestPolicy.js" as LatestPolicy
 
 // One Display and its Deck: the Layouts it offers, the active one, its
 // surface (a full-output surface, or a Dock along one edge), runtime rotation
@@ -92,7 +93,8 @@ Item {
 
   // Runtime rotation of a rotatable surface (never monitors.lua). Docks never
   // rotate.
-  property int rotationSequence: 0
+  // Only the newest apply may act on its monitor read (LatestPolicy).
+  property var rotationGuard: ({ sequence: 0 })
   property var rotationStatus: ({ requests: 0, transform: -1, error: "" })
   property var touch: ({ transform: -1, devices: [], error: "" })
   property int touchLogged: -1
@@ -146,12 +148,14 @@ Item {
   function applyOrientation() {
     if (!service || isDock || !display.rotatable || !service.overridesLoaded || !present) return
     if (activeOrientation !== "portrait" && activeOrientation !== "landscape") return
-    var sequence = ++rotationSequence
+    var started = LatestPolicy.start(rotationGuard)
+    rotationGuard = started.guard
+    var token = started.token
     var output = name
     var orientation = activeOrientation
     var layoutName = activeLayoutName
     service.runCommand(CommandPolicy.MONITORS, function(text, code) {
-      if (sequence !== rotationSequence) return
+      if (!LatestPolicy.accepts(rotationGuard, token)) return
       var monitor = code === 0 ? DeckPolicy.parseMonitor(text, output) : null
       if (!monitor) {
         rotationStatus = { requests: rotationStatus.requests, transform: -1, error: "output " + output + " not in hyprctl monitors" }
