@@ -130,6 +130,87 @@ test("fileOutcome says what installing a file does: created, unchanged, or repla
   assert.equal(Preset.fileOutcome("gjetr.toml", "", "a\n", 1).action, "created")
 })
 
+const DIR = "/home/test/.config/gjetr"
+
+test("installPlan writes a file that is not there yet, and nothing else", () => {
+  const files = [{ relative: "layouts/panel.toml", path: DIR + "/layouts/panel.toml", text: "a\nb\n" }]
+  const plan = Preset.installPlan(DIR, files, { [DIR + "/layouts/panel.toml"]: null }, 1789400000)
+  assert.deepEqual(plain(plan.writes), [{ path: DIR + "/layouts/panel.toml", text: "a\nb\n", kind: "file", relative: "layouts/panel.toml" }])
+  assert.deepEqual(plan.outcomes.map(o => o.action), ["created"])
+  assert.deepEqual(Array.from(plan.summaryLines), ["layouts/panel.toml: created (2 lines)"])
+})
+
+test("installPlan leaves an identical file alone", () => {
+  const files = [{ relative: "gjetr.toml", path: DIR + "/gjetr.toml", text: "a\n" }]
+  const plan = Preset.installPlan(DIR, files, { [DIR + "/gjetr.toml"]: "a\n" }, 1789400000)
+  assert.deepEqual(plain(plan.writes), [])
+  assert.deepEqual(Array.from(plan.summaryLines), ["gjetr.toml: unchanged"])
+})
+
+test("installPlan backs up a file it replaces before writing it", () => {
+  const files = [{ relative: "gjetr.toml", path: DIR + "/gjetr.toml", text: "a\nnew\n" }]
+  const plan = Preset.installPlan(DIR, files, { [DIR + "/gjetr.toml"]: "a\nold\n" }, 1789400000)
+  assert.deepEqual(plain(plan.writes), [
+    { path: DIR + "/gjetr.toml.bak.1789400000", text: "a\nold\n", kind: "backup", relative: "gjetr.toml" },
+    { path: DIR + "/gjetr.toml", text: "a\nnew\n", kind: "file", relative: "gjetr.toml" }
+  ])
+  assert.deepEqual(Array.from(plan.summaryLines), ["gjetr.toml: replaced (+1 -1), yours kept as gjetr.toml.bak.1789400000"])
+})
+
+test("installPlan refuses a file outside what installing may write, writing nothing for it", () => {
+  const files = [
+    { relative: "gjetr.toml", path: "/etc/gjetr.toml", text: "a\n" },
+    { relative: "layouts/../x.toml", path: DIR + "/layouts/../x.toml", text: "b\n" }
+  ]
+  const plan = Preset.installPlan(DIR, files, {}, 1789400000)
+  assert.deepEqual(plain(plan.writes), [])
+  assert.deepEqual(plan.outcomes.map(o => o.action), ["refused", "refused"])
+  assert.deepEqual(Array.from(plan.summaryLines), ["gjetr.toml: refused", "layouts/../x.toml: refused"])
+})
+
+test("installPlan plans a mixed set of files in order, each file's writes together", () => {
+  const files = [
+    { relative: "gjetr.toml", path: DIR + "/gjetr.toml", text: "main\nnew\n" },
+    { relative: "layouts/panel.toml", path: DIR + "/layouts/panel.toml", text: "panel\n" },
+    { relative: "layouts/sidebar.toml", path: DIR + "/layouts/sidebar.toml", text: "sidebar\nx\ny\n" },
+    { relative: "layouts/usage.toml", path: DIR + "/layouts/usage.toml", text: "usage\n" }
+  ]
+  const current = { [DIR + "/gjetr.toml"]: "main\n", [DIR + "/layouts/panel.toml"]: "panel\n", [DIR + "/layouts/sidebar.toml"]: null }
+  const plan = Preset.installPlan(DIR + "/", files, current, 42)
+  assert.deepEqual(plain(plan.writes).map(w => w.kind + " " + w.path + " " + JSON.stringify(w.text)), [
+    `backup ${DIR}/gjetr.toml.bak.42 "main\\n"`,
+    `file ${DIR}/gjetr.toml "main\\nnew\\n"`,
+    `file ${DIR}/layouts/sidebar.toml "sidebar\\nx\\ny\\n"`,
+    `file ${DIR}/layouts/usage.toml "usage\\n"`
+  ])
+  assert.deepEqual(Array.from(plan.summaryLines), [
+    "gjetr.toml: replaced (+1 -0), yours kept as gjetr.toml.bak.42",
+    "layouts/panel.toml: unchanged",
+    "layouts/sidebar.toml: created (3 lines)",
+    "layouts/usage.toml: created (1 line)"
+  ])
+  assert.deepEqual(plan.outcomes.map(o => o.relative), files.map(f => f.relative))
+  assert.equal(Preset.installSummary("panel", DIR, plan.outcomes, []).split("\n").length, 5)
+})
+
+test("failedOutcome says a file was not installed, keeping the backup a failed write leaves", () => {
+  const replaced = Preset.fileOutcome("gjetr.toml", "a\n", "b\n", 7)
+  const created = Preset.fileOutcome("layouts/panel.toml", null, "x\n", 7)
+  assert.deepEqual(plain(Preset.failedOutcome(replaced, "backup")), { relative: "gjetr.toml", action: "failed", backup: "",
+    added: 0, removed: 0, line: "gjetr.toml: not replaced, its backup could not be written" })
+  assert.equal(Preset.failedOutcome(replaced, "file").line, "gjetr.toml: could not be written (backup gjetr.toml.bak.7 kept)")
+  assert.equal(Preset.failedOutcome(replaced, "file").backup, "gjetr.toml.bak.7")
+  assert.equal(Preset.failedOutcome(created, "file").line, "layouts/panel.toml: could not be written")
+})
+
+test("installPlan plans no writes for a file whose backup it may not write", () => {
+  const files = [{ relative: "gjetr.toml", path: DIR + "/gjetr.toml", text: "b\n" }]
+  // An epoch past what a backup name holds.
+  const plan = Preset.installPlan(DIR, files, { [DIR + "/gjetr.toml"]: "a\n" }, 1e13)
+  assert.deepEqual(plain(plan.writes), [])
+  assert.deepEqual(Array.from(plan.summaryLines), ["gjetr.toml: not replaced, its backup could not be written"])
+})
+
 test("installSummary reports each file and the output names left to set", () => {
   const outcomes = [Preset.fileOutcome("gjetr.toml", "a\n", "b\n", 7), Preset.fileOutcome("layouts/panel.toml", null, "x\n", 7)]
   assert.equal(Preset.installSummary("panel", "/c/gjetr/", outcomes, ["touchscreen"]), [

@@ -31,7 +31,8 @@ All notable changes to gjetr. The format follows
   `hl.device` rules in `~/.config/hypr/input.lua`, as Hyprland does not report
   it), else the `sidebar` preset as a shown Dock on the focused monitor. It
   detects again after a hotplug or an `input.lua` change and keeps the outputs
-  it chose while they are connected. `state` → `config.source` and `detect`.
+  it chose while they are connected. `state` → `config.source` (`file`,
+  `preset`, or `none` when nothing is detected) and `detect`.
 - `installConfig <preset>` installs a preset into the Config directory, as
   `omarchy refresh config` does: `gjetr.toml` and the Layouts its Decks name,
   with the detected outputs filled in. A file it would change is first kept as

@@ -58,7 +58,9 @@ valid `[[display]]` uses the detected Displays too.
 omarchy-shell nytafar.gjetr state | jq '.config.source, .detect'
 ```
 
-`config.source` is `preset` without a `gjetr.toml` and `file` with one;
+`config.source` is `file` with a `gjetr.toml`, `preset` without one, and
+`none` when there is no `gjetr.toml` and no preset was detected (gjetr's
+defaults);
 `detect` names the preset, the touchscreen and monitor, and a `reason` such as
 `touchscreen wch.cn-usb2iic_ctp_control is bound to HDMI-A-2`.
 

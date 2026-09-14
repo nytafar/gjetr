@@ -22,6 +22,7 @@ import "lib/ThemeModel.js" as ThemeModel
 import "lib/UsageModel.js" as UsageModel
 import "lib/DetectPolicy.js" as DetectPolicy
 import "lib/PresetModel.js" as PresetModel
+import "lib/ConfigSource.js" as ConfigSource
 import "sources"
 import "components"
 
@@ -52,11 +53,6 @@ Item {
   readonly property string shippedDir: decodeURIComponent(String(Qt.resolvedUrl("presets")).replace(/^file:\/\//, ""))
   property var layoutUserTexts: ({})
   property var layoutShippedTexts: ({})
-  readonly property var layoutRead: ConfigModel.overlayLayouts(deckNames, layoutUserTexts, layoutShippedTexts)
-  readonly property var layoutTexts: layoutRead.texts
-  // Whether gjetr.toml or a Layout of the Decks is not in the Config (yet).
-  readonly property bool configIncomplete: mainText === null
-    || Object.keys(layoutRead.sources).some(function(name) { return layoutRead.sources[name] !== "config" })
   // Without a gjetr.toml, gjetr shows the preset DetectPolicy picks for this
   // machine, its outputs filled in (PresetModel); its Displays also stand in
   // for a gjetr.toml that names none. Monitors and touch devices are read on
@@ -65,15 +61,14 @@ Item {
   property var presetTexts: ({})
   readonly property string hyprInputPath: home + "/.config/hypr/input.lua"
   readonly property var detection: detectDriver.state.detection
-  readonly property var presetRender: detection.preset !== "" && typeof presetTexts[detection.preset] === "string"
-    ? PresetModel.render(presetTexts[detection.preset], { touchscreen: detection.touchscreen, monitor: detection.monitor }) : null
-  readonly property var presetRead: presetRender ? ConfigModel.readMain(presetRender.text, home) : null
-  readonly property var detectedDisplays: presetRead ? DetectPolicy.detectedConfig(presetRead.config).displays : []
-  readonly property bool configFromPreset: mainText === null
-  readonly property var mainRead: !configFromPreset ? ConfigModel.readMain(mainText, home, detectedDisplays)
-    : presetRead ? { config: DetectPolicy.detectedConfig(presetRead.config), errors: presetRead.errors }
-    : ConfigModel.readMain(null, home)
-  readonly property var config: mainRead.config
+  // The Config in effect, where it came from and where each Layout came from
+  // (ConfigSource.resolve), from the texts above.
+  readonly property var resolved: ConfigSource.resolve({ mainText: mainText, layoutUserTexts: layoutUserTexts,
+    layoutShippedTexts: layoutShippedTexts, presetTexts: presetTexts, detection: detection, home: home })
+  readonly property var config: resolved.config
+  readonly property var layoutTexts: resolved.layoutTexts
+  // Whether gjetr.toml or a Layout of the Decks is not in the Config (yet).
+  readonly property bool configIncomplete: resolved.incomplete
   readonly property var deckNames: ConfigModel.deckLayoutNames(config)
 
   // Displays: one DisplayDeck per [[display]], keyed "<kind>:<output>" (an
@@ -181,7 +176,7 @@ Item {
   // Session state, never written: the expanded workspaces and tabs of each
   // Workspace List (WorkspaceTreeModel expansion state), pruned as they go away.
   property var treeExpanded: WorkspaceTreeModel.emptyExpanded()
-  readonly property var configErrors: collectConfigErrors(mainRead, layoutTexts, deckNames)
+  readonly property var configErrors: collectConfigErrors(resolved, layoutTexts, deckNames)
   readonly property string configSummary: decks.map(function(deck) { return deck.summary }).join("; ")
 
   // Overrides, from ~/.local/state/gjetr/state.json. This service is the file's
@@ -605,29 +600,24 @@ Item {
       var text = readInstallFile(ConfigModel.layoutPath(shippedDir, names[i]))
       if (typeof text === "string" && text !== "") layouts[names[i]] = text
     }
-    var base = configDir.replace(/\/+$/, "")
-    var epoch = Math.floor(Date.now() / 1000)
-    var outcomes = []
     var files = PresetModel.installFiles(configDir, rendered.text, layouts)
+    var current = {}
     for (var f = 0; f < files.length; f++) {
-      var file = files[f]
-      if (!PresetModel.isInstallPath(configDir, file.path)) {
-        outcomes.push({ line: file.relative + ": refused" })
-        continue
+      if (PresetModel.isInstallPath(configDir, files[f].path)) current[files[f].path] = readInstallFile(files[f].path)
+    }
+    var plan = PresetModel.installPlan(configDir, files, current, Math.floor(Date.now() / 1000))
+    // The writes in order. A file's first failed write skips the rest of that
+    // file: a failed backup leaves it unreplaced, a failed write keeps the backup.
+    var outcomes = plan.outcomes.slice()
+    var failed = {}
+    for (var w = 0; w < plan.writes.length; w++) {
+      var write = plan.writes[w]
+      if (failed[write.relative]) continue
+      if (PresetModel.isInstallPath(configDir, write.path) && writeInstallFile(write.path, write.text)) continue
+      failed[write.relative] = true
+      for (var o = 0; o < outcomes.length; o++) {
+        if (outcomes[o].relative === write.relative) outcomes[o] = PresetModel.failedOutcome(outcomes[o], write.kind)
       }
-      var before = readInstallFile(file.path)
-      var outcome = PresetModel.fileOutcome(file.relative, before, file.text, epoch)
-      if (outcome.action === "replaced") {
-        var backupPath = base + "/" + outcome.backup
-        if (!PresetModel.isInstallPath(configDir, backupPath) || !writeInstallFile(backupPath, before)) {
-          outcomes.push({ line: file.relative + ": not replaced, its backup could not be written" })
-          continue
-        }
-      }
-      if (outcome.action !== "unchanged" && !writeInstallFile(file.path, file.text)) {
-        outcome = { line: file.relative + ": could not be written" + (outcome.backup !== "" ? " (backup " + outcome.backup + " kept)" : "") }
-      }
-      outcomes.push(outcome)
     }
     var summary = PresetModel.installSummary(preset, configDir, outcomes, rendered.missing)
     log(summary.replace(/\n\s*/g, "; "))
@@ -643,7 +633,7 @@ Item {
     if (mainText === null) mainFile.reload()
     var views = userLayoutFiles.instances
     for (var i = 0; i < views.length; i++) {
-      if (views[i] && layoutRead.sources[views[i].modelData] !== "config") views[i].reload()
+      if (views[i] && resolved.sources[views[i].modelData] !== "config") views[i].reload()
     }
   }
 
@@ -709,8 +699,8 @@ Item {
       focusOverridden: focusOverridden,
       windowFocus: hostFocus.result,
       commands: { started: commandRunner.started, refused: commandRunner.refused, lastError: commandRunner.lastError },
-      config: { dir: configDir, source: configFromPreset ? "preset" : "file", preset: configFromPreset ? detection.preset : "",
-        summary: configSummary, errors: configErrors, defaults: config.defaults, layouts: layoutRead.sources },
+      config: { dir: configDir, source: resolved.source, preset: resolved.preset,
+        summary: configSummary, errors: configErrors, defaults: config.defaults, layouts: resolved.sources },
       detect: { ready: detection.ready, preset: detection.preset, touchscreen: detection.touchscreen, monitor: detection.monitor,
         device: detection.device, reason: detection.reason,
         monitors: (detectDriver.state.monitors || []).map(function(monitor) { return monitor.name }),
