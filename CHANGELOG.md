@@ -57,6 +57,8 @@ All notable changes to gjetr. The format follows
   Sort mode changes or an Agent arrives or leaves, as it already did when a
   Card above it grew. The Agent List and the Workspace List now share
   `components/KeyedList.qml` for this.
+- A new Claude session's Recap is found as soon as its Agent appears, instead
+  of at the next 5 s check.
 
 ### Fixed
 
