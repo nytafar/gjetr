@@ -5,8 +5,6 @@ import QtQuick.Window
 import qs.Commons
 import "../../lib/CardPolicy.js" as CardPolicy
 import "../../lib/DensityPolicy.js" as DensityPolicy
-import "../../lib/LayoutPolicy.js" as LayoutPolicy
-import "../../lib/ListSyncPolicy.js" as ListSyncPolicy
 import "../../lib/StatusPolicy.js" as StatusPolicy
 import "../../lib/IndicatorPolicy.js" as IndicatorPolicy
 import "../../lib/MotionPolicy.js" as MotionPolicy
@@ -63,46 +61,14 @@ Item {
   readonly property int statusSize: compact ? density.statusWidth : 24
   readonly property int iconSize: compact ? density.iconPx : 24
 
-  // Rows are keyed by node in a ListModel updated in place, so a snapshot or
-  // an expansion keeps every row, its pulse and the scroll position. Each row
-  // finds its data in rowByKey and its place in rowIndex.
-  property var rowByKey: ({})
-  property var rowIndex: ({})
-  property var rowOrder: []
-
-  function syncRows() {
-    var map = {}
-    var index = {}
-    var keys = []
-    for (var i = 0; i < rows.length; i++) {
-      map[rows[i].key] = rows[i]
-      index[rows[i].key] = i
-      keys.push(rows[i].key)
-    }
-    var before = rowOrder
-    var y = list.contentY
-    var current = []
-    for (var j = 0; j < rowModel.count; j++) current.push(rowModel.get(j).nodeKey)
-    rowByKey = map
-    rowIndex = index
-    var steps = ListSyncPolicy.syncSteps(current, keys)
-    for (var k = 0; k < steps.length; k++) {
-      var step = steps[k]
-      if (step.op === "remove") rowModel.remove(step.index, 1)
-      else if (step.op === "move") rowModel.move(step.from, step.to, 1)
-      else rowModel.insert(step.index, { nodeKey: step.key })
-    }
-    rowOrder = keys
-    // The row at the top of the view stays where it is on screen.
-    if (!list.moving && y > 0)
-      list.contentY = LayoutPolicy.clampScroll(LayoutPolicy.keepRowScroll(before, keys, pitch, y), keys.length * pitch, list.height)
-  }
-
-  onRowsChanged: syncRows()
-  Component.onCompleted: syncRows()
-
-  ListModel {
-    id: rowModel
+  // Rows keyed by node (a row's `key`) and updated in place, so a snapshot or
+  // an expansion keeps every row, its pulse and the row at the top of the view.
+  KeyedList {
+    id: keyed
+    items: root.rows
+    keyOf: "key"
+    view: list
+    pitch: root.pitch
   }
 
   Item {
@@ -193,20 +159,21 @@ Item {
     }
     clip: true
     contentWidth: width
-    contentHeight: root.rowOrder.length * root.pitch
+    contentHeight: keyed.order.length * root.pitch
     flickableDirection: Flickable.VerticalFlick
     boundsBehavior: Flickable.StopAtBounds
     // The last known tree stays visible while Offline, greyed out.
     opacity: root.online ? 1 : 0.4
 
     Repeater {
-      model: rowModel
+      model: keyed.model
 
       delegate: Item {
         id: rowItem
-        required property string nodeKey
+        // The row's node key.
+        required property string key
 
-        readonly property var row: root.rowByKey[nodeKey] || null
+        readonly property var row: keyed.byKey[key] || null
         readonly property bool parentRow: !!row && row.expandable
         // In focus mode a parent row keeps a separate chevron area to expand it.
         readonly property bool chevronZone: root.tapMode === "focus" && parentRow
@@ -221,7 +188,7 @@ Item {
         readonly property bool onScreen: root.windowShown && y + height > list.contentY && y < list.contentY + list.height
 
         x: depth * root.indent
-        y: (root.rowIndex[nodeKey] !== undefined ? root.rowIndex[nodeKey] : 0) * root.pitch
+        y: (keyed.index[key] !== undefined ? keyed.index[key] : 0) * root.pitch
         width: list.width - (root.compact ? 0 : root.gap) - x
         height: root.rowHeight
         visible: row !== null

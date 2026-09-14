@@ -52,6 +52,10 @@ All notable changes to gjetr. The format follows
   Dock as herdr's sidebar on a 4K monitor, the panel in landscape and portrait,
   the Workspace List and Usage), a section on using a Dock in place of herdr's
   sidebar with its Config and keybinding, and a gallery.
+- A scrolled Agent List keeps the Card at the top of its view in place when its
+  Sort mode changes or an Agent arrives or leaves, as it already did when a
+  Card above it grew. The Agent List and the Workspace List now share
+  `components/KeyedList.qml` for this.
 
 ### Fixed
 

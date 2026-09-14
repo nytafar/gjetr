@@ -7,7 +7,6 @@ import "../../lib/CardPolicy.js" as CardPolicy
 import "../../lib/CardModel.js" as CardModel
 import "../../lib/DensityPolicy.js" as DensityPolicy
 import "../../lib/LayoutPolicy.js" as LayoutPolicy
-import "../../lib/ListSyncPolicy.js" as ListSyncPolicy
 import "../../components"
 
 // The Agent List Module: every Agent as a Card, in this Module's Sort mode.
@@ -54,26 +53,21 @@ Item {
   // "overlay"), or null.
   readonly property string recapPane: service && moduleState && moduleState.recapOpen === "overlay"
     && service.recapOverlay.key === moduleKey ? service.recapOverlay.pane : ""
-  readonly property var recapAgent: recapPane !== "" ? (agentByPane[recapPane] || null) : null
+  readonly property var recapAgent: recapPane !== "" ? (keyed.byKey[recapPane] || null) : null
   readonly property var recapCard: recapAgent && service
     ? CardModel.build(recapAgent, moduleState, facts, service.nowSeconds) : CardModel.EMPTY
 
   readonly property var agents: service ? (service.sortedByMode[sortMode] || []) : []
-  // Cards are keyed by pane id in a ListModel that is updated in place, so a
-  // new snapshot or a re-sort keeps every Card, its pulse and the scroll
-  // position. Each Card finds its Agent in agentByPane.
-  property var agentByPane: ({})
   // Cards may differ in height (a Recap open in its Card), so they are placed
-  // by LayoutPolicy.cardPlacement from the model's order and each Card's
+  // by LayoutPolicy.cardPlacement from the keyed order and each Card's
   // measured height, rather than by a uniform grid.
-  property var cardOrder: []
   property var cardHeights: ({})
   // The height of a Card before it is measured. Each Card's own base height
   // adds room for an inline Recap only when its Agent has one.
   readonly property int baseCardHeight: full ? DensityPolicy.fullCardHeight(density, false)
     : compact ? DensityPolicy.rowHeight(density, false) : CardPolicy.cardHeight(preset)
   readonly property int cellWidth: Math.floor(grid.width / columns)
-  readonly property var placement: LayoutPolicy.cardPlacement(cardOrder, cardHeights, columns, baseCardHeight,
+  readonly property var placement: LayoutPolicy.cardPlacement(keyed.order, cardHeights, columns, baseCardHeight,
     compact ? density.rowGap : gap)
   readonly property bool online: !!service && service.herdrOnline
   readonly property bool offline: !!service && service.herdrOffline
@@ -89,51 +83,37 @@ Item {
   // A narrow list (a Dock) shows its header toggles as bare values.
   readonly property bool compactHeader: CardPolicy.compactHeader(width)
 
-  function syncCards() {
-    var map = {}
-    var keys = []
-    for (var i = 0; i < agents.length; i++) {
-      map[agents[i].paneId] = agents[i]
-      keys.push(agents[i].paneId)
-    }
-    var current = []
-    for (var j = 0; j < cardModel.count; j++) current.push(cardModel.get(j).paneId)
-    agentByPane = map
-    var steps = ListSyncPolicy.syncSteps(current, keys)
-    for (var k = 0; k < steps.length; k++) {
-      var step = steps[k]
-      if (step.op === "remove") cardModel.remove(step.index, 1)
-      else if (step.op === "move") cardModel.move(step.from, step.to, 1)
-      else cardModel.insert(step.index, { paneId: step.key })
-    }
+  // Forgets the heights of Cards whose Agent left.
+  function pruneCardHeights() {
     var heights = {}
-    for (var h = 0; h < keys.length; h++) {
-      if (Object.prototype.hasOwnProperty.call(cardHeights, keys[h])) heights[keys[h]] = cardHeights[keys[h]]
+    for (var i = 0; i < keyed.order.length; i++) {
+      var key = keyed.order[i]
+      if (Object.prototype.hasOwnProperty.call(cardHeights, key)) heights[key] = cardHeights[key]
     }
     cardHeights = heights
-    cardOrder = keys
   }
 
-  // A Card reports its height. When one changes without a re-sort, the Card at
-  // the top of the view keeps its place, so an open Recap above it never
-  // shifts what is on screen.
+  // A Card reports its height. The Card at the top of the view keeps its
+  // place, so an open Recap above it never shifts what is on screen.
   function setCardHeight(paneId, height) {
     if (cardHeights[paneId] === height) return
-    var before = placement
-    var next = {}
-    for (var key in cardHeights) next[key] = cardHeights[key]
-    next[paneId] = height
-    cardHeights = next
-    if (grid.moving || grid.contentY <= 0) return
-    grid.contentY = LayoutPolicy.clampScroll(LayoutPolicy.keepScroll(before, placement, cardOrder, grid.contentY),
-      placement.contentHeight, grid.height)
+    keyed.holdScroll(function() {
+      var next = {}
+      for (var key in root.cardHeights) next[key] = root.cardHeights[key]
+      next[paneId] = height
+      root.cardHeights = next
+    })
   }
 
-  onAgentsChanged: syncCards()
-  Component.onCompleted: syncCards()
-
-  ListModel {
-    id: cardModel
+  // Cards keyed by pane id and updated in place, so a new snapshot or a
+  // re-sort keeps every Card, its pulse and the Card at the top of the view.
+  KeyedList {
+    id: keyed
+    items: root.agents
+    keyOf: "paneId"
+    view: grid
+    placement: root.placement
+    onOrderChanged: root.pruneCardHeights()
   }
 
   Item {
@@ -251,16 +231,17 @@ Item {
     }
 
     Repeater {
-      model: cardModel
+      model: keyed.model
 
       // A Card (comfortable) or a row (compact) per Agent, placed by the list
       // and reporting its height back to it.
       delegate: Item {
         id: cell
-        required property string paneId
+        // The Agent's pane id.
+        required property string key
 
-        readonly property var place: root.placement.positions[paneId] || null
-        readonly property var agent: root.agentByPane[paneId] || null
+        readonly property var place: root.placement.positions[key] || null
+        readonly property var agent: keyed.byKey[key] || null
         // Every Field this Agent's Card draws, resolved once.
         readonly property var card: root.service
           ? CardModel.build(agent, root.moduleState, root.facts, root.service.nowSeconds) : CardModel.EMPTY
@@ -272,15 +253,15 @@ Item {
         }
 
         function toggleRecap() {
-          if (root.service) root.service.toggleRecap(paneId, root.moduleKey)
+          if (root.service) root.service.toggleRecap(key, root.moduleKey)
         }
 
         x: place ? place.column * root.cellWidth : 0
         y: place ? place.y : 0
         width: root.cellWidth - (root.compact && root.columns === 1 ? 0 : root.gap)
         height: loader.item ? loader.item.implicitHeight : root.baseCardHeight
-        onHeightChanged: root.setCardHeight(paneId, height)
-        Component.onCompleted: root.setCardHeight(paneId, height)
+        onHeightChanged: root.setCardHeight(key, height)
+        Component.onCompleted: root.setCardHeight(key, height)
 
         Loader {
           id: loader
