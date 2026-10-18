@@ -176,7 +176,11 @@ Item {
   // Session state, never written: the expanded workspaces and tabs of each
   // Workspace List (WorkspaceTreeModel expansion state), pruned as they go away.
   property var treeExpanded: WorkspaceTreeModel.emptyExpanded()
-  readonly property var configErrors: collectConfigErrors(resolved, layoutTexts, deckNames)
+  // Layout errors count only once a file has answered (ConfigSource), so a
+  // Layout still loading is not reported as missing.
+  readonly property var configErrors: resolved.errors.concat(resolved.layoutErrors)
+  // The errors logged so far, so a changed list logs only the new ones.
+  property var loggedConfigErrors: []
   readonly property string configSummary: decks.map(function(deck) { return deck.summary }).join("; ")
 
   // Overrides, from ~/.local/state/gjetr/state.json. This service is the file's
@@ -273,17 +277,6 @@ Item {
 
   function log(message) {
     console.info("[gjetr] " + message)
-  }
-
-  // Layout errors count only once a file has answered, so a Layout still
-  // loading is not reported as missing.
-  function collectConfigErrors(read, texts, names) {
-    var errors = read.errors.slice()
-    for (var i = 0; i < names.length; i++) {
-      if (texts[names[i]] === undefined) continue
-      errors = errors.concat(ConfigModel.readLayout(names[i], texts[names[i]], read.config.defaults).errors)
-    }
-    return errors
   }
 
   // A Layout whose file has not answered yet counts as `any`, so it is not
@@ -391,6 +384,15 @@ Item {
     for (var key in current) next[key] = current[key]
     next[name] = text
     root[which] = next
+  }
+
+  // A Layout file's FileView answered (ConfigModel.answeredText): null only
+  // when the file is not there; a failed read keeps what was read before.
+  function answerLayoutText(which, name, answer) {
+    var current = root[which]
+    var previous = Object.prototype.hasOwnProperty.call(current, name) ? current[name] : undefined
+    var text = ConfigModel.answeredText(previous, answer)
+    if (text !== undefined) setLayoutText(which, name, text)
   }
 
   function applyOverridesText(text) {
@@ -833,7 +835,9 @@ Item {
   onUsageShownChanged: if (usageShown) usageNowMs = Date.now()
 
   onConfigErrorsChanged: {
-    for (var i = 0; i < configErrors.length; i++) log("config: " + configErrors[i])
+    var fresh = ConfigModel.newErrors(loggedConfigErrors, configErrors)
+    for (var i = 0; i < fresh.length; i++) log("config: " + fresh[i])
+    loggedConfigErrors = configErrors
   }
   onConfigSummaryChanged: log("config " + configSummary)
 
@@ -851,8 +855,9 @@ Item {
     blockLoading: true
     printErrors: false
     onFileChanged: reload()
-    onLoaded: root.mainText = text()
-    onLoadFailed: root.mainText = null
+    onLoaded: root.mainText = ConfigModel.answeredText(root.mainText, { loaded: true, text: text() })
+    onLoadFailed: error => root.mainText = ConfigModel.answeredText(root.mainText,
+      { loaded: false, notFound: error === FileViewError.FileNotFound })
   }
 
   Variants {
@@ -867,8 +872,9 @@ Item {
       blockLoading: true
       printErrors: false
       onFileChanged: reload()
-      onLoaded: root.setLayoutText("layoutUserTexts", modelData, text())
-      onLoadFailed: root.setLayoutText("layoutUserTexts", modelData, null)
+      onLoaded: root.answerLayoutText("layoutUserTexts", modelData, { loaded: true, text: text() })
+      onLoadFailed: error => root.answerLayoutText("layoutUserTexts", modelData,
+        { loaded: false, notFound: error === FileViewError.FileNotFound })
     }
   }
 
@@ -884,8 +890,9 @@ Item {
       blockLoading: true
       printErrors: false
       onFileChanged: reload()
-      onLoaded: root.setLayoutText("layoutShippedTexts", modelData, text())
-      onLoadFailed: root.setLayoutText("layoutShippedTexts", modelData, null)
+      onLoaded: root.answerLayoutText("layoutShippedTexts", modelData, { loaded: true, text: text() })
+      onLoadFailed: error => root.answerLayoutText("layoutShippedTexts", modelData,
+        { loaded: false, notFound: error === FileViewError.FileNotFound })
     }
   }
 

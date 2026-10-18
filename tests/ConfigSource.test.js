@@ -127,3 +127,66 @@ test("resolve returns the same object for the same texts, so bindings on it do n
     assert.notEqual(Source.resolve(input()), changed, JSON.stringify(change))
   }
 })
+
+function presetLayout(name) {
+  return fs.readFileSync(path.join(PRESETS_DIR, "layouts", name + ".toml"), "utf8")
+}
+
+test("resolve reports a Layout's errors only once its files have answered", () => {
+  const main = '[[display]]\nname = "DP-3"\ndeck = ["cache", "sidebar", "gone", "broken", "waiting"]\n'
+  const resolved = Source.resolve({ mainText: main, presetTexts: {}, detection: detection({}), home: HOME,
+    layoutUserTexts: { cache: '[[module]]\ntype = "agent-list"\n', sidebar: null, gone: null, broken: "= nope" },
+    layoutShippedTexts: { sidebar: presetLayout("sidebar"), gone: null, waiting: null } })
+  assert.deepEqual(resolved.sources,
+    { cache: "config", sidebar: "shipped", gone: "missing", broken: "config", waiting: "loading" })
+  const errors = Array.from(resolved.layoutErrors)
+  assert.equal(errors.length, 2, errors.join("\n"))
+  assert.match(errors[0], /^layouts\/gone\.toml: not found in the Config or among gjetr's Layouts/)
+  assert.match(errors[1], /^layouts\/broken\.toml:/)
+})
+
+// The shell start of #6: Layouts that exist are read while the shipped ones
+// answer, and are read again (a file watch, the retry timer). None of them is
+// reported missing, or drawn as the default Agent List, at any step.
+test("a Layout that exists is never reported missing while its files are read or read again", () => {
+  const ConfigModel = loadLib("lib/ConfigModel.js")
+  const main = '[[display]]\nname = "DP-3"\ndeck = ["cache", "agents"]\n'
+  const cache = '[[module]]\ntype = "agent-list"\nsort = "cache"\n'
+  const agents = '[[module]]\ntype = "agent-list"\n'
+  const user = {}
+  const shipped = {}
+  function answer(texts, name, outcome) {
+    const previous = Object.prototype.hasOwnProperty.call(texts, name) ? texts[name] : undefined
+    const text = ConfigModel.answeredText(previous, outcome)
+    if (text !== undefined) texts[name] = text
+  }
+  function step() {
+    const resolved = Source.resolve({ mainText: main, presetTexts: {}, detection: detection({}), home: HOME,
+      layoutUserTexts: Object.assign({}, user), layoutShippedTexts: Object.assign({}, shipped) })
+    for (const name of ["cache", "agents"]) assert.notEqual(resolved.sources[name], "missing", name)
+    assert.deepEqual(Array.from(resolved.layoutErrors), [])
+    return resolved
+  }
+  step()
+  // gjetr ships no cache Layout; its agents one answers first.
+  answer(shipped, "cache", { loaded: false, notFound: true })
+  answer(shipped, "agents", { loaded: true, text: presetLayout("agents") })
+  assert.deepEqual(step().sources, { cache: "loading", agents: "loading" })
+  // A read of the Config's file fails without saying it is not there.
+  answer(user, "cache", { loaded: false, notFound: false })
+  assert.equal(step().sources.cache, "loading")
+  answer(user, "cache", { loaded: true, text: cache })
+  answer(user, "agents", { loaded: true, text: agents })
+  assert.deepEqual(step().sources, { cache: "config", agents: "config" })
+  // Read again: a failed read keeps the text, so the Layout keeps its Modules.
+  answer(user, "cache", { loaded: false, notFound: false })
+  const again = step()
+  assert.equal(again.sources.cache, "config")
+  assert.equal(again.layoutTexts.cache, cache)
+  // Only a file really not there is missing, once the shipped one is not there either.
+  answer(user, "cache", { loaded: false, notFound: true })
+  const gone = Source.resolve({ mainText: main, presetTexts: {}, detection: detection({}), home: HOME,
+    layoutUserTexts: Object.assign({}, user), layoutShippedTexts: Object.assign({}, shipped) })
+  assert.equal(gone.sources.cache, "missing")
+  assert.match(Array.from(gone.layoutErrors).join("\n"), /layouts\/cache\.toml: not found/)
+})

@@ -64,6 +64,12 @@ All notable changes to gjetr. The format follows
 
 - A Config created while gjetr runs, in a directory that did not exist when
   gjetr started, applies within 5 seconds instead of after a shell restart.
+- A Layout in the Config is no longer logged as not found, or drawn as the
+  default Agent List, while the shell starts. Only a file that is not there
+  counts as missing: a read that fails for another reason keeps the text read
+  before, and leaves a Layout not read yet loading. A Layout's errors come from
+  the same resolved texts as the rest of the Config, and each error is logged
+  once when it appears instead of the whole list on every change.
 
 ## [0.2.0] - 2026-09-13
 
