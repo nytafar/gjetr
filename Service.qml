@@ -64,7 +64,8 @@ Item {
   // The Config in effect, where it came from and where each Layout came from
   // (ConfigSource.resolve), from the texts above.
   readonly property var resolved: ConfigSource.resolve({ mainText: mainText, layoutUserTexts: layoutUserTexts,
-    layoutShippedTexts: layoutShippedTexts, presetTexts: presetTexts, detection: detection, home: home })
+    layoutShippedTexts: layoutShippedTexts, presetTexts: presetTexts, detection: detection,
+    monitors: detectDriver.state.monitors, home: home })
   readonly property var config: resolved.config
   readonly property var layoutTexts: resolved.layoutTexts
   // Whether gjetr.toml or a Layout of the Decks is not in the Config (yet).
@@ -323,7 +324,7 @@ Item {
   // per Display. `output` names the Dock; "" is the first Dock.
   // -> "shown", "hidden", or why nothing happened.
   function dockAction(action, output) {
-    var target = DockPolicy.dockTarget(config.displays, output)
+    var target = DockPolicy.dockTarget(config.displays, output, detectDriver.state.monitors)
     if (target.error !== "") return target.error
     var deck = deckNamed(target.name)
     if (!deck) return "no dock " + target.name
@@ -1081,7 +1082,8 @@ Item {
     }
 
     // Shows, hides or toggles a Dock, kept as an Override. `output` names it,
-    // "" is the first Dock. Prints "shown", "hidden" or why nothing happened.
+    // by port or as desc:<description>; "" is the first Dock. Prints "shown",
+    // "hidden" or why nothing happened.
     function toggleDock(output: string): string {
       return root.dockAction("toggle", output)
     }

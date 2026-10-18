@@ -233,6 +233,7 @@ Item {
     var surface = activeSurface
     var out = {
       name: name,
+      match: display.match || name,
       kind: display.kind,
       present: present,
       shown: shown,
