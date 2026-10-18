@@ -673,6 +673,7 @@ Item {
       displayPresent: !!primary && primary.present,
       surface: primary ? primary.surface : null,
       displays: decks.map(function(deck) { return deck.describe() }),
+      warnings: decks.map(function(deck) { return deck.coverWarning }).filter(function(text) { return text !== "" }),
       bar: { position: barPosition, size: barSize, hidden: barHidden, inset: barInset },
       herdr: {
         socket: herdr.socketPath,

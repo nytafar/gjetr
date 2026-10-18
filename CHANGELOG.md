@@ -62,6 +62,13 @@ All notable changes to gjetr. The format follows
 
 ### Fixed
 
+- A window covering a surface is reported instead of looking healthy. After
+  window and workspace events (debounced) and every 10 seconds, gjetr reads
+  `hyprctl -j monitors` and `hyprctl -j clients` and finds the mapped, shown
+  windows on the output's active or open special workspace, or pinned there,
+  that overlap it. `state` → `surface.covered`, `surface.cover.windows` and
+  `warnings` say which; it is logged when cover starts and stops. Docks are
+  not checked: windows tile beside them.
 - A Config created while gjetr runs, in a directory that did not exist when
   gjetr started, applies within 5 seconds instead of after a shell restart.
 

@@ -9,6 +9,7 @@ import "lib/DockPolicy.js" as DockPolicy
 import "lib/LayoutPolicy.js" as LayoutPolicy
 import "lib/CommandPolicy.js" as CommandPolicy
 import "lib/LatestPolicy.js" as LatestPolicy
+import "lib/CoverPolicy.js" as CoverPolicy
 
 // One Display and its Deck: the Layouts it offers, the active one, its
 // surface (a full-output surface, or a Dock along one edge), runtime rotation
@@ -98,6 +99,12 @@ Item {
   property var rotationStatus: ({ requests: 0, transform: -1, error: "" })
   property var touch: ({ transform: -1, devices: [], error: "" })
   property int touchLogged: -1
+  // Whether a window covers this surface (CoverPolicy), checked after window
+  // and workspace events and on a slow timer. Docks are not checked.
+  readonly property bool coverChecked: valid && !isDock && present && !!activeSurface
+  property var coverGuard: ({ sequence: 0 })
+  property var cover: CoverPolicy.initial()
+  readonly property string coverWarning: coverChecked ? CoverPolicy.warning(name, cover) : ""
 
   function log(message) {
     if (service) service.log(message)
@@ -199,6 +206,28 @@ Item {
     touchLogged = transform
   }
 
+  // Reads monitors and clients and keeps what covers this surface. Only the
+  // newest check may apply its replies.
+  function checkCover() {
+    if (!service || !coverChecked) return
+    var started = LatestPolicy.start(coverGuard)
+    coverGuard = started.guard
+    var token = started.token
+    var output = name
+    service.runCommand(CommandPolicy.MONITORS, function(monitorsText, monitorsCode) {
+      if (!LatestPolicy.accepts(coverGuard, token)) return
+      service.runCommand(CommandPolicy.CLIENTS, function(clientsText, clientsCode) {
+        if (!LatestPolicy.accepts(coverGuard, token)) return
+        var next = CoverPolicy.check(monitorsCode === 0 ? monitorsText : "", clientsCode === 0 ? clientsText : "", output)
+        if (CoverPolicy.same(cover, next)) return
+        var warning = CoverPolicy.warning(output, next)
+        if (warning !== "") log(warning)
+        else if (cover.covered === true && next.covered === false) log("surface " + output + " no longer covered")
+        cover = next
+      })
+    })
+  }
+
   // This Display for `state`.
   function describe() {
     var surface = activeSurface
@@ -211,6 +240,8 @@ Item {
         width: surface.width,
         height: surface.height,
         mapped: surface.visible,
+        covered: isDock ? null : cover.covered,
+        cover: isDock ? null : cover,
         layer: surface.layerName,
         exclusiveZone: surface.reservedSize,
         content: surface.contentRect
@@ -272,7 +303,32 @@ Item {
     target: Hyprland
     function onRawEvent(event) {
       if (event && event.name === "configreloaded") reloadTimer.restart()
+      if (event && root.coverChecked && CoverPolicy.triggers(event.name)) coverTimer.restart()
     }
+  }
+
+  onCoverCheckedChanged: {
+    if (coverChecked) coverTimer.restart()
+    else {
+      // A check still in flight must not report a surface that is gone.
+      coverGuard = LatestPolicy.start(coverGuard).guard
+      cover = CoverPolicy.initial()
+    }
+  }
+
+  // Coalesces a burst of window events into one cover check.
+  Timer {
+    id: coverTimer
+    interval: 250
+    onTriggered: root.checkCover()
+  }
+
+  // A floating window dragged or resized sends no event.
+  Timer {
+    interval: 10000
+    repeat: true
+    running: root.coverChecked
+    onTriggered: root.checkCover()
   }
 
   Timer {

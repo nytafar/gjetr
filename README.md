@@ -265,6 +265,7 @@ omarchy-shell nytafar.gjetr state | jq
 | Symptom | Check |
 |---|---|
 | Nothing on the display | `state` → `displayPresent`. The name in `[[display]]` must match `hyprctl monitors` exactly. Without a Config, `state` → `detect.reason` says what gjetr found |
+| A window over the display | `state` → `warnings` and `surface.cover.windows` name it. A surface is below windows; keep that output's workspace empty |
 | "herdr offline, retrying" | Is herdr running? `state` → `herdr.socket` must be the socket `herdr status server` reports |
 | "untested herdr ..." under the header | herdr speaks an API protocol gjetr is not tested with (it supports 0.8.2 and 0.9.0). It keeps working; `state` → `herdr.protocolMismatch` and `herdr.unsupported` say what differs |
 | Config seems ignored | `state` → `config.errors` names the file, line and key that fell back to a default |

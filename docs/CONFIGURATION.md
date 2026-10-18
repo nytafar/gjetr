@@ -154,6 +154,14 @@ background = "#c0000000"
 
 A surface sits on the Bottom layer, so ordinary windows cover it and the
 Omarchy bar stays on top. Content steps out of the bar's strip on its own.
+Keep windows off its output, for example with a workspace of its own there.
+gjetr checks after every window and workspace event, and every 10 seconds,
+whether a window shows on the output: mapped, not a hidden group tab, on the
+output's active or open special workspace (or pinned there), and overlapping
+it. `state` → `displays[].surface.covered` is `true` then (`null` before the
+first check or for a Dock), `surface.cover.windows` lists the windows (address,
+title, class, workspace, floating, fullscreen) and `warnings` says
+`surface <output> is covered by <class>`. It is logged when it starts and stops.
 
 ### `[defaults]`
 
@@ -832,7 +840,7 @@ omarchy-shell nytafar.gjetr <function> [argument]
 
 | Function | Does |
 |---|---|
-| `state` | JSON: `displays` (every Display: kind, edge, size, shown, surface with layer and exclusive zone, Deck, Modules), `detect` (what gjetr found for [Without a Config](#without-a-config)). The rest describes the primary Display, the first surface: Display, bar inset, herdr connection (with the server's `version` and `protocol`, the `supported` set, `protocolMismatch`, `pingError` and `unsupported`), Config source, summary, errors and where each Layout came from, the active Layout's `modules` (key, type, weight, pin, rectangle), `workspaces` (Focused workspace, expansion and rows of the first Workspace List), Deck, Overrides, Attention, Recap, every Card (with its `name`, `kind`, `kindLabel` and `kindMark`: the SVG file or the letter drawn). `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
+| `state` | JSON: `displays` (every Display: kind, edge, size, shown, surface with layer, exclusive zone and the windows covering it, Deck, Modules), `warnings` (each surface a window covers), `detect` (what gjetr found for [Without a Config](#without-a-config)). The rest describes the primary Display, the first surface: Display, bar inset, herdr connection (with the server's `version` and `protocol`, the `supported` set, `protocolMismatch`, `pingError` and `unsupported`), Config source, summary, errors and where each Layout came from, the active Layout's `modules` (key, type, weight, pin, rectangle), `workspaces` (Focused workspace, expansion and rows of the first Workspace List), Deck, Overrides, Attention, Recap, every Card (with its `name`, `kind`, `kindLabel` and `kindMark`: the SVG file or the letter drawn). `sortMode`, `focusMode`, `recap` and `cards` describe the first Agent List |
 | `reconnect` | Drop and reopen the herdr connection |
 | `focus <pane-id>` | Focus an Agent's pane, as a tap on a touch surface does, with the first Agent List's Focus behaviour |
 | `pointerFocus <pane-id>` | The same, as a mouse click on a Dock does: with Focus behaviour `window`, the pointer goes back where it was once the window is focused. `state` → `windowFocus.cursor` says `restored x,y` or why not |
