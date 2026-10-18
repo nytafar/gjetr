@@ -80,6 +80,14 @@ All notable changes to gjetr. The format follows
   not checked: windows tile beside them.
 - A Config created while gjetr runs, in a directory that did not exist when
   gjetr started, applies within 5 seconds instead of after a shell restart.
+- Text reads on a light Omarchy theme. gjetr draws on its Display background
+  (black by default), not the theme's, so a light theme's dark foreground and
+  muted were dark on black. Text now keeps the theme's colour only when it
+  contrasts enough with the Display background (4.5:1 for text, 3:1 for
+  secondary text), else it is a light neutral; the accent, urgent, green and
+  `hue` colours are lightened until they reach 3:1. It is relative to the
+  actual background, so a light `background` gets dark text. `state` →
+  `theme.readable` shows the colours in use.
 
 ## [0.2.0] - 2026-09-13
 

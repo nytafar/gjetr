@@ -20,6 +20,8 @@ Item {
   id: root
 
   property var service: null
+  // The colours that read on the Display background (Tone, the service's colors).
+  readonly property QtObject colors: Tone.colorsOf(service)
   // <layout>#<index>: this Module's settings, Overrides and expansion.
   property string moduleKey: ""
   // "pointer" on a Dock, "touch" on a surface: with the Module's size it picks
@@ -84,7 +86,7 @@ Item {
       }
       elide: Text.ElideRight
       text: root.workspaceCount === 1 ? "1 workspace" : root.workspaceCount + " workspaces"
-      color: Color.foreground
+      color: root.colors.foreground
       font.family: Style.font.family
       font.pixelSize: root.density.titlePx
       font.bold: true
@@ -95,7 +97,7 @@ Item {
       id: tapLabel
       anchors { right: focusToggle.left; rightMargin: root.headerPad; verticalCenter: parent.verticalCenter }
       text: CardPolicy.headerCaption("tap", root.tapMode, CardPolicy.compactHeader(root.width))
-      color: Color.muted
+      color: root.colors.muted
       font.family: Style.font.family
       font.pixelSize: root.density.bodyPx
     }
@@ -105,20 +107,20 @@ Item {
       id: focusToggle
       anchors { top: parent.top; bottom: parent.bottom; right: parent.right }
       width: Math.max(root.density.headerHeight, focusLabel.implicitWidth + root.headerPad * 2)
-      color: focusTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent) : "transparent"
+      color: focusTap.pressed ? Style.pressedFillFor(root.colors.foreground, root.colors.accent) : "transparent"
 
       Rectangle {
         anchors { left: parent.left; verticalCenter: parent.verticalCenter }
         width: 1
         height: parent.height / 2
-        color: Util.alpha(Color.foreground, 0.12)
+        color: Util.alpha(root.colors.foreground, 0.12)
       }
 
       Text {
         id: focusLabel
         anchors.centerIn: parent
         text: CardPolicy.headerCaption("focus", root.focusMode, CardPolicy.compactHeader(root.width))
-        color: root.moduleState && root.moduleState.focusOverridden ? Color.accent : Color.muted
+        color: root.moduleState && root.moduleState.focusOverridden ? root.colors.accent : root.colors.muted
         font.family: Style.font.family
         font.pixelSize: root.density.bodyPx
       }
@@ -132,7 +134,7 @@ Item {
     Rectangle {
       anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
       height: 1
-      color: Util.alpha(Color.foreground, 0.12)
+      color: Util.alpha(root.colors.foreground, 0.12)
     }
   }
 
@@ -146,7 +148,7 @@ Item {
     elide: Text.ElideRight
     text: !root.online ? (root.offline ? "herdr offline, retrying" : "connecting to herdr")
       : (root.service ? root.service.herdrMismatchCue : "")
-    color: Color.muted
+    color: root.colors.muted
     font.family: Style.font.family
     font.pixelSize: Math.round(Style.font.body * root.textScale)
   }
@@ -181,8 +183,8 @@ Item {
         // Status as glyph, tone and motion (StatusPolicy), the same as on a Card;
         // rows show the glyph without the word.
         readonly property var indicator: StatusPolicy.indicator(row ? row.status : "")
-        readonly property color statusColor: Tone.color(indicator.tone, root.service ? root.service.successColor : undefined)
-        readonly property color attentionColor: row && row.attention === "blocked" ? Color.urgent : Color.accent
+        readonly property color statusColor: Tone.color(indicator.tone, root.colors)
+        readonly property color attentionColor: row && row.attention === "blocked" ? root.colors.urgent : root.colors.accent
         readonly property string iconUrl: row && row.kind !== "" && root.service ? root.service.kindIconUrl(row.kind) : ""
         readonly property var mark: IndicatorPolicy.markFor(row ? row.status : "", row ? row.attention : "", root.workingEffect)
         readonly property bool onScreen: root.windowShown && y + height > list.contentY && y < list.contentY + list.height
@@ -196,15 +198,15 @@ Item {
         Rectangle {
           anchors.fill: parent
           radius: Style.cornerRadius
-          color: rowTap.pressed || chevronTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent)
-            : rowItem.row && rowItem.row.focused ? Style.selectedFillFor(Color.foreground, Color.accent)
-            : root.compact && rowHover.hovered ? Util.alpha(Color.foreground, 0.06)
-            : rowItem.depth === 0 && !root.compact ? Style.normalFillFor(Color.foreground, Color.accent)
+          color: rowTap.pressed || chevronTap.pressed ? Style.pressedFillFor(root.colors.foreground, root.colors.accent)
+            : rowItem.row && rowItem.row.focused ? Style.selectedFillFor(root.colors.foreground, root.colors.accent)
+            : root.compact && rowHover.hovered ? Util.alpha(root.colors.foreground, 0.06)
+            : rowItem.depth === 0 && !root.compact ? Style.normalFillFor(root.colors.foreground, root.colors.accent)
             : "transparent"
           // Compact rows have no box: selection and hover are fills only.
           border.width: root.compact ? 0 : 1
-          border.color: rowItem.row && rowItem.row.focused ? Util.alpha(Color.accent, rowItem.depth === 0 ? 0.8 : 0.4)
-            : Util.alpha(Color.foreground, rowItem.depth === 0 ? 0.1 : 0.06)
+          border.color: rowItem.row && rowItem.row.focused ? Util.alpha(root.colors.accent, rowItem.depth === 0 ? 0.8 : 0.4)
+            : Util.alpha(root.colors.foreground, rowItem.depth === 0 ? 0.1 : 0.06)
         }
 
         HoverHandler {
@@ -274,7 +276,8 @@ Item {
           frameRadius: Math.min(Style.cornerRadius, 4)
           stateful: IndicatorPolicy.marksState(root.indicatorMode)
           mark: rowItem.mark
-          toneColor: Tone.color(rowItem.mark.tone, root.service ? root.service.successColor : undefined)
+          plainColor: root.colors.muted
+          toneColor: Tone.color(rowItem.mark.tone, root.colors)
           palette: root.service ? root.service.indicatorPalette : []
           animate: rowItem.onScreen
           clock: root.service ? root.service.motionClock : null
@@ -288,7 +291,7 @@ Item {
           }
           text: rowItem.row ? rowItem.row.label : ""
           textFormat: Text.PlainText
-          color: Color.foreground
+          color: root.colors.foreground
           opacity: rowItem.indicator.textOpacity
           elide: Text.ElideRight
           maximumLineCount: 1
@@ -306,7 +309,7 @@ Item {
             verticalCenter: parent.verticalCenter
           }
           text: rowItem.row ? rowItem.row.detail : ""
-          color: Color.muted
+          color: root.colors.muted
           font.family: Style.font.family
           font.pixelSize: root.compact ? root.density.detailPx : Math.round(Style.font.body * root.textScale)
         }
@@ -333,13 +336,13 @@ Item {
             anchors { left: parent.left; verticalCenter: parent.verticalCenter }
             width: 1
             height: parent.height / 2
-            color: Util.alpha(Color.foreground, 0.12)
+            color: Util.alpha(root.colors.foreground, 0.12)
           }
 
           Text {
             anchors.centerIn: parent
             text: rowItem.row && rowItem.row.expanded ? "▾" : "▸"
-            color: rowItem.chevronZone ? Color.accent : Color.muted
+            color: rowItem.chevronZone ? root.colors.accent : root.colors.muted
             font.family: Style.font.family
             font.pixelSize: root.compact ? root.density.namePx : Math.round(Style.font.title * root.textScale)
           }
@@ -358,7 +361,7 @@ Item {
     anchors.centerIn: list
     visible: root.online && root.rows.length === 0
     text: "No workspaces"
-    color: Color.muted
+    color: root.colors.muted
     font.family: Style.font.family
     font.pixelSize: root.density.titlePx
   }

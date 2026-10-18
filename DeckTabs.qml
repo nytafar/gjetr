@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.Commons
+import "components"
 import "lib/CardPolicy.js" as CardPolicy
 
 // The Deck's tab bar on one short edge. Renders only: Layout names, the active
@@ -14,6 +15,8 @@ Item {
   property string active: ""
   property var badges: []
   property real textScale: 1.25
+  // The colours that read on the Display background (the service's colors).
+  property QtObject colors: Tone.fallback
 
   signal selected(string name)
 
@@ -24,7 +27,7 @@ Item {
 
   // Divider on the content side.
   Rectangle {
-    color: Util.alpha(Color.foreground, 0.12)
+    color: Util.alpha(root.colors.foreground, 0.12)
     x: root.edge === "left" ? root.width - 1 : 0
     y: root.edge === "top" ? root.height - 1 : 0
     width: root.vertical ? 1 : root.width
@@ -50,14 +53,14 @@ Item {
 
         Rectangle {
           anchors.fill: parent
-          color: tabTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent)
-            : tab.current ? Style.selectedFillFor(Color.foreground, Color.accent) : "transparent"
+          color: tabTap.pressed ? Style.pressedFillFor(root.colors.foreground, root.colors.accent)
+            : tab.current ? Style.selectedFillFor(root.colors.foreground, root.colors.accent) : "transparent"
         }
 
         // Active marker on the content side.
         Rectangle {
           visible: tab.current
-          color: Color.accent
+          color: root.colors.accent
           x: root.edge === "left" ? parent.width - width : 0
           y: root.edge === "top" ? parent.height - height : 0
           width: root.vertical ? 3 : parent.width
@@ -72,7 +75,7 @@ Item {
           horizontalAlignment: Text.AlignHCenter
           elide: Text.ElideRight
           text: tab.modelData
-          color: tab.current ? Color.foreground : Color.muted
+          color: tab.current ? root.colors.foreground : root.colors.muted
           font.family: Style.font.family
           font.pixelSize: Math.round(Style.font.body * root.textScale)
           font.bold: tab.current
@@ -84,14 +87,14 @@ Item {
           width: Math.max(22, badgeText.implicitWidth + 10)
           height: 22
           radius: 11
-          color: Color.urgent
+          color: root.colors.urgent
           anchors { top: parent.top; right: parent.right; margins: 6 }
 
           Text {
             id: badgeText
             anchors.centerIn: parent
             text: tab.badge > 99 ? "99+" : String(tab.badge)
-            color: Color.background
+            color: root.colors.background
             font.family: Style.font.family
             font.pixelSize: Math.round(Style.font.caption * root.textScale)
             font.bold: true

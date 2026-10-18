@@ -39,9 +39,9 @@ Item {
   readonly property bool recapShown: card.recap.shown
   readonly property var cacheTimer: fields.cache ? card.cache : null
   readonly property string iconUrl: fields.kind && service && card.kind !== "" ? service.kindIconUrl(card.kind) : ""
-  readonly property var successColor: service ? service.successColor : undefined
-  readonly property color statusColor: Tone.color(card.indicator.tone, successColor)
-  readonly property color attentionColor: Tone.color(card.attentionTone, successColor)
+  readonly property QtObject colors: Tone.colorsOf(service)
+  readonly property color statusColor: Tone.color(card.indicator.tone, colors)
+  readonly property color attentionColor: Tone.color(card.attentionTone, colors)
   readonly property int radius: Math.min(Style.cornerRadius, 6)
   // Where the text starts, right of the glyph column.
   readonly property int textX: t.pad + (fields.status || fields.kind ? t.statusWidth + t.gap : 0)
@@ -58,11 +58,11 @@ Item {
   Rectangle {
     anchors.fill: parent
     radius: root.radius
-    color: headTap.pressed || recapTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent)
-      : root.focused ? Style.selectedFillFor(Color.foreground, Color.accent)
-      : hover.hovered ? Util.alpha(Color.foreground, 0.08)
-      : root.card.highlighted ? Util.alpha(Color.accent, 0.07)
-      : Util.alpha(Color.foreground, 0.035)
+    color: headTap.pressed || recapTap.pressed ? Style.pressedFillFor(root.colors.foreground, root.colors.accent)
+      : root.focused ? Style.selectedFillFor(root.colors.foreground, root.colors.accent)
+      : hover.hovered ? Util.alpha(root.colors.foreground, 0.08)
+      : root.card.highlighted ? Util.alpha(root.colors.accent, 0.07)
+      : Util.alpha(root.colors.foreground, 0.035)
   }
 
   HoverHandler {
@@ -77,7 +77,7 @@ Item {
     anchors { left: parent.left; top: parent.top; bottom: parent.bottom; topMargin: root.radius; bottomMargin: root.radius }
     width: 3
     radius: 1.5
-    color: Color.accent
+    color: root.colors.accent
   }
 
   // Attention: a tint and a bar in the status colour, breathing.
@@ -173,7 +173,8 @@ Item {
     plainOpacity: 0.85
     stateful: root.card.marksState
     mark: root.card.mark
-    toneColor: Tone.color(root.card.mark.tone, root.successColor)
+    plainColor: root.colors.muted
+    toneColor: Tone.color(root.card.mark.tone, root.colors)
     palette: root.palette
     animate: root.animate && root.visible
     clock: root.service ? root.service.motionClock : null
@@ -187,7 +188,7 @@ Item {
     visible: root.fields.name
     text: root.card.name
     textFormat: Text.PlainText
-    color: Color.foreground
+    color: root.colors.foreground
     opacity: root.indicator.textOpacity
     font.family: Style.font.family
     font.pixelSize: root.t.namePx
@@ -218,7 +219,7 @@ Item {
     visible: text !== "" && room > root.t.metaPx * 3
     text: root.card.repo.text
     textFormat: Text.PlainText
-    color: Color.muted
+    color: root.colors.muted
     font.family: Style.font.family
     font.pixelSize: root.t.metaPx
     elide: Text.ElideMiddle
@@ -233,7 +234,7 @@ Item {
     visible: root.fields.location && text !== "" && root.metaRight - startX >= implicitWidth
     text: root.card.location
     textFormat: Text.PlainText
-    color: Color.muted
+    color: root.colors.muted
     opacity: 0.6
     font.family: Style.font.family
     font.pixelSize: root.t.metaPx
@@ -254,7 +255,7 @@ Item {
       anchors { right: parent.right; verticalCenter: undefined }
       y: Math.round((root.t.lineHeight - height) / 2)
       text: root.cacheTimer ? root.cacheTimer.label : ""
-      color: Tone.color(root.card.cacheTone, root.successColor)
+      color: Tone.color(root.card.cacheTone, root.colors)
       font.family: Style.font.family
       font.pixelSize: root.t.cachePx
       font.weight: root.cacheTimer && root.cacheTimer.level === "critical" ? Font.Bold : Font.Medium
@@ -268,13 +269,13 @@ Item {
       width: root.t.cacheBarWidth
       height: root.t.cacheBarHeight
       radius: height / 2
-      color: Util.alpha(Color.foreground, 0.12)
+      color: Util.alpha(root.colors.foreground, 0.12)
 
       Rectangle {
         anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
         width: root.cacheTimer ? Math.round(parent.width * root.cacheTimer.fraction) : 0
         radius: parent.radius
-        color: Tone.color(root.card.cacheBarTone, root.successColor)
+        color: Tone.color(root.card.cacheBarTone, root.colors)
         Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
       }
     }
@@ -286,7 +287,7 @@ Item {
     x: root.width - root.t.pad - implicitWidth
     anchors.verticalCenter: metaLine.verticalCenter
     text: "cold"
-    color: Color.muted
+    color: root.colors.muted
     opacity: 0.7
     font.family: Style.font.family
     font.pixelSize: root.t.metaPx
@@ -322,7 +323,7 @@ Item {
     elide: Text.ElideRight
     lineHeightMode: Text.FixedHeight
     lineHeight: root.t.recapLineHeight
-    color: Color.foreground
+    color: root.colors.foreground
     opacity: 0.6 * root.indicator.textOpacity
     font.family: Style.font.family
     font.pixelSize: root.t.recapPx
@@ -338,12 +339,12 @@ Item {
     width: Math.max(0, root.width - root.t.pad + Math.round(root.t.gap / 2) - x)
     height: visible ? recapBody.implicitHeight + root.t.gap * 1.5 + closeHint.implicitHeight : 0
     radius: Math.min(Style.cornerRadius, 4)
-    color: Util.alpha(Color.accent, 0.1)
+    color: Util.alpha(root.colors.accent, 0.1)
 
     Rectangle {
       anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
       width: 2
-      color: Color.accent
+      color: root.colors.accent
     }
 
     Text {
@@ -352,7 +353,7 @@ Item {
       text: root.recapShown ? root.card.recap.text : ""
       textFormat: Text.PlainText
       wrapMode: Text.Wrap
-      color: Color.foreground
+      color: root.colors.foreground
       font.family: Style.font.family
       font.pixelSize: root.t.recapPx + 1
       lineHeight: 1.25
@@ -362,7 +363,7 @@ Item {
       id: closeHint
       anchors { right: parent.right; top: recapBody.bottom; rightMargin: root.t.gap; topMargin: root.t.gap / 2 }
       text: "▴ close"
-      color: Color.accent
+      color: root.colors.accent
       opacity: 0.8
       font.family: Style.font.family
       font.pixelSize: root.t.captionPx
