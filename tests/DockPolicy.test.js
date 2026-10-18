@@ -85,6 +85,28 @@ test("dockTarget names a dock by output, or the first dock without one", () => {
   assert.deepEqual(plain(Dock.dockTarget(DISPLAYS, undefined)), { name: "DP-1", error: "" })
 })
 
+test("dockTarget names a dock by its monitor's description, as the Config or as a port", () => {
+  const displays = [
+    { name: "HDMI-A-2", match: "HDMI-A-2", kind: "surface" },
+    { name: "DP-3", match: "desc:JRP JRP7006H 0", kind: "dock" },
+    { name: "DP-2", match: "DP-2", kind: "dock" }
+  ]
+  const monitors = [
+    { name: "HDMI-A-2", description: "Dell Inc. DELL U2720Q 8FDSM13" },
+    { name: "DP-3", description: "JRP JRP7006H 0" },
+    { name: "DP-2", description: "BOE 0x0BCA" }
+  ]
+  // The Config's name, without monitors, and the port it resolved to.
+  assert.deepEqual(plain(Dock.dockTarget(displays, "desc:JRP JRP7006H 0")), { name: "DP-3", error: "" })
+  assert.deepEqual(plain(Dock.dockTarget(displays, "  desc: JRP JRP7006H 0 ")), { name: "DP-3", error: "" })
+  assert.deepEqual(plain(Dock.dockTarget(displays, "DP-3")), { name: "DP-3", error: "" })
+  // A description a Display configured by port has, exactly or by prefix.
+  assert.deepEqual(plain(Dock.dockTarget(displays, "desc:BOE 0x0BCA", monitors)), { name: "DP-2", error: "" })
+  assert.deepEqual(plain(Dock.dockTarget(displays, "desc:BOE", monitors)), { name: "DP-2", error: "" })
+  assert.deepEqual(plain(Dock.dockTarget(displays, "desc:Dell Inc.", monitors)), { name: "", error: "desc:Dell Inc. is not a dock" })
+  assert.deepEqual(plain(Dock.dockTarget(displays, "desc:LG", monitors)), { name: "", error: "no dock desc:LG" })
+})
+
 test("dockTarget refuses a surface, an unknown output and a Config without docks", () => {
   assert.deepEqual(plain(Dock.dockTarget(DISPLAYS, "HDMI-A-2")), { name: "", error: "HDMI-A-2 is not a dock" })
   assert.deepEqual(plain(Dock.dockTarget(DISPLAYS, "DP-9")), { name: "", error: "no dock DP-9" })

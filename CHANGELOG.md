@@ -8,6 +8,15 @@ All notable changes to gjetr. The format follows
 
 ### Added
 
+- A Display can be named by its monitor's description, as Hyprland's monitor
+  rules do: `name = "desc:JRP JRP7006H 0"` in a `[[display]]`, and
+  `toggleDock "desc:JRP JRP7006H 0"` (also `showDock`, `hideDock`). The
+  description is the one `hyprctl monitors -j` reports, from the monitor's
+  EDID, so a Display and its key binding follow the monitor when its cable
+  moves to another port. It matches exactly first, then as a prefix, as
+  Hyprland does, and is looked up again after every hotplug; while nothing
+  matches, the Display is not drawn. `state` → `displays[].match` is the name
+  from the Config, `displays[].name` the port it is on.
 - Pinned Usage: `pin = "end"` on a Usage `[[module]]` puts it after the other
   Modules, flush against the end of its Layout. Stacked, it is exactly as tall
   as its content (at most half the height, scrolling beyond) and follows it as

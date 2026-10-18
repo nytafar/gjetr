@@ -541,6 +541,17 @@ test("a second display on the same output is skipped", () => {
   assert.match(read.errors.join("\n"), /display\[1\]\.name: "DP-1" is already a Display; display skipped/)
 })
 
+test("a display may be named by its monitor's description", () => {
+  const read = Config.readMain('[[display]]\nname = "desc: JRP JRP7006H 0 "\n\n[[display]]\nname = "desc:"\n\n'
+    + '[[display]]\nname = "desc:a\\nb"\n\n[[display]]\nname = "JRP JRP7006H 0"\n', HOME)
+  assert.deepEqual(read.config.displays.map((d) => d.name), ["desc:JRP JRP7006H 0"])
+  const text = read.errors.join("\n")
+  for (const index of [1, 2, 3]) {
+    assert.match(text, new RegExp("display\\[" + index + "\\]\\.name: expected an output name such as HDMI-A-2 or a monitor "
+      + "description such as \"desc:JRP JRP7006H 0\", got .*; display skipped"))
+  }
+})
+
 test("displayNamed finds a Display by output", () => {
   const read = Config.readMain('[[display]]\nname = "HDMI-A-2"\n\n[[display]]\nkind = "dock"\nname = "DP-1"\nedge = "left"\n', HOME)
   assert.equal(Config.displayNamed(read.config, "DP-1").kind, "dock")

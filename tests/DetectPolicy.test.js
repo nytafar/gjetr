@@ -17,8 +17,8 @@ function plain(value) {
 }
 
 const MONITORS = JSON.stringify([
-  { name: "DP-1", focused: true, disabled: false, width: 3840, height: 2160 },
-  { name: "HDMI-A-2", focused: false, disabled: false, width: 1024, height: 600 }
+  { name: "DP-1", description: "Dell Inc. DELL U2720Q 8FDSM13", focused: true, disabled: false, width: 3840, height: 2160 },
+  { name: "HDMI-A-2", description: "JRP JRP7006H 0", focused: false, disabled: false, width: 1024, height: 600 }
 ])
 const DEVICES = JSON.stringify({ keyboards: [], touch: [
   { address: "0x1", name: "wch.cn-usb2iic_ctp_control-1" }, { address: "0x2", name: "wch.cn-usb2iic_ctp_control" }] })
@@ -61,11 +61,11 @@ test("touchBindings reads each hl.device output binding and skips comments and b
 
 test("parseMonitors and parseTouchDevices read hyprctl's JSON and refuse junk", () => {
   assert.deepEqual(plain(Detect.parseMonitors(MONITORS).monitors), [
-    { name: "DP-1", focused: true, disabled: false, width: 3840, height: 2160 },
-    { name: "HDMI-A-2", focused: false, disabled: false, width: 1024, height: 600 }
+    { name: "DP-1", description: "Dell Inc. DELL U2720Q 8FDSM13", focused: true, disabled: false, width: 3840, height: 2160 },
+    { name: "HDMI-A-2", description: "JRP JRP7006H 0", focused: false, disabled: false, width: 1024, height: 600 }
   ])
-  assert.deepEqual(plain(Detect.parseMonitors('[{"name":"bad name"},{"name":"DP-2","focused":"yes"}]')),
-    { ok: true, monitors: [{ name: "DP-2", focused: false, disabled: false, width: 0, height: 0 }] })
+  assert.deepEqual(plain(Detect.parseMonitors('[{"name":"bad name"},{"name":"DP-2","focused":"yes","description":"a\\nb"}]')),
+    { ok: true, monitors: [{ name: "DP-2", description: "", focused: false, disabled: false, width: 0, height: 0 }] })
   assert.deepEqual(plain(Detect.parseMonitors("not json")), { ok: false, monitors: [] })
   assert.deepEqual(plain(Detect.parseMonitors('{"name":"DP-1"}')), { ok: false, monitors: [] })
   assert.deepEqual(plain(Detect.parseTouchDevices(DEVICES).names), ["wch.cn-usb2iic_ctp_control-1", "wch.cn-usb2iic_ctp_control"])

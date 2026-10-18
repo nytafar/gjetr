@@ -37,6 +37,38 @@ test("resolve reads a gjetr.toml when there is one, whatever is detected", () =>
   assert.deepEqual(Array.from(resolved.errors), [])
 })
 
+test("resolve puts a desc: Display on the port its monitor is plugged into", () => {
+  const main = '[[display]]\nname = "desc:JRP JRP7006H"\ndeck = ["agents"]\n\n'
+    + '[[display]]\nname = "DP-1"\nkind = "dock"\ndeck = ["agents"]\n'
+  const input = monitors => ({ mainText: main, layoutUserTexts: { agents: "" }, layoutShippedTexts: {},
+    presetTexts: presetTexts(), detection: detection({}), monitors: monitors, home: HOME })
+  const before = Source.resolve(input(null))
+  // Not connected (or not read yet): kept by its description, so no screen shows it.
+  assert.deepEqual(names(before.config.displays), ["surface:desc:JRP JRP7006H:true", "dock:DP-1:true"])
+  assert.deepEqual(Array.from(before.errors), [])
+
+  const plugged = Source.resolve(input([{ name: "DP-1", description: "Dell Inc. DELL U2720Q 8FDSM13" },
+    { name: "HDMI-A-2", description: "JRP JRP7006H 0" }]))
+  assert.notEqual(plugged, before)
+  assert.deepEqual(names(plugged.config.displays), ["surface:HDMI-A-2:true", "dock:DP-1:true"])
+  assert.equal(plugged.config.displays[0].match, "desc:JRP JRP7006H")
+  assert.equal(plugged.config.displays[1].match, "DP-1")
+
+  // The cable moved: the same monitor on another port.
+  const moved = Source.resolve(input([{ name: "DP-1", description: "Dell Inc. DELL U2720Q 8FDSM13" },
+    { name: "HDMI-A-1", description: "JRP JRP7006H 0" }]))
+  assert.deepEqual(names(moved.config.displays), ["surface:HDMI-A-1:true", "dock:DP-1:true"])
+
+  // The same monitors read again: the same object.
+  assert.equal(Source.resolve(input([{ name: "DP-1", description: "Dell Inc. DELL U2720Q 8FDSM13" },
+    { name: "HDMI-A-1", description: "JRP JRP7006H 0" }])), moved)
+
+  // A description that lands on an output another Display holds is skipped.
+  const clash = Source.resolve(input([{ name: "DP-1", description: "JRP JRP7006H 0" }]))
+  assert.deepEqual(names(clash.config.displays), ["surface:DP-1:true"])
+  assert.match(clash.errors.join("\n"), /display "DP-1" is on DP-1, which "desc:JRP JRP7006H" already holds; display skipped/)
+})
+
 test("resolve shows the detected preset, its outputs filled in, when there is no gjetr.toml", () => {
   const panel = Source.resolve({ mainText: null, layoutUserTexts: {}, layoutShippedTexts: {}, presetTexts: presetTexts(),
     detection: detection({ preset: "panel", touchscreen: "HDMI-A-2", monitor: "DP-1" }), home: HOME })

@@ -131,11 +131,12 @@ that tap alone.
 A place the dashboard is shown. Every `[[display]]` is drawn, each with its own
 Deck: for example the touchscreen as a `surface` and a [Dock](#docks) beside
 your windows on the main monitor. An output holds one Display; a second
-`[[display]]` with the same `name` is skipped with a logged error.
+`[[display]]` with the same `name`, or whose description lands on an output
+an earlier one holds, is skipped with a logged error.
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `name` | string | required | The output, as `hyprctl monitors` names it. Letters, digits, `.`, `_`, `-`. A Display without a valid name is skipped; with none left, gjetr uses the [detected](#without-a-config) Displays |
+| `name` | string | required | The output, as `hyprctl monitors` names it (letters, digits, `.`, `_`, `-`), or `desc:` and the monitor's description (see [Naming a monitor by its description](#naming-a-monitor-by-its-description)). A Display without a valid name is skipped; with none left, gjetr uses the [detected](#without-a-config) Displays |
 | `kind` | string | `"surface"` | `"surface"`: the whole output. `"dock"`: a strip along one edge, beside windows (see [Docks](#docks)). Any other value skips the Display |
 | `deck` | list of Layout names | `["agents"]` | The Deck: Layouts to tab through, in order. Each is `layouts/<name>.toml`. Names use letters, digits, `-` and `_`, at most 32 characters. Duplicates are dropped |
 | `rotatable` | boolean | `false` | Surface only. May gjetr rotate the output to fit the active Layout's orientation |
@@ -154,6 +155,33 @@ background = "#c0000000"
 
 A surface sits on the Bottom layer, so ordinary windows cover it and the
 Omarchy bar stays on top. Content steps out of the bar's strip on its own.
+
+#### Naming a monitor by its description
+
+An output name such as `DP-1` changes when the cable moves to another port.
+The monitor's description does not: it is the `description` that
+`hyprctl monitors -j` reports (make, model and serial from its EDID), and
+Hyprland's monitor rules accept it as `desc:<description>`. So does gjetr,
+wherever it takes a Display's output: `name` here and the
+[`toggleDock`](#docks) argument.
+
+```bash
+hyprctl monitors -j | jq -r '.[] | "\(.name)\tdesc:\(.description)"'
+```
+
+```toml
+[[display]]
+name = "desc:JRP JRP7006H 0"
+deck = ["agents"]
+```
+
+As in Hyprland, the description matches exactly first, then as a prefix
+(`desc:JRP JRP7006H` matches `JRP JRP7006H 0`); among several matches the first
+monitor `hyprctl monitors` lists wins. gjetr looks the port up again after
+every hotplug, so the Display follows its monitor to a new port. While no
+connected monitor matches, the Display is not drawn. Its Override is kept by
+the port it is on. `state` → `displays[].match` is the name from the Config,
+`displays[].name` the port.
 
 ### `[defaults]`
 
@@ -223,7 +251,7 @@ touchscreen.
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `kind` | string | | `"dock"` |
-| `name` | string | | The output, e.g. `"DP-1"` |
+| `name` | string | | The output, e.g. `"DP-1"`, or `"desc:<description>"` |
 | `edge` | string | `"left"` | `"left"`, `"right"`, `"top"` or `"bottom"`. Any other value skips the Dock, with a logged error |
 | `size` | whole number, 120 to 2000 | `360` | Logical pixels: the width of a left or right Dock, the height of a top or bottom one. Out of range clamps, with a logged error. A Dock never takes more than half of its output |
 | `visible` | boolean | `true` | Shown when gjetr starts. `toggleDock` keeps its choice as an Override |
@@ -295,19 +323,24 @@ restarts; `resetOverrides` returns to `visible` from Config.
 
 ```bash
 omarchy-shell nytafar.gjetr toggleDock DP-1   # or showDock, hideDock
+omarchy-shell nytafar.gjetr toggleDock "desc:JRP JRP7006H 0"
 omarchy-shell nytafar.gjetr toggleDock ""     # the first Dock
 ```
+
+A `desc:` argument names the Dock whose Config `name` is that description, or
+the Dock on the port that description resolves to, so a binding keeps working
+when the cable moves.
 
 Bind it to a key in `~/.config/hypr/bindings.lua`, with Omarchy's helper:
 
 ```lua
-o.bind("SUPER + CTRL + G", "Toggle gjetr dock", "omarchy-shell nytafar.gjetr toggleDock DP-1")
+o.bind("SUPER + CTRL + G", "Toggle gjetr dock", "omarchy-shell nytafar.gjetr toggleDock 'desc:JRP JRP7006H 0'")
 ```
 
 or with Hyprland's own:
 
 ```lua
-hl.bind("SUPER + CTRL + G", hl.dsp.exec_cmd("omarchy-shell nytafar.gjetr toggleDock DP-1"), { description = "Toggle gjetr dock" })
+hl.bind("SUPER + CTRL + G", hl.dsp.exec_cmd("omarchy-shell nytafar.gjetr toggleDock 'desc:JRP JRP7006H 0'"), { description = "Toggle gjetr dock" })
 ```
 
 Pick a key that is free (`omarchy menu keybindings --print`), and check
@@ -842,7 +875,7 @@ omarchy-shell nytafar.gjetr <function> [argument]
 | `toggleFocus` | Flip Focus behaviour of the first Agent List |
 | `selectLayout <name>` | Show a Layout of the primary Display's Deck |
 | `nextLayout`, `previousLayout` | The step a swipe takes, on the primary Display |
-| `toggleDock <output>` | Show or hide the Dock on an output (`""` for the first Dock), kept as an Override. Prints `shown`, `hidden`, or why nothing happened (`no dock DP-9`, `HDMI-A-2 is not a dock`) |
+| `toggleDock <output>` | Show or hide the Dock on an output, by name or as `desc:<description>` (`""` for the first Dock), kept as an Override. Prints `shown`, `hidden`, or why nothing happened (`no dock DP-9`, `HDMI-A-2 is not a dock`) |
 | `showDock <output>`, `hideDock <output>` | The same, one way |
 | `toggleExpand <node>` | Open or close a workspace (`w:<id>`) or tab (`t:<id>`) in the first Workspace List. Prints `expanded`, `collapsed`, `unknown node` or `no workspace list`. `state` → `workspaces.rows` lists the rows drawn |
 | `tapRow <node> <zone>` | Tap a row (`w:<id>`, `t:<id>`, `p:<id>`) of the first Workspace List in zone `row` or `chevron`, as a finger does. Prints what it did |
