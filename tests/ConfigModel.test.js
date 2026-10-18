@@ -292,6 +292,32 @@ test("a Layout is read from the Config first, then from the Layouts gjetr ships"
   assert.deepEqual(plain(Config.overlayLayouts(null, null, null)), { texts: {}, sources: {} })
 })
 
+test("only a file that is not there answers null; another failed read keeps what was read", () => {
+  const read = { loaded: true, text: "orientation = \"any\"\n" }
+  const notFound = { loaded: false, notFound: true }
+  const failed = { loaded: false, notFound: false }
+  assert.equal(Config.answeredText(undefined, read), read.text)
+  assert.equal(Config.answeredText(null, read), read.text)
+  assert.equal(Config.answeredText("old", notFound), null)
+  // A read that fails for another reason says nothing about the file being there.
+  assert.equal(Config.answeredText(undefined, failed), undefined)
+  assert.equal(Config.answeredText("old", failed), "old")
+  assert.equal(Config.answeredText(null, failed), null)
+  // A read is never taken for a missing file, whatever text it hands back.
+  assert.equal(Config.answeredText(undefined, { loaded: true, text: null }), "")
+  assert.equal(Config.answeredText(undefined, { loaded: true }), "")
+  assert.equal(Config.answeredText("old", null), "old")
+})
+
+test("only errors not logged before are new", () => {
+  assert.deepEqual(Array.from(Config.newErrors([], ["a", "b"])), ["a", "b"])
+  assert.deepEqual(Array.from(Config.newErrors(["a", "b"], ["a", "b"])), [])
+  assert.deepEqual(Array.from(Config.newErrors(["a"], ["b", "a", "c", "c"])), ["b", "c"])
+  // One that went away and came back is new again.
+  assert.deepEqual(Array.from(Config.newErrors(["b"], ["a"])), ["a"])
+  assert.deepEqual(Array.from(Config.newErrors(null, null)), [])
+})
+
 test("a Layout found nowhere says so and falls back to the Agent List", () => {
   const read = Config.readLayout("nowhere", null)
   assert.match(read.errors.join("\n"), /layouts\/nowhere\.toml: not found in the Config or among gjetr's Layouts, using the default Agent List/)
