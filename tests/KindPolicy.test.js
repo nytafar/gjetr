@@ -17,8 +17,9 @@ function fixtureKinds(version) {
 }
 const HERDR_0_8_2_KINDS = fixtureKinds("0.8.2")
 const HERDR_0_9_0_KINDS = fixtureKinds("0.9.0")
+const HERDR_0_9_5_KINDS = fixtureKinds("0.9.5")
 
-for (const [version, kinds] of [["0.8.2", HERDR_0_8_2_KINDS], ["0.9.0", HERDR_0_9_0_KINDS]]) {
+for (const [version, kinds] of [["0.8.2", HERDR_0_8_2_KINDS], ["0.9.0", HERDR_0_9_0_KINDS], ["0.9.5", HERDR_0_9_5_KINDS]]) {
   test(`every kind herdr ${version} reports has a label and a mark or a letter`, () => {
     for (const kind of kinds) {
       const mark = Kind.kindMark(kind, "", false)
@@ -32,7 +33,7 @@ for (const [version, kinds] of [["0.8.2", HERDR_0_8_2_KINDS], ["0.9.0", HERDR_0_
 }
 
 test("the table covers exactly the kinds herdr reports", () => {
-  assert.deepEqual([...Kind.KINDS].sort(), [...HERDR_0_9_0_KINDS].sort())
+  assert.deepEqual([...Kind.KINDS].sort(), [...HERDR_0_9_5_KINDS].sort())
 })
 
 test("kinds drawn as a letter each get a different letter", () => {
@@ -49,7 +50,7 @@ test("kinds drawn as a letter each get a different letter", () => {
 const SHIPPED = ["pi", "gemini", "cursor", "cline", "opencode", "copilot", "kimi", "qwen", "devin", "agy",
   "mastracode", "kiro", "amp", "grok", "hermes", "kilo", "qodercli", "omp"]
 const OMARCHY = ["claude", "codex"]
-const LETTERS = ["droid", "maki", "muse"]
+const LETTERS = ["droid", "letta", "maki", "muse"]
 
 test("every kind is an Omarchy mark, a shipped mark or a letter", () => {
   assert.deepEqual([...Kind.KINDS].sort(), OMARCHY.concat(SHIPPED, LETTERS).sort())
@@ -73,7 +74,7 @@ test("the other kinds with a licensed logo draw gjetr's one-colour mark, in any 
   }
 })
 
-test("droid, maki and muse draw their letter", () => {
+test("droid, letta, maki and muse draw their letter", () => {
   for (const kind of LETTERS) {
     assert.deepEqual({ ...Kind.kindIcon(kind, false) }, { file: "", origin: "", tinted: false }, kind)
     assert.equal(Kind.kindIconFile(kind, false), "", kind)
@@ -103,6 +104,7 @@ test("labels read as the product is called", () => {
   assert.equal(Kind.kindLabel("omp"), "Oh My Pi")
   assert.equal(Kind.kindLabel("copilot"), "GitHub Copilot")
   assert.equal(Kind.kindLabel("muse"), "Muse")
+  assert.equal(Kind.kindLabel("letta"), "Letta Code")
 })
 
 test("herdr's aliases for a kind resolve to it, whatever the case", () => {
@@ -111,6 +113,8 @@ test("herdr's aliases for a kind resolve to it, whatever the case", () => {
   assert.equal(Kind.canonicalKind(" github-copilot "), "copilot")
   assert.equal(Kind.canonicalKind("kiro-cli"), "kiro")
   assert.equal(Kind.canonicalKind("mastra code"), "mastracode")
+  assert.equal(Kind.canonicalKind("Letta-Code"), "letta")
+  assert.equal(Kind.canonicalKind("letta code"), "letta")
   assert.equal(Kind.kindLabel("claude-code"), "Claude")
   assert.equal(Kind.kindIconFile("CLAUDE", false), "claude.svg")
   assert.equal(Kind.kindIconFile("kiro-cli", false), "kiro.svg")

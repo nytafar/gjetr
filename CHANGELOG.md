@@ -59,6 +59,17 @@ All notable changes to gjetr. The format follows
   `components/KeyedList.qml` for this.
 - A new Claude session's Recap is found as soon as its Agent appears, instead
   of at the next 5 s check.
+- herdr 0.9.5 (protocol 22) is supported beside 0.8.2 and 0.9.0. Its schema
+  and agent kinds are recorded in `tests/fixtures/herdr-0.9.5/`, captured from
+  a release build of the v0.9.5 tag. What changed since 0.9.0 is additive for
+  gjetr: the `letta` agent kind (Letta Code, drawn as an L in a frame, as it
+  has no clearly licensed logo), optional `completion_seq` on agents and
+  `restore_error` on panes, and the removed `pane.graphics.*` methods, which
+  gjetr never sent.
+- When herdr (0.9.2 and later) ends a live event stream with `events_lost`
+  because gjetr fell behind, gjetr subscribes again at once and takes a new
+  snapshot, keeping the Agents shown, instead of going offline and retrying on
+  the backoff.
 
 ### Fixed
 

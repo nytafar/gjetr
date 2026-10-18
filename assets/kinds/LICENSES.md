@@ -30,7 +30,7 @@ endorsement is implied.
 
 Not shipped here: Claude's and Codex's marks are read in place from Omarchy
 (`$OMARCHY_PATH/shell/plugins/agents/assets/`) in their brand colours. Droid,
-Maki and Muse have no clearly licensed logo and draw a letter.
+Letta Code, Maki and Muse have no clearly licensed logo and draw a letter.
 
 ## Simple Icons (CC0 1.0)
 

@@ -23,7 +23,9 @@ import "lib/HerdrModel.js" as HerdrModel
 // fails only records why. herdr rejects a method or subscription type it does
 // not know as invalid_request "unknown variant": that turns one feature off
 // (`unsupported`), and a refused subscription type is dropped and the stream
-// subscribes again at once, never through the backoff.
+// subscribes again at once, never through the backoff. A live stream herdr
+// ends with `events_lost` (0.9.2+, the reader fell behind) is also opened
+// again at once, keeping the Agents shown; the snapshot after it catches up.
 //
 // Every connection attempt and every request uses a freshly created Socket.
 // Quickshell 0.3.1's Socket reports a failed connect only once per object and
@@ -143,6 +145,17 @@ QtObject {
   function resubscribeWithout(type) {
     markUnsupported(type)
     subscriptionTypes = HerdrModel.withoutType(subscriptionTypes, type)
+    phase = "connecting"
+    resetWork()
+    openSubscription()
+  }
+
+  // herdr dropped a live stream that fell behind (events_lost): subscribe again
+  // at once and let the snapshot after subscription_started catch up. Only a
+  // live stream does this, so a stream that keeps failing before its snapshot
+  // lands goes through fail() and the backoff instead.
+  function resync() {
+    log("events lost, subscribing again")
     phase = "connecting"
     resetWork()
     openSubscription()
@@ -285,6 +298,7 @@ QtObject {
     } else if (item.kind === "error") {
       var refused = HerdrModel.unsupportedVariant(item.error)
       if (refused !== "" && subscriptionTypes.indexOf(refused) >= 0) resubscribeWithout(refused)
+      else if (HerdrModel.eventsLost(item.error) && phase === "live") resync()
       else fail("subscribe " + item.error.code + " " + item.error.message)
     }
   }
