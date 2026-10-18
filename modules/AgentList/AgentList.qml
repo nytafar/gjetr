@@ -18,6 +18,8 @@ Item {
   id: root
 
   property var service: null
+  // The colours that read on the Display background (Tone, the service's colors).
+  readonly property QtObject colors: Tone.colorsOf(service)
   // <layout>#<index>: this Module's Overrides and session state.
   property string moduleKey: ""
   // "pointer" on a Dock, "touch" on a surface: with the Module's size and its
@@ -125,7 +127,7 @@ Item {
     Rectangle {
       id: sortArea
       anchors { top: parent.top; bottom: parent.bottom; left: parent.left; right: focusToggle.left }
-      color: headerTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent) : "transparent"
+      color: headerTap.pressed ? Style.pressedFillFor(root.colors.foreground, root.colors.accent) : "transparent"
 
       Text {
         anchors {
@@ -135,7 +137,7 @@ Item {
         }
         elide: Text.ElideRight
         text: root.agents.length === 1 ? "1 agent" : root.agents.length + " agents"
-        color: Color.foreground
+        color: root.colors.foreground
         font.family: Style.font.family
         font.pixelSize: root.density.titlePx
         font.bold: true
@@ -146,7 +148,7 @@ Item {
         anchors { right: parent.right; rightMargin: root.headerPad; verticalCenter: parent.verticalCenter }
         text: CardPolicy.headerCaption("sort", root.sortMode, root.compactHeader)
         // Accent while an Override shadows the Config default.
-        color: root.moduleState && root.moduleState.sortOverridden ? Color.accent : Color.muted
+        color: root.moduleState && root.moduleState.sortOverridden ? root.colors.accent : root.colors.muted
         font.family: Style.font.family
         font.pixelSize: root.density.bodyPx
       }
@@ -162,20 +164,20 @@ Item {
       id: focusToggle
       anchors { top: parent.top; bottom: parent.bottom; right: parent.right }
       width: Math.max(root.density.headerHeight, focusLabel.implicitWidth + root.headerPad * 2)
-      color: focusTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent) : "transparent"
+      color: focusTap.pressed ? Style.pressedFillFor(root.colors.foreground, root.colors.accent) : "transparent"
 
       Rectangle {
         anchors { left: parent.left; verticalCenter: parent.verticalCenter }
         width: 1
         height: parent.height / 2
-        color: Util.alpha(Color.foreground, 0.12)
+        color: Util.alpha(root.colors.foreground, 0.12)
       }
 
       Text {
         id: focusLabel
         anchors.centerIn: parent
         text: CardPolicy.headerCaption("focus", root.focusMode, root.compactHeader)
-        color: root.moduleState && root.moduleState.focusOverridden ? Color.accent : Color.muted
+        color: root.moduleState && root.moduleState.focusOverridden ? root.colors.accent : root.colors.muted
         font.family: Style.font.family
         font.pixelSize: root.density.bodyPx
       }
@@ -189,7 +191,7 @@ Item {
     Rectangle {
       anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
       height: 1
-      color: Util.alpha(Color.foreground, 0.12)
+      color: Util.alpha(root.colors.foreground, 0.12)
     }
   }
 
@@ -202,7 +204,7 @@ Item {
     horizontalAlignment: Text.AlignHCenter
     elide: Text.ElideRight
     text: !root.online ? (root.offline ? "herdr offline, retrying" : "connecting to herdr") : root.mismatchCue
-    color: Color.muted
+    color: root.colors.muted
     font.family: Style.font.family
     font.pixelSize: Math.round(Style.font.body * root.textScale)
   }
@@ -330,7 +332,7 @@ Item {
     anchors.fill: parent
     z: 20
     visible: root.recapAgent !== null
-    color: Util.alpha(Color.background, 0.92)
+    color: Util.alpha(root.colors.background, 0.92)
 
     TapHandler {
       onTapped: if (root.service) root.service.closeRecapOverlay()
@@ -343,7 +345,7 @@ Item {
       Text {
         width: parent.width
         text: root.recapCard.name
-        color: Color.foreground
+        color: root.colors.foreground
         font.family: Style.font.family
         font.pixelSize: Math.round(Style.font.title * root.textScale)
         font.bold: true
@@ -353,7 +355,7 @@ Item {
       Text {
         width: parent.width
         text: root.recapCard.location
-        color: Color.muted
+        color: root.colors.muted
         font.family: Style.font.family
         font.pixelSize: Math.round(Style.font.body * root.textScale)
       }
@@ -363,7 +365,7 @@ Item {
         text: root.recapCard.recap.text
         textFormat: Text.PlainText
         wrapMode: Text.WordWrap
-        color: Color.foreground
+        color: root.colors.foreground
         font.family: Style.font.family
         font.pixelSize: Math.round(Style.font.body * root.textScale)
         lineHeight: 1.2
@@ -371,7 +373,7 @@ Item {
 
       Text {
         text: "tap to close"
-        color: Color.muted
+        color: root.colors.muted
         font.family: Style.font.family
         font.pixelSize: Math.round(Style.font.caption * root.textScale)
       }
@@ -382,7 +384,7 @@ Item {
     anchors.centerIn: grid
     visible: root.online && root.agents.length === 0
     text: "No agents"
-    color: Color.muted
+    color: root.colors.muted
     font.family: Style.font.family
     font.pixelSize: root.density.titlePx
   }

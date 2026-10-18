@@ -36,10 +36,10 @@ Item {
   readonly property bool recapInline: card.recap.inline
   readonly property bool recapShown: card.recap.shown
   readonly property string iconUrl: fields.kind && service && card.kind !== "" ? service.kindIconUrl(card.kind) : ""
-  readonly property var successColor: service ? service.successColor : undefined
-  readonly property color statusColor: Tone.color(card.indicator.tone, successColor)
+  readonly property QtObject colors: Tone.colorsOf(service)
+  readonly property color statusColor: Tone.color(card.indicator.tone, colors)
   readonly property int pad: Style.spacing.xxl
-  readonly property color attentionColor: Tone.color(card.attentionTone, successColor)
+  readonly property color attentionColor: Tone.color(card.attentionTone, colors)
 
   implicitHeight: baseHeight + (recapShown ? recapBlock.implicitHeight : 0)
 
@@ -47,14 +47,14 @@ Item {
     anchors.fill: parent
     radius: Style.cornerRadius
     color: tap.pressed
-      ? Style.pressedFillFor(Color.foreground, Color.accent)
-      : root.focused ? Style.selectedFillFor(Color.foreground, Color.accent)
-      : root.card.highlighted ? Util.alpha(Color.accent, 0.08)
-      : Style.normalFillFor(Color.foreground, Color.accent)
+      ? Style.pressedFillFor(root.colors.foreground, root.colors.accent)
+      : root.focused ? Style.selectedFillFor(root.colors.foreground, root.colors.accent)
+      : root.card.highlighted ? Util.alpha(root.colors.accent, 0.08)
+      : Style.normalFillFor(root.colors.foreground, root.colors.accent)
     border.width: 1
-    border.color: root.focused ? Color.accent
-      : root.card.highlighted ? Util.alpha(Color.accent, 0.35)
-      : Util.alpha(Color.foreground, 0.1)
+    border.color: root.focused ? root.colors.accent
+      : root.card.highlighted ? Util.alpha(root.colors.accent, 0.35)
+      : Util.alpha(root.colors.foreground, 0.1)
   }
 
   // Attention: a tinted fill and a thick border in the status colour, breathing
@@ -127,7 +127,8 @@ Item {
     frameRadius: Math.min(Style.cornerRadius, 6)
     stateful: root.card.marksState
     mark: root.card.mark
-    toneColor: Tone.color(root.card.mark.tone, root.successColor)
+    plainColor: root.colors.muted
+    toneColor: Tone.color(root.card.mark.tone, root.colors)
     palette: root.palette
     animate: root.animate && root.visible
     clock: root.service ? root.service.motionClock : null
@@ -147,7 +148,7 @@ Item {
       width: parent.width
       visible: root.fields.name
       text: root.card.name
-      color: Color.foreground
+      color: root.colors.foreground
       opacity: root.indicator.textOpacity
       font.family: Style.font.family
       font.pixelSize: Math.round(Style.font.title * root.textScale)
@@ -160,7 +161,7 @@ Item {
       width: parent.width
       visible: root.fields.location
       text: root.card.location
-      color: Color.muted
+      color: root.colors.muted
       opacity: root.indicator.textOpacity
       font.family: Style.font.family
       font.pixelSize: Math.round(Style.font.body * root.textScale)
@@ -174,7 +175,7 @@ Item {
       visible: root.recapInline
       text: root.card.recap.text
       textFormat: Text.PlainText
-      color: Color.muted
+      color: root.colors.muted
       font.family: Style.font.family
       font.pixelSize: Math.round(Style.font.caption * root.textScale)
       wrapMode: Text.WordWrap
@@ -196,7 +197,7 @@ Item {
       anchors.right: parent.right
       visible: root.fields.cache && root.cacheTimer !== null
       text: root.cacheTimer ? root.cacheTimer.label : ""
-      color: Tone.color(root.card.cacheTone, root.successColor)
+      color: Tone.color(root.card.cacheTone, root.colors)
       opacity: root.cacheTimer && root.cacheTimer.level === "cold" ? 0.7 : 1
       font.family: Style.font.family
       font.pixelSize: Math.round(Style.font.title * root.textScale)
@@ -211,13 +212,13 @@ Item {
       width: 40
       height: 3
       radius: 1.5
-      color: Util.alpha(Color.foreground, 0.12)
+      color: Util.alpha(root.colors.foreground, 0.12)
 
       Rectangle {
         anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
         width: root.cacheTimer ? Math.round(parent.width * root.cacheTimer.fraction) : 0
         radius: parent.radius
-        color: Tone.color(root.card.cacheBarTone, root.successColor)
+        color: Tone.color(root.card.cacheBarTone, root.colors)
       }
     }
 
@@ -258,8 +259,8 @@ Item {
       anchors.fill: parent
       anchors.margins: 1
       radius: Style.cornerRadius
-      color: disclosureTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent)
-        : root.recapShown ? Style.selectedFillFor(Color.foreground, Color.accent)
+      color: disclosureTap.pressed ? Style.pressedFillFor(root.colors.foreground, root.colors.accent)
+        : root.recapShown ? Style.selectedFillFor(root.colors.foreground, root.colors.accent)
         : "transparent"
     }
 
@@ -267,14 +268,14 @@ Item {
       anchors { left: parent.left; verticalCenter: parent.verticalCenter }
       width: 1
       height: parent.height / 2
-      color: Util.alpha(Color.foreground, 0.12)
+      color: Util.alpha(root.colors.foreground, 0.12)
     }
 
     Text {
       anchors.centerIn: parent
       text: "recap"
       rotation: -90
-      color: Color.accent
+      color: root.colors.accent
       font.family: Style.font.family
       font.pixelSize: Math.round(Style.font.caption * root.textScale)
     }
@@ -296,7 +297,7 @@ Item {
     Rectangle {
       anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: root.pad; rightMargin: root.pad }
       height: 1
-      color: Util.alpha(Color.foreground, 0.12)
+      color: Util.alpha(root.colors.foreground, 0.12)
     }
 
     // Recap text is untrusted: always plain text, never rich text or links.
@@ -310,7 +311,7 @@ Item {
       text: root.recapShown ? root.card.recap.text : ""
       textFormat: Text.PlainText
       wrapMode: Text.WordWrap
-      color: Color.foreground
+      color: root.colors.foreground
       font.family: Style.font.family
       font.pixelSize: Math.round(Style.font.body * root.textScale)
       lineHeight: 1.2

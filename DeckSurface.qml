@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.Commons
+import "components"
 import "lib/LayoutPolicy.js" as LayoutPolicy
 import "lib/DeckPolicy.js" as DeckPolicy
 import "lib/DockPolicy.js" as DockPolicy
@@ -31,6 +32,7 @@ PanelWindow {
   id: root
 
   property var service: null
+  readonly property QtObject colors: Tone.colorsOf(service)
   property var deck: null
 
   readonly property bool isDock: !!deck && deck.isDock
@@ -111,6 +113,7 @@ PanelWindow {
     names: root.deck ? root.deck.deckLayouts : []
     active: root.deck ? root.deck.activeLayoutName : ""
     badges: root.deck ? root.deck.tabBadges : []
+    colors: root.colors
     onSelected: function(name) { if (root.deck) root.deck.selectLayout(name) }
   }
 
@@ -194,7 +197,7 @@ PanelWindow {
       Rectangle {
         required property var modelData
 
-        color: Util.alpha(Color.foreground, 0.12)
+        color: Util.alpha(root.colors.foreground, 0.12)
         x: modelData.x
         y: modelData.y
         width: modelData.width

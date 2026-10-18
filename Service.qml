@@ -248,13 +248,28 @@ Item {
   // at the same path Color reads its palette from; accent when there is none.
   readonly property string themeColorsPath: home + "/.local/state/omarchy/current/theme/colors.toml"
   property string themeSuccess: ""
-  readonly property color successColor: themeSuccess !== "" ? themeSuccess : Color.accent
+  readonly property color successColor: colors.success
   // The theme's accent and hues (ThemeModel.palette), which a working kind mark
   // cycles through with working_effect = "hue"; accent, green and urgent when
   // the theme lists fewer than two.
   property var themePalette: []
-  readonly property var indicatorPalette: themePalette.length >= 2 ? themePalette
-    : [String(Color.accent), String(successColor), String(Color.urgent)]
+  readonly property var indicatorPalette: readableColors.palette.length >= 2 ? readableColors.palette
+    : [String(colors.accent), String(colors.success), String(colors.urgent)]
+  // The colours every Module draws with (Tone.colorsOf): the theme's, made to
+  // read on the primary Display's background (ThemeModel.readable). gjetr is
+  // dark by default, so a light theme's dark text becomes a light neutral and
+  // its accents are lightened; a light Config background goes the other way.
+  readonly property var readableColors: ThemeModel.readable({ foreground: String(Color.foreground),
+    muted: String(Color.muted), accent: String(Color.accent), urgent: String(Color.urgent),
+    success: themeSuccess, palette: themePalette }, String(background))
+  readonly property QtObject colors: QtObject {
+    readonly property color background: root.readableColors.background
+    readonly property color foreground: root.readableColors.foreground
+    readonly property color muted: root.readableColors.muted
+    readonly property color accent: root.readableColors.accent
+    readonly property color urgent: root.readableColors.urgent
+    readonly property color success: root.readableColors.success
+  }
   // The clock every motion on every Display reads (MotionPolicy): it ticks only
   // while something moves on screen, so all windows redraw in the same frames.
   readonly property QtObject motionClock: motionClockObject
@@ -747,7 +762,8 @@ Item {
         error: overridesError, modules: overrides.modules },
       focus: { requests: herdr.focuses, lastError: herdr.lastFocusError },
       attention: attention.attention,
-      theme: { success: String(successColor), fromTheme: themeSuccess !== "", palette: indicatorPalette },
+      theme: { success: String(successColor), fromTheme: themeSuccess !== "", palette: indicatorPalette,
+        readable: readableColors },
       cache: {
         timers: Object.keys(cacheTimers).length,
         error: cacheTimersError,

@@ -44,19 +44,19 @@ Item {
   readonly property bool recapInline: secondLine === "recap"
   readonly property bool recapShown: card.recap.shown
   readonly property string iconUrl: fields.kind && service && card.kind !== "" ? service.kindIconUrl(card.kind) : ""
-  readonly property var successColor: service ? service.successColor : undefined
-  readonly property color statusColor: Tone.color(card.indicator.tone, successColor)
-  readonly property color attentionColor: Tone.color(card.attentionTone, successColor)
+  readonly property QtObject colors: Tone.colorsOf(service)
+  readonly property color statusColor: Tone.color(card.indicator.tone, colors)
+  readonly property color attentionColor: Tone.color(card.attentionTone, colors)
 
   implicitHeight: baseHeight + (recapShown ? recapBlock.implicitHeight : 0)
 
   Rectangle {
     anchors.fill: parent
     radius: Math.min(Style.cornerRadius, 4)
-    color: tap.pressed || recapTap.pressed || disclosureTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent)
-      : root.focused ? Style.selectedFillFor(Color.foreground, Color.accent)
-      : hover.hovered ? Util.alpha(Color.foreground, 0.06)
-      : root.card.highlighted ? Util.alpha(Color.accent, 0.07)
+    color: tap.pressed || recapTap.pressed || disclosureTap.pressed ? Style.pressedFillFor(root.colors.foreground, root.colors.accent)
+      : root.focused ? Style.selectedFillFor(root.colors.foreground, root.colors.accent)
+      : hover.hovered ? Util.alpha(root.colors.foreground, 0.06)
+      : root.card.highlighted ? Util.alpha(root.colors.accent, 0.07)
       : "transparent"
   }
 
@@ -67,7 +67,7 @@ Item {
     y: root.height
     width: Math.max(0, root.width - root.t.pad * 2)
     height: root.t.rowGap || 0
-    color: Util.alpha(Color.foreground, root.t.dividerAlpha || 0)
+    color: Util.alpha(root.colors.foreground, root.t.dividerAlpha || 0)
   }
 
   HoverHandler {
@@ -81,7 +81,7 @@ Item {
     visible: root.focused && root.attention === ""
     anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
     width: 2
-    color: Color.accent
+    color: root.colors.accent
   }
 
   // Attention: a tint and a bar in the status colour, breathing.
@@ -159,7 +159,8 @@ Item {
     frameRadius: Math.min(Style.cornerRadius, 3)
     stateful: root.card.marksState
     mark: root.card.mark
-    toneColor: Tone.color(root.card.mark.tone, root.successColor)
+    plainColor: root.colors.muted
+    toneColor: Tone.color(root.card.mark.tone, root.colors)
     palette: root.palette
     animate: root.animate && root.visible
     clock: root.service ? root.service.motionClock : null
@@ -176,7 +177,7 @@ Item {
     visible: root.fields.name
     text: root.card.name
     textFormat: Text.PlainText
-    color: Color.foreground
+    color: root.colors.foreground
     opacity: root.indicator.textOpacity
     font.family: Style.font.family
     font.pixelSize: root.t.namePx
@@ -190,7 +191,7 @@ Item {
     anchors { right: disclosure.left; rightMargin: disclosure.visible ? root.t.gap : root.t.pad; verticalCenter: line.verticalCenter }
     visible: root.fields.cache && root.cacheTimer !== null
     text: root.cacheTimer ? root.cacheTimer.label : ""
-    color: Tone.color(root.card.cacheTone, root.successColor)
+    color: Tone.color(root.card.cacheTone, root.colors)
     opacity: root.cacheTimer && root.cacheTimer.level === "cold" ? 0.6 : 1
     font.family: Style.font.family
     font.pixelSize: root.t.detailPx + 1
@@ -211,7 +212,7 @@ Item {
     text: root.secondLine === "recap" ? root.card.recap.text
       : root.secondLine === "location" ? RepoModel.withLocation(root.card.repo.text, root.card.location) : ""
     textFormat: Text.PlainText
-    color: Color.muted
+    color: root.colors.muted
     opacity: root.recapShown ? 0.5 : 0.85
     font.family: Style.font.family
     font.pixelSize: root.t.detailPx
@@ -257,7 +258,7 @@ Item {
     Text {
       anchors.centerIn: parent
       text: root.recapShown ? "▾" : "▸"
-      color: Color.accent
+      color: root.colors.accent
       font.family: Style.font.family
       font.pixelSize: root.t.namePx
     }
@@ -283,7 +284,7 @@ Item {
       text: root.recapShown ? root.card.recap.text : ""
       textFormat: Text.PlainText
       wrapMode: Text.WordWrap
-      color: Color.foreground
+      color: root.colors.foreground
       opacity: 0.85
       font.family: Style.font.family
       font.pixelSize: root.t.detailPx + 1

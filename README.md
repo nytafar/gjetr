@@ -119,8 +119,9 @@ o.bind("SUPER + CTRL + G", "Toggle gjetr dock", "omarchy-shell nytafar.gjetr tog
   rotatable, gjetr turns the output and its touch input to match at runtime.
 - **Offline-tolerant.** If herdr goes away, the last Cards stay visible, greyed,
   while gjetr reconnects.
-- **Themed.** Colours come from the Omarchy theme. Background black, theme,
-  wallpaper, or a tinted wallpaper.
+- **Themed.** Colours come from the Omarchy theme, kept readable on the
+  Display's background: on the default black a light theme's text turns light.
+  Background black, theme, wallpaper, or a tinted wallpaper.
 
 ## Requirements
 

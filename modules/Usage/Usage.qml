@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Window
 import qs.Commons
+import "../../components"
 import "../../lib/CardPolicy.js" as CardPolicy
 import "../../lib/DensityPolicy.js" as DensityPolicy
 import "../../lib/UsageModel.js" as UsageModel
@@ -16,6 +17,8 @@ Item {
   id: root
 
   property var service: null
+  // The colours that read on the Display background (Tone, the service's colors).
+  readonly property QtObject colors: Tone.colorsOf(service)
   // <layout>#<index>: this Module's settings.
   property string moduleKey: ""
   // "pointer" on a Dock, "touch" on a surface: with the Module's size it picks
@@ -67,9 +70,9 @@ Item {
 
   // Meter colours: theme tokens only, loudest at the highest share used.
   function levelColor(level) {
-    if (level === "critical") return Color.urgent
-    if (level === "warn") return Color.accent
-    return Color.foreground
+    if (level === "critical") return root.colors.urgent
+    if (level === "warn") return root.colors.accent
+    return root.colors.foreground
   }
 
   Item {
@@ -79,13 +82,13 @@ Item {
 
     Rectangle {
       anchors.fill: parent
-      color: headerTap.pressed ? Style.pressedFillFor(Color.foreground, Color.accent) : "transparent"
+      color: headerTap.pressed ? Style.pressedFillFor(root.colors.foreground, root.colors.accent) : "transparent"
     }
 
     Text {
       anchors { left: parent.left; leftMargin: root.headerPad; verticalCenter: parent.verticalCenter }
       text: "usage"
-      color: Color.foreground
+      color: root.colors.foreground
       font.family: Style.font.family
       font.pixelSize: root.titlePx
       font.bold: true
@@ -97,7 +100,7 @@ Item {
       text: root.compact
         ? (root.refreshing ? "↻" : root.newestUpdate > 0 ? UsageModel.shortDuration(root.now - root.newestUpdate) : "")
         : root.refreshing ? "refreshing" : UsageModel.ageLabel(root.newestUpdate, root.now)
-      color: Color.muted
+      color: root.colors.muted
       font.family: Style.font.family
       font.pixelSize: root.bodyPx
     }
@@ -111,7 +114,7 @@ Item {
     Rectangle {
       anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
       height: 1
-      color: Util.alpha(Color.foreground, 0.12)
+      color: Util.alpha(root.colors.foreground, 0.12)
     }
   }
 
@@ -207,7 +210,7 @@ Item {
                   anchors.centerIn: parent
                   visible: line.entry.first && markImage.status !== Image.Ready
                   text: line.entry.mark
-                  color: Color.muted
+                  color: root.colors.muted
                   font.family: Style.font.family
                   font.pixelSize: root.captionPx
                   font.bold: true
@@ -221,7 +224,7 @@ Item {
                 text: line.entry.text
                 textFormat: Text.PlainText
                 elide: Text.ElideRight
-                color: Color.muted
+                color: root.colors.muted
                 font.family: Style.font.family
                 font.pixelSize: root.captionPx
               }
@@ -232,7 +235,7 @@ Item {
                 anchors { left: mark.right; leftMargin: root.pad; verticalCenter: parent.verticalCenter }
                 width: Math.ceil(codeMetrics.advanceWidth)
                 text: line.entry.code
-                color: Color.muted
+                color: root.colors.muted
                 font.family: Style.font.family
                 font.pixelSize: root.captionPx + 1
               }
@@ -251,7 +254,7 @@ Item {
                   anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter }
                   height: 4
                   radius: 2
-                  color: Util.alpha(Color.foreground, 0.14)
+                  color: Util.alpha(root.colors.foreground, 0.14)
                 }
 
                 Rectangle {
@@ -270,7 +273,7 @@ Item {
                   width: 2
                   height: parent.height
                   radius: 1
-                  color: line.entry.pace === "ahead" ? Color.accent : Util.alpha(Color.foreground, 0.5)
+                  color: line.entry.pace === "ahead" ? root.colors.accent : Util.alpha(root.colors.foreground, 0.5)
                 }
               }
 
@@ -295,7 +298,7 @@ Item {
                 width: visible ? Math.ceil(resetMetrics.advanceWidth) : 0
                 horizontalAlignment: Text.AlignRight
                 text: line.entry.reset
-                color: Color.muted
+                color: root.colors.muted
                 opacity: 0.8
                 font.family: Style.font.family
                 font.pixelSize: root.captionPx
@@ -317,9 +320,9 @@ Item {
               width: hoverText.implicitWidth + root.pad * 2
               height: hoverText.implicitHeight + root.gap
               radius: Math.min(Style.cornerRadius, 4)
-              color: Color.background
+              color: root.colors.background
               border.width: 1
-              border.color: Util.alpha(Color.foreground, 0.2)
+              border.color: Util.alpha(root.colors.foreground, 0.2)
 
               Text {
                 id: hoverText
@@ -327,7 +330,7 @@ Item {
                 text: line.entry.label + "  " + UsageModel.formatPercent(line.entry.fraction)
                   + (line.entry.resetsAtMs > 0 ? "  ·  " + UsageModel.resetLabel(line.entry.resetsAtMs, root.now) : "")
                 textFormat: Text.PlainText
-                color: Color.foreground
+                color: root.colors.foreground
                 font.family: Style.font.family
                 font.pixelSize: root.captionPx
               }
@@ -360,7 +363,7 @@ Item {
               id: nameText
               text: section.provider.name
               textFormat: Text.PlainText
-              color: section.provider.ready ? Color.foreground : Color.muted
+              color: section.provider.ready ? root.colors.foreground : root.colors.muted
               font.family: Style.font.family
               font.pixelSize: root.titlePx
               font.bold: true
@@ -370,7 +373,7 @@ Item {
               anchors { left: nameText.right; leftMargin: root.pad; baseline: nameText.baseline; right: staleText.left; rightMargin: root.gap }
               text: section.provider.tier
               textFormat: Text.PlainText
-              color: Color.muted
+              color: root.colors.muted
               elide: Text.ElideRight
               font.family: Style.font.family
               font.pixelSize: root.bodyPx
@@ -380,7 +383,7 @@ Item {
               id: staleText
               anchors { right: parent.right; baseline: nameText.baseline }
               text: section.stale ? (UsageModel.ageLabel(section.provider.updatedAtMs, root.now) || "no update time") : ""
-              color: Color.muted
+              color: root.colors.muted
               font.family: Style.font.family
               font.pixelSize: root.captionPx
             }
@@ -392,7 +395,7 @@ Item {
             text: section.provider.statusText !== "" ? section.provider.statusText : "not ready"
             textFormat: Text.PlainText
             wrapMode: Text.WordWrap
-            color: Color.muted
+            color: root.colors.muted
             font.family: Style.font.family
             font.pixelSize: root.bodyPx
           }
@@ -416,7 +419,7 @@ Item {
                 Text {
                   visible: section.provider.limits.length === 0
                   text: "no limits reported"
-                  color: Color.muted
+                  color: root.colors.muted
                   font.family: Style.font.family
                   font.pixelSize: root.bodyPx
                 }
@@ -443,7 +446,7 @@ Item {
                         text: limit.modelData.label
                         textFormat: Text.PlainText
                         elide: Text.ElideRight
-                        color: Color.foreground
+                        color: root.colors.foreground
                         font.family: Style.font.family
                         font.pixelSize: root.bodyPx
                       }
@@ -464,7 +467,7 @@ Item {
                       width: limit.width
                       height: 8
                       radius: 4
-                      color: Util.alpha(Color.foreground, 0.12)
+                      color: Util.alpha(root.colors.foreground, 0.12)
 
                       Rectangle {
                         width: Math.round(parent.width * Math.max(0, Math.min(1, limit.modelData.fraction)))
@@ -479,7 +482,7 @@ Item {
                       horizontalAlignment: Text.AlignRight
                       visible: text !== ""
                       text: UsageModel.resetLabel(limit.modelData.resetsAtMs, root.now)
-                      color: Color.muted
+                      color: root.colors.muted
                       font.family: Style.font.family
                       font.pixelSize: root.captionPx
                     }
@@ -495,7 +498,7 @@ Item {
 
                 Text {
                   text: "today"
-                  color: Color.muted
+                  color: root.colors.muted
                   font.family: Style.font.family
                   font.pixelSize: root.captionPx
                 }
@@ -510,7 +513,7 @@ Item {
                     parts.push(today.sessions + (today.sessions === 1 ? " session" : " sessions"))
                     return parts.join("  ·  ")
                   }
-                  color: Color.foreground
+                  color: root.colors.foreground
                   font.family: Style.font.family
                   font.pixelSize: root.bodyPx
                 }
@@ -534,7 +537,7 @@ Item {
                   Text {
                     id: recentTitle
                     text: "last " + recent.bars.length + " days"
-                    color: Color.muted
+                    color: root.colors.muted
                     font.family: Style.font.family
                     font.pixelSize: root.captionPx
                   }
@@ -546,7 +549,7 @@ Item {
                       for (var i = 0; i < recent.bars.length; i++) peak = Math.max(peak, recent.bars[i].tokens)
                       return peak > 0 ? "peak " + UsageModel.formatTokens(peak) : ""
                     }
-                    color: Color.muted
+                    color: root.colors.muted
                     font.family: Style.font.family
                     font.pixelSize: root.captionPx
                   }
@@ -555,7 +558,7 @@ Item {
                 Text {
                   visible: recent.bars.length === 0
                   text: "no daily usage"
-                  color: Color.muted
+                  color: root.colors.muted
                   font.family: Style.font.family
                   font.pixelSize: root.bodyPx
                 }
@@ -579,14 +582,14 @@ Item {
                         anchors { left: parent.left; right: parent.right; bottom: dayLabel.top; bottomMargin: 2 }
                         height: Math.max(2, Math.round(recent.chartHeight * bar.modelData.fraction))
                         radius: 2
-                        color: bar.index === recent.bars.length - 1 ? Color.accent : Util.alpha(Color.foreground, 0.45)
+                        color: bar.index === recent.bars.length - 1 ? root.colors.accent : Util.alpha(root.colors.foreground, 0.45)
                       }
 
                       Text {
                         id: dayLabel
                         anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter }
                         text: bar.modelData.label
-                        color: Color.muted
+                        color: root.colors.muted
                         font.family: Style.font.family
                         font.pixelSize: root.captionPx
                       }
@@ -603,7 +606,7 @@ Item {
 
                 Text {
                   text: "today by model"
-                  color: Color.muted
+                  color: root.colors.muted
                   font.family: Style.font.family
                   font.pixelSize: root.captionPx
                 }
@@ -611,7 +614,7 @@ Item {
                 Text {
                   visible: section.provider.models.length === 0
                   text: "no model usage today"
-                  color: Color.muted
+                  color: root.colors.muted
                   font.family: Style.font.family
                   font.pixelSize: root.bodyPx
                 }
@@ -632,7 +635,7 @@ Item {
                       text: modelRow.modelData.name
                       textFormat: Text.PlainText
                       elide: Text.ElideRight
-                      color: Color.foreground
+                      color: root.colors.foreground
                       font.family: Style.font.family
                       font.pixelSize: root.bodyPx
                     }
@@ -641,7 +644,7 @@ Item {
                       id: modelTokens
                       anchors.right: parent.right
                       text: UsageModel.formatTokens(modelRow.modelData.tokens)
-                      color: Color.foreground
+                      color: root.colors.foreground
                       font.family: Style.font.family
                       font.pixelSize: root.bodyPx
                       font.features: { "tnum": 1 }
@@ -655,7 +658,7 @@ Item {
           Rectangle {
             width: section.width
             height: 1
-            color: Util.alpha(Color.foreground, 0.08)
+            color: Util.alpha(root.colors.foreground, 0.08)
           }
         }
       }
@@ -670,7 +673,7 @@ Item {
     wrapMode: Text.WordWrap
     visible: root.providers.length === 0
     text: root.refreshing ? "reading usage" : "No usage data yet"
-    color: Color.muted
+    color: root.colors.muted
     font.family: Style.font.family
     font.pixelSize: root.titlePx
   }

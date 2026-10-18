@@ -152,6 +152,13 @@ touch_devices = ["wch.cn-usb2iic_ctp_control", "wch.cn-usb2iic_ctp_control-1"]
 background = "#c0000000"
 ```
 
+Text and accents take the theme's colours where they read on this
+background: the theme's foreground needs a 4.5:1 contrast ratio, its muted
+3:1, else they are a neutral (light on a dark background, dark on a light
+one); the accent, urgent, green and `hue` colours are lightened (or darkened)
+until they reach 3:1. A transparent or tinted background counts as over black.
+The colours follow the primary Display's background.
+
 A surface sits on the Bottom layer, so ordinary windows cover it and the
 Omarchy bar stays on top. Content steps out of the bar's strip on its own.
 
