@@ -16,7 +16,7 @@ const Schema = loadLib("lib/HerdrSchema.js")
 const Kind = loadLib("lib/KindPolicy.js")
 
 const ROOT = path.join(__dirname, "..")
-const VERSIONS = ["0.8.2", "0.9.0"]
+const VERSIONS = ["0.8.2", "0.9.0", "0.9.5"]
 
 function plain(value) {
   return JSON.parse(JSON.stringify(value))
@@ -107,8 +107,8 @@ test("the generated table is current with the fixtures", () => {
   assert.match(out, /up to date/)
 })
 
-test("the fixtures are the supported set: herdr 0.8.2 on protocol 20 and 0.9.0 on protocol 22", () => {
-  assert.deepEqual(plain(Schema.SUPPORTED), [{ version: "0.8.2", protocol: 20 }, { version: "0.9.0", protocol: 22 }])
+test("the fixtures are the supported set: herdr 0.8.2 on protocol 20, 0.9.0 and 0.9.5 on protocol 22", () => {
+  assert.deepEqual(plain(Schema.SUPPORTED), [{ version: "0.8.2", protocol: 20 }, { version: "0.9.0", protocol: 22 }, { version: "0.9.5", protocol: 22 }])
   assert.deepEqual(plain(H.SUPPORTED), plain(Schema.SUPPORTED))
   for (const version of VERSIONS) {
     assert.equal(fixture(version, "schema.json").protocol, table(version).protocol)
@@ -220,4 +220,30 @@ test("herdr 0.9.0 reports every 0.8.2 kind and adds muse", () => {
   const after = table("0.9.0").agentKinds
   assert.deepEqual(after.filter(kind => !before.includes(kind)), ["muse"])
   assert.deepEqual(before.filter(kind => !after.includes(kind)), [])
+})
+
+test("herdr 0.9.5 reports every 0.9.0 kind and adds letta", () => {
+  const before = table("0.9.0").agentKinds
+  const after = table("0.9.5").agentKinds
+  assert.deepEqual(after.filter(kind => !before.includes(kind)), ["letta"])
+  assert.deepEqual(before.filter(kind => !after.includes(kind)), [])
+})
+
+test("herdr 0.9.5 changes nothing gjetr sends or reads, only adds beside it", () => {
+  const before = table("0.9.0")
+  const after = table("0.9.5")
+  assert.equal(after.protocol, before.protocol)
+  assert.deepEqual(after.eventKinds, before.eventKinds)
+  assert.deepEqual(after.eventFields, before.eventFields)
+  assert.deepEqual(after.subscriptionTypes, before.subscriptionTypes)
+  assert.deepEqual(after.requestParams, before.requestParams)
+  assert.deepEqual(after.resultFields, before.resultFields)
+  for (const [name, fields] of Object.entries(before.fields)) {
+    assert.deepEqual(fields.filter(field => !after.fields[name].includes(field)), [], `${name} keeps every field`)
+  }
+  assert.deepEqual(after.fields.agent.filter(field => !before.fields.agent.includes(field)), ["completion_seq"])
+  assert.deepEqual(after.fields.pane.filter(field => !before.fields.pane.includes(field)), ["restore_error"])
+  // The removed pane.graphics.* methods were never sent.
+  const removed = before.methods.filter(method => !after.methods.includes(method))
+  assert.deepEqual(removed, ["pane.graphics.clear", "pane.graphics.info", "pane.graphics.set"])
 })

@@ -115,16 +115,18 @@ bytes). A named herdr session lives at `~/.config/herdr/sessions/<name>/herdr.so
 socket = "~/.config/herdr/sessions/work/herdr.sock"
 ```
 
-gjetr is tested with herdr 0.8.2 (API protocol 20) and 0.9.0 (protocol 22).
-On each connection it pings herdr and records its version and protocol
-(`state` → `herdr.version`, `herdr.protocol`). With a protocol outside that
-set gjetr still connects and works as far as herdr allows; Agent Lists and
+gjetr is tested with herdr 0.8.2 (API protocol 20), 0.9.0 and 0.9.5 (both
+protocol 22). On each connection it pings herdr and records its version and
+protocol (`state` → `herdr.version`, `herdr.protocol`). With a protocol outside
+that set gjetr still connects and works as far as herdr allows; Agent Lists and
 Workspace Lists show a quiet `untested herdr 0.10.0 (protocol 23)` line and
 `state` → `herdr.protocolMismatch` names the server. When herdr does not know
 a request gjetr sends (it answers `unknown variant`), only that feature is
 switched off and listed in `herdr.unsupported`: a refused subscription type is
 dropped and gjetr subscribes again at once, and a refused focus request fails
-that tap alone.
+that tap alone. When herdr 0.9.2 or later ends the event stream because gjetr
+fell behind (`events_lost`), gjetr also subscribes again at once and takes a
+new snapshot, keeping the Agents shown.
 
 ### `[[display]]`
 
@@ -692,9 +694,10 @@ Kinds are shown by their written name (Claude, Oh My Pi, GitHub Copilot, ...).
 Claude and Codex draw Omarchy's marks in their own colours. Pi, Gemini, Cursor,
 Cline, OpenCode, GitHub Copilot, Kimi, Qwen Code, Devin, Antigravity, Mastra
 Code, Kiro, Amp, Grok, Hermes, Kilo Code, Qoder and Oh My Pi draw their logo,
-shipped with gjetr in `assets/kinds/`, in the theme's muted colour. Droid, Maki
-and Muse, which have no clearly licensed logo, draw a letter in a thin frame in
-the same colour (D, I, M), and a kind herdr adds later draws its first letter.
+shipped with gjetr in `assets/kinds/`, in the theme's muted colour. Droid,
+Letta Code, Maki and Muse, which have no clearly licensed logo, draw a letter in
+a thin frame in the same colour (D, L, I, M), and a kind herdr adds later draws
+its first letter.
 Where each logo comes from, and its licence, is in
 [`assets/kinds/LICENSES.md`](../assets/kinds/LICENSES.md).
 

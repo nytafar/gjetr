@@ -9,14 +9,16 @@ const H = loadLib("lib/HerdrModel.js")
 // Reply lines as herdr 0.8.2 sends them (captured from the live socket).
 const PONG_0_8_2 = '{"id":"gjetr:1:ping","result":{"type":"pong","version":"0.8.2","protocol":20,"capabilities":{"live_handoff":true,"detached_server_daemon":true}}}'
 const UNKNOWN_METHOD = '{"id":"","error":{"code":"invalid_request","message":"invalid request: unknown variant `bogus.method`, expected one of `ping`, `server.stop`, `session.snapshot`"}}'
+// herdr 0.9.2+ ends a subscription that fell behind with this (src/api/subscriptions.rs).
+const EVENTS_LOST = '{"id":"gjetr:2:subscribe","error":{"code":"events_lost","message":"event subscription fell behind retained history; resubscribe and resync with session.snapshot"}}'
 const UNKNOWN_SUBSCRIPTION = '{"id":"","error":{"code":"invalid_request","message":"invalid request: unknown variant `bogus.thing`, expected one of `workspace.created`, `workspace.updated`"}}'
 
 function plain(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
-test("the supported set is herdr 0.8.2 (protocol 20) and 0.9.0 (protocol 22)", () => {
-  assert.deepEqual(plain(H.SUPPORTED), [{ version: "0.8.2", protocol: 20 }, { version: "0.9.0", protocol: 22 }])
+test("the supported set is herdr 0.8.2 (protocol 20), 0.9.0 and 0.9.5 (protocol 22)", () => {
+  assert.deepEqual(plain(H.SUPPORTED), [{ version: "0.8.2", protocol: 20 }, { version: "0.9.0", protocol: 22 }, { version: "0.9.5", protocol: 22 }])
 })
 
 test("pingLine asks for a pong", () => {
@@ -48,11 +50,13 @@ test("protocols 20 and 22 are supported; any other is a mismatch, never a failur
     { version: "0.8.2", protocol: 20, supported: true, mismatch: null })
   assert.deepEqual(plain(H.protocolStatus({ version: "0.9.0", protocol: 22 })),
     { version: "0.9.0", protocol: 22, supported: true, mismatch: null })
+  assert.deepEqual(plain(H.protocolStatus({ version: "0.9.5", protocol: 22 })),
+    { version: "0.9.5", protocol: 22, supported: true, mismatch: null })
   // The protocol decides: a patch release speaking protocol 22 is fine.
   assert.equal(H.protocolStatus({ version: "0.9.1", protocol: 22 }).mismatch, null)
   assert.deepEqual(plain(H.protocolStatus({ version: "0.10.0", protocol: 23 })), {
     version: "0.10.0", protocol: 23, supported: false,
-    mismatch: { version: "0.10.0", protocol: 23, supported: [{ version: "0.8.2", protocol: 20 }, { version: "0.9.0", protocol: 22 }] }
+    mismatch: { version: "0.10.0", protocol: 23, supported: [{ version: "0.8.2", protocol: 20 }, { version: "0.9.0", protocol: 22 }, { version: "0.9.5", protocol: 22 }] }
   })
   assert.equal(H.protocolStatus({ version: "0.8.0", protocol: 19 }).supported, false)
 })
@@ -91,4 +95,14 @@ test("withoutType drops one subscription type and keeps the rest in order", () =
   assert.deepEqual(Array.from(H.withoutType(["a", "b", "c"], "b")), ["a", "c"])
   assert.deepEqual(Array.from(H.withoutType(["a", "c"], "x")), ["a", "c"])
   assert.deepEqual(Array.from(H.withoutType(null, "x")), [])
+})
+
+test("a stream that fell behind (events_lost) is a resync, not an unsupported feature", () => {
+  const item = H.classifyStreamLine(EVENTS_LOST)
+  assert.equal(item.kind, "error")
+  assert.equal(H.eventsLost(item.error), true)
+  assert.equal(H.unsupportedVariant(item.error), "")
+  assert.equal(H.eventsLost(H.classifyStreamLine(UNKNOWN_SUBSCRIPTION).error), false)
+  assert.equal(H.eventsLost({ code: "server_unavailable", message: "event history is unavailable" }), false)
+  assert.equal(H.eventsLost(null), false)
 })
